@@ -1877,6 +1877,7 @@ window.initMap = function () {
             center: {lat: -23.5505, lng: -46.6333},
             zoom: 17,
             mapId: MAP_ID,
+            mapTypeId: google.maps.MapTypeId.ROADMAP, // 🚀 Iniciar com ROADMAP (mais rápido)
             tilt: 0,
             heading: 0,
             gestureHandling: "greedy",
@@ -1887,7 +1888,8 @@ window.initMap = function () {
             mapTypeControl: true, // Controle de tipo de mapa (satélite, terreno, etc)
             mapTypeControlOptions: {
                 style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-                position: google.maps.ControlPosition.TOP_RIGHT
+                position: google.maps.ControlPosition.TOP_RIGHT,
+                mapTypeIds: ['roadmap', 'satellite', 'hybrid'] // Sem TERRAIN para melhor performance
             },
             scaleControl: false, // Desabilitar escala
             // Otimizações de renderização
