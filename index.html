@@ -1794,6 +1794,10 @@ let routeMode = false; // Modo de planejamento de rota ativo/inativo
 
 const MAP_ID = "ebb7ca4503045feabc75b373";
 
+// IMPORTANTE: Substitua pelo seu Project ID do Google Cloud Platform
+// Encontre em: https://console.cloud.google.com/ → Configurações do projeto
+const GOOGLE_CLOUD_PROJECT_ID = "mapas-clientes-479801"; // ✅ Configurado!
+
 // ===========================
 // SISTEMA DE NOTIFICAÇÕES
 // ===========================
@@ -2913,13 +2917,25 @@ function deactivateRouteMode() {
     );
 }
 
-function calculateOptimizedRoute(origin) {
+async function calculateOptimizedRoute(origin) {
     showToast(
-        'Calculando rota...',
-        'Planejando a melhor rota para todas as entregas',
+        'Calculando rota otimizada...',
+        'Usando Fleet Routing API para todos os 73 endereços',
         'info',
-        3000
+        4000
     );
+
+    // Verificar se Project ID foi configurado
+    if (GOOGLE_CLOUD_PROJECT_ID === "SEU_PROJECT_ID_AQUI") {
+        showToast(
+            '⚠️ Configuração necessária',
+            'Configure o GOOGLE_CLOUD_PROJECT_ID no código (linha 1799)',
+            'error',
+            8000
+        );
+        deactivateRouteMode();
+        return;
+    }
 
     // Obter todos os pontos de entrega
     let deliveryPoints = Object.values(addressDatabase).map(data => ({
@@ -2943,22 +2959,7 @@ function calculateOptimizedRoute(origin) {
 
     console.log(`Endereços únicos (sem duplicatas): ${uniquePoints.length}`);
 
-    // Google Maps Directions API suporta até 25 pontos total (origem + 23 waypoints + destino)
-    // Vamos usar os 23 pontos mais próximos
-    const nearestPoints = uniquePoints
-        .map(point => ({
-            ...point,
-            distance: google.maps.geometry.spherical.computeDistanceBetween(
-                new google.maps.LatLng(origin.lat, origin.lng),
-                new google.maps.LatLng(point.location.lat, point.location.lng)
-            )
-        }))
-        .sort((a, b) => a.distance - b.distance)
-        .slice(0, 23); // Limitar a 23 pontos (máximo permitido pela API)
-
-    console.log(`Pontos selecionados para rota: ${nearestPoints.length}`);
-
-    if (nearestPoints.length === 0) {
+    if (uniquePoints.length === 0) {
         showToast(
             'Nenhuma entrega encontrada',
             'Não há endereços cadastrados para criar uma rota',
@@ -2969,31 +2970,131 @@ function calculateOptimizedRoute(origin) {
         return;
     }
 
-    // Preparar waypoints para a API (todos exceto o último)
-    const waypoints = nearestPoints.slice(0, -1).map(point => ({
-        location: point.location,
+    // Usar Fleet Routing API para TODOS os pontos
+    try {
+        await calculateFleetRoute(origin, uniquePoints);
+    } catch (error) {
+        console.error('Erro ao calcular rota com Fleet API:', error);
+        // Fallback para Directions API com limite de 23 pontos
+        console.log('Usando fallback: Directions API com 23 pontos...');
+        await calculateDirectionsRoute(origin, uniquePoints);
+    }
+}
+
+// Nova função: Fleet Routing API (suporta todos os pontos)
+async function calculateFleetRoute(origin, deliveryPoints) {
+    console.log(`Usando Fleet Routing API para ${deliveryPoints.length} pontos`);
+
+    // Preparar payload para Fleet Routing API
+    const payload = {
+        parent: `projects/${GOOGLE_CLOUD_PROJECT_ID}`,
+        model: {
+            shipments: deliveryPoints.map((point, index) => ({
+                deliveries: [{
+                    arrivalWaypoint: {
+                        location: {
+                            latLng: {
+                                latitude: point.location.lat,
+                                longitude: point.location.lng
+                            }
+                        }
+                    }
+                }],
+                label: `Entrega ${index + 1}`
+            })),
+            vehicles: [{
+                startWaypoint: {
+                    location: {
+                        latLng: {
+                            latitude: origin.lat,
+                            longitude: origin.lng
+                        }
+                    }
+                },
+                endWaypoint: {
+                    location: {
+                        latLng: {
+                            latitude: origin.lat,
+                            longitude: origin.lng
+                        }
+                    }
+                },
+                label: "Veículo 1"
+            }]
+        }
+    };
+
+    const API_KEY = 'AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU';
+    const url = `https://routeoptimization.googleapis.com/v1/projects/${GOOGLE_CLOUD_PROJECT_ID}:optimizeTours?key=${API_KEY}`;
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Fleet API error:', errorText);
+        throw new Error(`Fleet API falhou: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('Fleet Routing result:', result);
+
+    // Renderizar rota otimizada no mapa
+    renderFleetRoute(result, origin);
+}
+
+// Renderizar resultado da Fleet Routing API
+function renderFleetRoute(fleetResult, origin) {
+    const route = fleetResult.routes[0];
+
+    if (!route || !route.visits) {
+        showToast(
+            'Erro ao processar rota',
+            'Não foi possível obter rota otimizada',
+            'error',
+            5000
+        );
+        deactivateRouteMode();
+        return;
+    }
+
+    // Criar waypoints a partir das visitas otimizadas
+    const optimizedWaypoints = route.visits.map(visit => {
+        const shipment = fleetResult.model.shipments[visit.shipmentIndex];
+        const delivery = shipment.deliveries[0];
+        return {
+            location: {
+                lat: delivery.arrivalWaypoint.location.latLng.latitude,
+                lng: delivery.arrivalWaypoint.location.latLng.longitude
+            }
+        };
+    });
+
+    console.log(`Rota otimizada com ${optimizedWaypoints.length} pontos`);
+
+    // Usar Directions API para renderizar a rota visual
+    const waypoints = optimizedWaypoints.slice(0, -1).map(wp => ({
+        location: wp.location,
         stopover: true
     }));
 
-    const destination = nearestPoints[nearestPoints.length - 1].location;
+    const destination = optimizedWaypoints[optimizedWaypoints.length - 1].location;
 
-    console.log(`Origem: sua localização`);
-    console.log(`Waypoints (paradas): ${waypoints.length}`);
-    console.log(`Destino: último ponto`);
-    console.log(`Total de pontos na rota: ${waypoints.length + 2}`);
-
-    // Requisitar rota ao Google Directions API
     const request = {
         origin: origin,
         destination: destination,
         waypoints: waypoints,
-        optimizeWaypoints: true, // Otimizar ordem dos waypoints
+        optimizeWaypoints: false, // Já foi otimizado pela Fleet API
         travelMode: google.maps.TravelMode.DRIVING
     };
 
     directionsService.route(request, (result, status) => {
         if (status === 'OK') {
-            // Exibir rota no mapa
             directionsRenderer.setDirections(result);
 
             // Calcular distância e tempo total
@@ -3001,39 +3102,93 @@ function calculateOptimizedRoute(origin) {
             let totalDuration = 0;
 
             result.routes[0].legs.forEach(leg => {
-                totalDistance += leg.distance.value; // em metros
-                totalDuration += leg.duration.value; // em segundos
+                totalDistance += leg.distance.value;
+                totalDuration += leg.duration.value;
             });
 
             const distanceKm = (totalDistance / 1000).toFixed(1);
             const durationMin = Math.round(totalDuration / 60);
 
-            const totalPoints = waypoints.length + 2; // origem + waypoints + destino
+            showToast(
+                '✓ Rota otimizada calculada!',
+                `${optimizedWaypoints.length} entregas • ${distanceKm} km • ${durationMin} min`,
+                'success',
+                8000
+            );
+
+            console.log(`Fleet route: ${optimizedWaypoints.length} pontos, ${distanceKm}km, ${durationMin}min`);
+
+            // Ajustar zoom
+            const bounds = new google.maps.LatLngBounds();
+            result.routes[0].overview_path.forEach(point => bounds.extend(point));
+            map.fitBounds(bounds);
+        } else {
+            console.error('Erro ao renderizar rota:', status);
+            showToast('Erro ao exibir rota', status, 'error', 5000);
+            deactivateRouteMode();
+        }
+    });
+}
+
+// Fallback: Directions API (até 23 pontos)
+async function calculateDirectionsRoute(origin, deliveryPoints) {
+    console.log(`Usando Directions API (fallback) com limite de 23 pontos`);
+
+    const nearestPoints = deliveryPoints
+        .map(point => ({
+            ...point,
+            distance: google.maps.geometry.spherical.computeDistanceBetween(
+                new google.maps.LatLng(origin.lat, origin.lng),
+                new google.maps.LatLng(point.location.lat, point.location.lng)
+            )
+        }))
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 23);
+
+    const waypoints = nearestPoints.slice(0, -1).map(point => ({
+        location: point.location,
+        stopover: true
+    }));
+
+    const destination = nearestPoints[nearestPoints.length - 1].location;
+
+    const request = {
+        origin: origin,
+        destination: destination,
+        waypoints: waypoints,
+        optimizeWaypoints: true,
+        travelMode: google.maps.TravelMode.DRIVING
+    };
+
+    directionsService.route(request, (result, status) => {
+        if (status === 'OK') {
+            directionsRenderer.setDirections(result);
+
+            let totalDistance = 0;
+            let totalDuration = 0;
+
+            result.routes[0].legs.forEach(leg => {
+                totalDistance += leg.distance.value;
+                totalDuration += leg.duration.value;
+            });
+
+            const distanceKm = (totalDistance / 1000).toFixed(1);
+            const durationMin = Math.round(totalDuration / 60);
+            const totalPoints = waypoints.length + 2;
 
             showToast(
-                '✓ Rota calculada!',
+                '✓ Rota calculada (Directions API)!',
                 `${totalPoints} pontos de entrega • ${distanceKm} km • ${durationMin} min`,
                 'success',
                 8000
             );
 
-            console.log(`Rota traçada com sucesso: ${totalPoints} pontos, ${distanceKm}km, ${durationMin}min`);
-
-            // Ajustar zoom para mostrar toda a rota
             const bounds = new google.maps.LatLngBounds();
-            result.routes[0].overview_path.forEach(point => {
-                bounds.extend(point);
-            });
+            result.routes[0].overview_path.forEach(point => bounds.extend(point));
             map.fitBounds(bounds);
-
         } else {
             console.error('Erro ao calcular rota:', status);
-            showToast(
-                'Erro ao calcular rota',
-                'Não foi possível traçar a rota. Tente novamente.',
-                'error',
-                5000
-            );
+            showToast('Erro ao calcular rota', 'Tente novamente', 'error', 5000);
             deactivateRouteMode();
         }
     });
