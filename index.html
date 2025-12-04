@@ -1122,6 +1122,7 @@
 <div class="map-control">
     <button id="btnToggle3D" class="control-btn" title="Alternar visualização 3D">3D</button>
     <button id="btnCenterLocation" class="control-btn" title="Centralizar na minha localização">📍</button>
+    <button id="btnToggleRoute" class="control-btn" title="Planejar rota de entrega">🚗</button>
     <button id="btnOpenSidebar" class="control-btn" title="Ver lista de clientes">👥</button>
 </div>
 
@@ -1777,7 +1778,7 @@
 </script>
 
 <!-- Google Maps -->
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&loading=async&callback=initMap&v=beta&libraries=places"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&loading=async&callback=initMap&v=beta&libraries=places,geometry"></script>
 
 <script>
 let map;
@@ -1786,6 +1787,10 @@ let userLocationMarker = null;
 let watchId = null;
 let _animating3D = false;
 let locationAccuracy = null;
+let deliveryMarkers = {}; // Armazena marcadores de endereços de entrega
+let directionsService = null; // Serviço de rotas do Google Maps
+let directionsRenderer = null; // Renderizador de rotas
+let routeMode = false; // Modo de planejamento de rota ativo/inativo
 
 const MAP_ID = "ebb7ca4503045feabc75b373";
 
@@ -1871,6 +1876,18 @@ window.initMap = function () {
             zoomControl: true,
             streetViewControl: false,
             fullscreenControl: true
+        });
+
+        // Inicializar serviços de rota
+        directionsService = new google.maps.DirectionsService();
+        directionsRenderer = new google.maps.DirectionsRenderer({
+            map: map,
+            suppressMarkers: false, // Não suprimir marcadores (A, B, C, etc.)
+            polylineOptions: {
+                strokeColor: '#4285f4',
+                strokeWeight: 5,
+                strokeOpacity: 0.7
+            }
         });
 
         console.log('Mapa criado, aguardando tiles...');
@@ -1963,6 +1980,9 @@ function startLocationTracking() {
                 console.log('Escondendo loading screen...');
                 hideLoadingScreen();
                 showAddClientButton(); // Mostrar botão adicionar cliente
+
+                // Adicionar marcadores de entrega após carregar o mapa
+                addDeliveryMarkers();
             } catch (error) {
                 console.error('Erro ao criar marcador:', error);
                 hideLoadingScreen();
@@ -2046,6 +2066,84 @@ function handleGeoError(error, isInitial = false) {
     if (isInitial) {
         map.setCenter({ lat: -23.5505, lng: -46.6333 });
     }
+}
+
+// ===========================
+// MARCADORES DE ENTREGAS
+// ===========================
+
+function addDeliveryMarkers() {
+    console.log('Adicionando marcadores de entrega...');
+
+    // Limpar marcadores existentes
+    Object.values(deliveryMarkers).forEach(marker => {
+        if (marker.map) {
+            marker.map = null; // Remove do mapa
+        }
+    });
+    deliveryMarkers = {};
+
+    // Adicionar marcador para cada endereço no banco de dados
+    Object.entries(addressDatabase).forEach(([qrCode, data]) => {
+        const position = {
+            lat: data.latitude,
+            lng: data.longitude
+        };
+
+        // Criar elemento do marcador (pacote/caixa)
+        const markerDiv = document.createElement('div');
+        markerDiv.style.width = '30px';
+        markerDiv.style.height = '30px';
+        markerDiv.style.background = '#ea4335';
+        markerDiv.style.border = '2px solid white';
+        markerDiv.style.borderRadius = '4px';
+        markerDiv.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4)';
+        markerDiv.style.display = 'flex';
+        markerDiv.style.alignItems = 'center';
+        markerDiv.style.justifyContent = 'center';
+        markerDiv.style.fontSize = '16px';
+        markerDiv.innerHTML = '📦';
+        markerDiv.style.cursor = 'pointer';
+        markerDiv.style.transition = 'transform 0.2s';
+
+        markerDiv.addEventListener('mouseenter', () => {
+            markerDiv.style.transform = 'scale(1.2)';
+        });
+        markerDiv.addEventListener('mouseleave', () => {
+            markerDiv.style.transform = 'scale(1)';
+        });
+
+        try {
+            // Criar marcador usando AdvancedMarkerElement
+            if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+                const marker = new google.maps.marker.AdvancedMarkerElement({
+                    map,
+                    position,
+                    content: markerDiv,
+                    title: data.address.split('\n')[0] // Primeira linha do endereço
+                });
+
+                // Adicionar listener de clique no marcador
+                marker.addListener('click', () => {
+                    map.setCenter(position);
+                    map.setZoom(18);
+
+                    showToast(
+                        '📦 Pacote',
+                        data.address,
+                        'info',
+                        5000
+                    );
+                });
+
+                deliveryMarkers[qrCode] = marker;
+            }
+        } catch (error) {
+            console.error('Erro ao criar marcador de entrega:', error);
+        }
+    });
+
+    console.log(`${Object.keys(deliveryMarkers).length} marcadores de entrega adicionados`);
 }
 
 // ===========================
@@ -2685,16 +2783,60 @@ function updateClientCount(count) {
     clientCount.textContent = count;
 }
 
-// Mostrar detalhes do cliente (placeholder)
+// Mostrar detalhes do cliente e centralizar no mapa
 function showClientDetails(client) {
-    showToast(
-        client.name,
-        'Clique no cliente para ver mais detalhes (em desenvolvimento)',
-        'info',
-        3000
-    );
-    // TODO: Centralizar mapa no endereço do cliente
-    // TODO: Abrir modal com detalhes
+    // Fechar sidebar
+    closeSidebar();
+
+    // Tentar encontrar o endereço no addressDatabase procurando pela string de endereço
+    let targetPosition = null;
+    let qrCodeMatch = null;
+
+    // Procurar nos dados da planilha pelo endereço do cliente
+    for (const [qrCode, data] of Object.entries(addressDatabase)) {
+        if (client.address && client.address.includes(data.address.split('\n')[0])) {
+            targetPosition = {
+                lat: data.latitude,
+                lng: data.longitude
+            };
+            qrCodeMatch = qrCode;
+            break;
+        }
+    }
+
+    if (targetPosition) {
+        // Centralizar no endereço encontrado
+        map.setCenter(targetPosition);
+        map.setZoom(18);
+
+        // Destacar o marcador correspondente
+        if (deliveryMarkers[qrCodeMatch]) {
+            const markerElement = deliveryMarkers[qrCodeMatch].content;
+            // Animação de destaque
+            markerElement.style.transform = 'scale(1.5)';
+            markerElement.style.background = '#fbbc04'; // Amarelo para destaque
+
+            setTimeout(() => {
+                markerElement.style.transform = 'scale(1)';
+                markerElement.style.background = '#ea4335'; // Voltar ao vermelho
+            }, 2000);
+        }
+
+        showToast(
+            `📍 ${client.name}`,
+            client.address,
+            'success',
+            4000
+        );
+    } else {
+        // Se não encontrar coordenadas, apenas mostrar informações
+        showToast(
+            client.name,
+            `📞 ${client.phone || 'Sem telefone'}\n📍 ${client.address}`,
+            'info',
+            5000
+        );
+    }
 }
 
 // Função helper para escape HTML
@@ -2708,6 +2850,167 @@ function escapeHtml(text) {
 setTimeout(() => {
     loadClients();
 }, 2000);
+
+// ===========================
+// SISTEMA DE ROTAS DE ENTREGA
+// ===========================
+
+const btnToggleRoute = document.getElementById('btnToggleRoute');
+
+btnToggleRoute.addEventListener('click', () => {
+    if (!routeMode) {
+        // Ativar modo de rota
+        activateRouteMode();
+    } else {
+        // Desativar modo de rota
+        deactivateRouteMode();
+    }
+});
+
+function activateRouteMode() {
+    routeMode = true;
+    btnToggleRoute.classList.add('active');
+
+    // Obter posição atual do usuário
+    let currentPosition;
+    if (userLocationMarker) {
+        if (userLocationMarker.position) {
+            currentPosition = userLocationMarker.position;
+        } else if (userLocationMarker.getPosition) {
+            currentPosition = userLocationMarker.getPosition();
+        }
+    }
+
+    if (!currentPosition) {
+        showToast(
+            'Localização não disponível',
+            'Aguarde obter sua posição GPS para calcular rotas',
+            'warning',
+            4000
+        );
+        deactivateRouteMode();
+        return;
+    }
+
+    // Calcular rota otimizada para todos os pontos de entrega
+    calculateOptimizedRoute(currentPosition);
+}
+
+function deactivateRouteMode() {
+    routeMode = false;
+    btnToggleRoute.classList.remove('active');
+
+    // Limpar rota do mapa
+    if (directionsRenderer) {
+        directionsRenderer.setDirections({routes: []});
+    }
+
+    showToast(
+        'Modo de rota desativado',
+        'Marcadores de entrega restaurados',
+        'info',
+        2000
+    );
+}
+
+function calculateOptimizedRoute(origin) {
+    showToast(
+        'Calculando rota...',
+        'Planejando a melhor rota para todas as entregas',
+        'info',
+        3000
+    );
+
+    // Obter todos os pontos de entrega
+    const deliveryPoints = Object.values(addressDatabase).map(data => ({
+        location: {lat: data.latitude, lng: data.longitude},
+        address: data.address
+    }));
+
+    // Google Maps Directions API suporta até 25 waypoints
+    // Vamos pegar os 8 pontos mais próximos para demonstração
+    const nearestPoints = deliveryPoints
+        .map(point => ({
+            ...point,
+            distance: google.maps.geometry.spherical.computeDistanceBetween(
+                new google.maps.LatLng(origin.lat, origin.lng),
+                new google.maps.LatLng(point.location.lat, point.location.lng)
+            )
+        }))
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 8); // Limitar a 8 pontos
+
+    if (nearestPoints.length === 0) {
+        showToast(
+            'Nenhuma entrega encontrada',
+            'Não há endereços cadastrados para criar uma rota',
+            'warning',
+            4000
+        );
+        deactivateRouteMode();
+        return;
+    }
+
+    // Preparar waypoints para a API
+    const waypoints = nearestPoints.slice(0, -1).map(point => ({
+        location: point.location,
+        stopover: true
+    }));
+
+    const destination = nearestPoints[nearestPoints.length - 1].location;
+
+    // Requisitar rota ao Google Directions API
+    const request = {
+        origin: origin,
+        destination: destination,
+        waypoints: waypoints,
+        optimizeWaypoints: true, // Otimizar ordem dos waypoints
+        travelMode: google.maps.TravelMode.DRIVING
+    };
+
+    directionsService.route(request, (result, status) => {
+        if (status === 'OK') {
+            // Exibir rota no mapa
+            directionsRenderer.setDirections(result);
+
+            // Calcular distância e tempo total
+            let totalDistance = 0;
+            let totalDuration = 0;
+
+            result.routes[0].legs.forEach(leg => {
+                totalDistance += leg.distance.value; // em metros
+                totalDuration += leg.duration.value; // em segundos
+            });
+
+            const distanceKm = (totalDistance / 1000).toFixed(1);
+            const durationMin = Math.round(totalDuration / 60);
+
+            showToast(
+                '✓ Rota calculada!',
+                `${nearestPoints.length} entregas • ${distanceKm} km • ${durationMin} min`,
+                'success',
+                6000
+            );
+
+            // Ajustar zoom para mostrar toda a rota
+            const bounds = new google.maps.LatLngBounds();
+            result.routes[0].overview_path.forEach(point => {
+                bounds.extend(point);
+            });
+            map.fitBounds(bounds);
+
+        } else {
+            console.error('Erro ao calcular rota:', status);
+            showToast(
+                'Erro ao calcular rota',
+                'Não foi possível traçar a rota. Tente novamente.',
+                'error',
+                5000
+            );
+            deactivateRouteMode();
+        }
+    });
+}
 
 // ===========================
 // CLEANUP
