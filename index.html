@@ -1985,8 +1985,9 @@ function startLocationTracking() {
                 hideLoadingScreen();
                 showAddClientButton(); // Mostrar botão adicionar cliente
 
-                // Adicionar marcadores de entrega após carregar o mapa
-                addDeliveryMarkers();
+                // NÃO adicionar marcadores automaticamente (deixa o mapa leve)
+                // Os marcadores serão adicionados apenas ao ativar o modo de rota
+                console.log('Mapa carregado. Marcadores serão exibidos ao calcular rota.');
             } catch (error) {
                 console.error('Erro ao criar marcador:', error);
                 hideLoadingScreen();
@@ -2903,6 +2904,12 @@ function activateRouteMode() {
     routeMode = true;
     btnToggleRoute.classList.add('active');
 
+    // Adicionar marcadores quando ativar modo de rota (se ainda não existirem)
+    if (Object.keys(deliveryMarkers).length === 0) {
+        console.log('⚡ Adicionando marcadores de entrega...');
+        addDeliveryMarkers();
+    }
+
     // Obter posição atual do usuário
     let currentPosition;
     if (userLocationMarker) {
@@ -2945,9 +2952,20 @@ function deactivateRouteMode() {
         window.routePolylines = [];
     }
 
+    // Remover TODOS os marcadores de entrega para deixar o mapa leve
+    console.log('🗑️ Removendo marcadores de entrega...');
+    Object.values(deliveryMarkers).forEach(marker => {
+        if (marker.setMap) {
+            marker.setMap(null);
+        } else if (marker.map) {
+            marker.map = null;
+        }
+    });
+    deliveryMarkers = {};
+
     showToast(
         'Modo de rota desativado',
-        'Marcadores de entrega restaurados',
+        'Mapa restaurado (marcadores removidos)',
         'info',
         2000
     );
