@@ -5,12 +5,12 @@ export async function onRequestPost(context) {
     try {
         const body = await context.request.json();
 
-        const { origin, deliveries, apiKey, projectId } = body;
+        const { origin, deliveryPoints, apiKey, projectId } = body;
 
-        if (!origin || !deliveries || !apiKey || !projectId) {
+        if (!origin || !deliveryPoints || !apiKey || !projectId) {
             return new Response(JSON.stringify({
                 success: false,
-                message: 'Parâmetros inválidos. Requeridos: origin, deliveries, apiKey, projectId'
+                message: 'Parâmetros inválidos. Requeridos: origin, deliveryPoints, apiKey, projectId'
             }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
@@ -19,7 +19,7 @@ export async function onRequestPost(context) {
 
         console.log('🚗 Fleet Routing - Otimizando rota:', {
             origin,
-            deliveryCount: deliveries.length,
+            deliveryCount: deliveryPoints.length,
             projectId
         });
 
@@ -28,7 +28,7 @@ export async function onRequestPost(context) {
 
         // Montar modelo de otimização
         const model = {
-            shipments: deliveries.map((delivery, index) => ({
+            shipments: deliveryPoints.map((delivery, index) => ({
                 deliveries: [{
                     arrivalLocation: {
                         latLng: {
