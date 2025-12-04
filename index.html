@@ -1876,24 +1876,16 @@ window.initMap = function () {
         map = new google.maps.Map(document.getElementById("map"), {
             center: {lat: -23.5505, lng: -46.6333},
             zoom: 17,
-            mapId: MAP_ID,
-            tilt: 0,
-            heading: 0,
+            mapTypeId: 'roadmap', // Iniciar com roadmap (mais rápido)
             gestureHandling: "greedy",
-            rotateControl: true,
+            // Deixar controles padrão do Google Maps (inclui TERRAIN automaticamente)
+            mapTypeControl: true,
             zoomControl: true,
             streetViewControl: false,
-            fullscreenControl: false, // Desabilitar fullscreen para performance
-            mapTypeControl: true, // Controle de tipo de mapa (satélite, terreno, etc)
-            mapTypeControlOptions: {
-                style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-                position: google.maps.ControlPosition.TOP_RIGHT
-            },
-            scaleControl: false, // Desabilitar escala
+            fullscreenControl: false,
             // Otimizações de renderização
-            clickableIcons: false, // Desabilitar POIs clicáveis (melhora performance)
-            disableDefaultUI: false,
-            backgroundColor: '#e5e3df' // Cor de fundo enquanto carrega tiles
+            clickableIcons: false,
+            backgroundColor: '#e5e3df'
         });
 
         // Inicializar serviços de rota
@@ -2105,22 +2097,41 @@ let updateMarkersTimeout = null;
 let lastBounds = null; // Cache do último bounds calculado
 let lastZoom = null; // Cache do último zoom
 let qrScannerLoaded = false; // Flag para lazy loading do QR scanner
+let isMapMoving = false; // Flag para detectar movimento do mapa
+let mapIdleTimeout = null; // Timeout para detectar quando mapa parou de mover
+let markerPool = []; // Pool de marcadores reutilizáveis (memory pooling)
 
 function addDeliveryMarkers() {
     console.log('🎯 Inicializando sistema de marcadores otimizado (viewport-based)');
 
     // Preparar todos os pontos de entrega (apenas uma vez)
+    // Otimização: reduzir precisão de coordenadas para 6 casas decimais (suficiente para ~10cm de precisão)
     allDeliveryPoints = Object.entries(addressDatabase).map(([qrCode, data]) => ({
         qrCode,
-        position: { lat: data.latitude, lng: data.longitude },
+        position: {
+            lat: Number(data.latitude.toFixed(6)),
+            lng: Number(data.longitude.toFixed(6))
+        },
         address: data.address
     }));
 
     console.log(`📍 ${allDeliveryPoints.length} pontos de entrega preparados`);
 
     // Criar marcadores apenas quando necessário (zoom perto)
-    // Listener para atualizar marcadores quando mover/zoom o mapa
-    google.maps.event.addListener(map, 'idle', updateVisibleMarkers);
+    // Otimização: usar 'idle' em vez de listeners contínuos
+    google.maps.event.addListener(map, 'idle', () => {
+        isMapMoving = false;
+        updateVisibleMarkers();
+    });
+
+    // Detectar início de movimento para pausar renderizações pesadas
+    google.maps.event.addListener(map, 'dragstart', () => {
+        isMapMoving = true;
+    });
+
+    google.maps.event.addListener(map, 'zoom_changed', () => {
+        isMapMoving = true;
+    });
 
     // Renderizar marcadores iniciais
     updateVisibleMarkers();
@@ -2128,7 +2139,12 @@ function addDeliveryMarkers() {
 
 // Atualizar marcadores baseado no viewport e zoom atual
 function updateVisibleMarkers() {
-    // Debounce para evitar atualizações muito frequentes
+    // Não processar se mapa estiver em movimento (otimização crítica)
+    if (isMapMoving) {
+        return;
+    }
+
+    // Debounce agressivo para evitar atualizações muito frequentes
     if (updateMarkersTimeout) {
         clearTimeout(updateMarkersTimeout);
     }
@@ -2154,7 +2170,7 @@ function updateVisibleMarkers() {
         // De longe (zoom < 15): apenas rota
         // De perto (zoom >= 15): rota + marcadores na viewport
         if (zoom < 15) {
-            // Zoom distante: remover todos os marcadores
+            // Zoom distante: remover todos os marcadores (e retornar ao pool)
             clearVisibleMarkers();
             console.log('🔭 Zoom distante: marcadores ocultados');
             return;
@@ -2163,13 +2179,15 @@ function updateVisibleMarkers() {
         // Usar requestIdleCallback para processar quando navegador estiver ocioso
         if ('requestIdleCallback' in window) {
             requestIdleCallback(() => {
-                renderMarkersInViewport(bounds);
+                if (!isMapMoving) { // Double-check que mapa não começou a mover
+                    renderMarkersInViewport(bounds);
+                }
             }, { timeout: 500 });
         } else {
             // Fallback para navegadores sem suporte
             renderMarkersInViewport(bounds);
         }
-    }, 300); // Aguardar 300ms após parar de mover (reduz atualizações)
+    }, 400); // Aumentado de 300ms para 400ms (menos atualizações)
 }
 
 // Função separada para renderizar marcadores (pode ser chamada via requestIdleCallback)
@@ -2211,26 +2229,36 @@ function updateMarkerSet(newPoints) {
     });
 }
 
-// Criar marcador ultra-leve (círculo SVG simples)
+// Criar marcador ultra-leve (círculo SVG simples) com memory pooling
 function createLightweightMarker(point) {
     // Usar requestAnimationFrame para renderização suave
     requestAnimationFrame(() => {
-        // Criar círculo SVG leve (muito mais rápido que AdvancedMarkerElement com HTML)
-        const circle = new google.maps.Circle({
-            map: map,
-            center: point.position,
-            radius: 12, // 12 metros de raio (menor = mais leve)
-            fillColor: '#ea4335',
-            fillOpacity: 0.85,
-            strokeColor: '#ffffff',
-            strokeWeight: 2,
-            strokeOpacity: 1,
-            clickable: true,
-            zIndex: 100,
-            // Otimizações adicionais
-            optimized: true, // Renderização otimizada do Google Maps
-            visible: true
-        });
+        let circle;
+
+        // Memory pooling: reutilizar marcador do pool se disponível
+        if (markerPool.length > 0) {
+            circle = markerPool.pop();
+            circle.setCenter(point.position);
+            circle.setMap(map);
+            circle.setVisible(true);
+        } else {
+            // Criar novo círculo apenas se pool vazio
+            circle = new google.maps.Circle({
+                map: map,
+                center: point.position,
+                radius: 12, // 12 metros de raio (menor = mais leve)
+                fillColor: '#ea4335',
+                fillOpacity: 0.85,
+                strokeColor: '#ffffff',
+                strokeWeight: 2,
+                strokeOpacity: 1,
+                clickable: true,
+                zIndex: 100,
+                // Otimizações adicionais
+                optimized: true, // Renderização otimizada do Google Maps
+                visible: true
+            });
+        }
 
         // InfoWindow para mostrar endereço ao clicar (lazy loading)
         let infoWindow = null;
@@ -2260,13 +2288,26 @@ function createLightweightMarker(point) {
     });
 }
 
-// Limpar todos os marcadores visíveis
+// Limpar todos os marcadores visíveis (com memory pooling)
 function clearVisibleMarkers() {
     visibleMarkers.forEach(marker => {
-        marker.marker.map = null;
-        marker.infoWindow.close();
+        // Remover do mapa
+        marker.marker.setMap(null);
+
+        // Fechar infoWindow se existir
+        if (marker.infoWindow) {
+            marker.infoWindow.close();
+        }
+
+        // Retornar marcador ao pool para reutilização (memory pooling)
+        markerPool.push(marker.marker);
     });
     visibleMarkers = [];
+
+    // Limitar tamanho do pool para não usar memória demais
+    if (markerPool.length > 50) {
+        markerPool = markerPool.slice(0, 50);
+    }
 }
 
 // ===========================
@@ -2977,10 +3018,9 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Carregar clientes ao inicializar
-setTimeout(() => {
-    loadClients();
-}, 2000);
+// Lazy loading: carregar clientes apenas quando sidebar abrir
+// (removido carregamento automático no início para melhor performance inicial)
+// loadClients() será chamado quando btnOpenSidebar for clicado
 
 // ===========================
 // SISTEMA DE ROTAS DE ENTREGA
