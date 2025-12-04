@@ -974,7 +974,8 @@
                         type="tel"
                         class="form-input"
                         id="input-phone"
-                        placeholder="(00) 00000-0000"
+                        placeholder="(91)9 9942-1942"
+                        maxlength="16"
                     >
                 </div>
             </form>
@@ -1455,6 +1456,47 @@ btnCancel.addEventListener('click', closeModal);
 modal.addEventListener('click', (e) => {
     if (e.target === modal) {
         closeModal();
+    }
+});
+
+// ===========================
+// MÁSCARA DE TELEFONE
+// ===========================
+
+inputPhone.addEventListener('input', (e) => {
+    let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não é número
+
+    // Limita a 11 dígitos
+    if (value.length > 11) {
+        value = value.slice(0, 11);
+    }
+
+    // Aplica a máscara conforme o usuário digita
+    let formatted = '';
+
+    if (value.length > 0) {
+        formatted = '(' + value.substring(0, 2); // (DD
+    }
+    if (value.length >= 3) {
+        formatted += ')' + value.substring(2, 3); // (DD)D
+    }
+    if (value.length >= 4) {
+        formatted += ' ' + value.substring(3, 7); // (DD)D DDDD
+    }
+    if (value.length >= 8) {
+        formatted += '-' + value.substring(7, 11); // (DD)D DDDD-DDDD
+    }
+
+    e.target.value = formatted;
+});
+
+// Permitir apenas números e teclas de controle
+inputPhone.addEventListener('keydown', (e) => {
+    const allowedKeys = ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
+    const isNumber = /^[0-9]$/.test(e.key);
+
+    if (!isNumber && !allowedKeys.includes(e.key) && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
     }
 });
 
