@@ -1,27 +1,126 @@
 // Cloudflare Pages Function para Fleet Routing API
 // Rota: /api/optimize-route
 
+// Função para criar JWT para autenticação Google Cloud
+async function createJWT(serviceAccount) {
+    const header = {
+        alg: 'RS256',
+        typ: 'JWT'
+    };
+
+    const now = Math.floor(Date.now() / 1000);
+    const payload = {
+        iss: serviceAccount.client_email,
+        scope: 'https://www.googleapis.com/auth/cloud-platform',
+        aud: 'https://oauth2.googleapis.com/token',
+        exp: now + 3600,
+        iat: now
+    };
+
+    const encodedHeader = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    const encodedPayload = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    const unsignedToken = `${encodedHeader}.${encodedPayload}`;
+
+    // Importar chave privada
+    const privateKey = await crypto.subtle.importKey(
+        'pkcs8',
+        pemToArrayBuffer(serviceAccount.private_key),
+        {
+            name: 'RSASSA-PKCS1-v1_5',
+            hash: 'SHA-256'
+        },
+        false,
+        ['sign']
+    );
+
+    // Assinar
+    const signature = await crypto.subtle.sign(
+        'RSASSA-PKCS1-v1_5',
+        privateKey,
+        new TextEncoder().encode(unsignedToken)
+    );
+
+    const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)))
+        .replace(/=/g, '')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_');
+
+    return `${unsignedToken}.${encodedSignature}`;
+}
+
+// Converter PEM para ArrayBuffer
+function pemToArrayBuffer(pem) {
+    const b64 = pem
+        .replace(/-----BEGIN PRIVATE KEY-----/, '')
+        .replace(/-----END PRIVATE KEY-----/, '')
+        .replace(/\s/g, '');
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+}
+
+// Obter Access Token do Google
+async function getAccessToken(serviceAccount) {
+    const jwt = await createJWT(serviceAccount);
+
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
+    });
+
+    if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Falha ao obter access token: ${error}`);
+    }
+
+    const data = await response.json();
+    return data.access_token;
+}
+
 export async function onRequestPost(context) {
     try {
         const body = await context.request.json();
+        const { origin, deliveryPoints, projectId } = body;
 
-        const { origin, deliveryPoints, apiKey, projectId } = body;
-
-        if (!origin || !deliveryPoints || !apiKey || !projectId) {
+        if (!origin || !deliveryPoints || !projectId) {
             return new Response(JSON.stringify({
                 success: false,
-                message: 'Parâmetros inválidos. Requeridos: origin, deliveryPoints, apiKey, projectId'
+                message: 'Parâmetros inválidos. Requeridos: origin, deliveryPoints, projectId'
             }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });
         }
 
+        // Buscar Service Account das variáveis de ambiente
+        const serviceAccountJson = context.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+
+        if (!serviceAccountJson) {
+            return new Response(JSON.stringify({
+                success: false,
+                message: 'Credenciais do Google Cloud não configuradas'
+            }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        const serviceAccount = JSON.parse(serviceAccountJson);
+
         console.log('🚗 Fleet Routing - Otimizando rota:', {
             origin,
             deliveryCount: deliveryPoints.length,
             projectId
         });
+
+        // Obter access token
+        const accessToken = await getAccessToken(serviceAccount);
 
         // Preparar requisição para Fleet Routing API
         const fleetUrl = `https://cloudoptimization.googleapis.com/v1/projects/${projectId}:optimizeTours`;
@@ -36,7 +135,7 @@ export async function onRequestPost(context) {
                             longitude: delivery.lng
                         }
                     },
-                    duration: "300s", // 5 minutos por entrega
+                    duration: "300s",
                     timeWindows: [{
                         startTime: "2024-01-01T08:00:00Z",
                         endTime: "2024-01-01T18:00:00Z"
@@ -69,8 +168,7 @@ export async function onRequestPost(context) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Goog-Api-Key': apiKey,
-                'X-Goog-FieldMask': 'routes.visits,routes.transitions,routes.metrics'
+                'Authorization': `Bearer ${accessToken}`
             },
             body: JSON.stringify({ model })
         });
