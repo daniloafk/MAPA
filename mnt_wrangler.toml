@@ -1,0 +1,6 @@
+name = "mapas-clientes"
+compatibility_date = "2025-12-04"
+pages_build_output_dir = "."
+
+# Cloudflare Pages - arquivos estáticos na raiz
+# Funções serverless em /functions/
