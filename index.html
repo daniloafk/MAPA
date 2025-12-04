@@ -68,7 +68,8 @@
         .empty-state i { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
         .empty-state p { font-size: 14px; }
 
-        #map { flex: 1; height: 100%; width: 100%; }
+        #map { flex: 1; height: 100%; width: 100%; background: #e5e3df; position: relative; }
+        #map::before { content: 'Carregando mapa...'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--gray-600); font-size: 16px; }
 
         .map-btn { width: 48px; height: 48px; border-radius: 50%; border: none; background: var(--white); box-shadow: var(--shadow); font-size: 20px; cursor: pointer; transition: var(--transition); display: flex; align-items: center; justify-content: center; color: var(--gray-700); }
         .map-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 12px rgba(0,0,0,0.15); color: var(--primary); }
@@ -239,16 +240,21 @@ const App = {
     map: null, is3D: false, userMarker: null, watchId: null, supabase: null, clients: [], markers: new Map(), searchBox: null, geocoder: null,
 
     init() {
-        this.supabase = window.supabase?.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
-        this.map = new google.maps.Map(document.getElementById("map"), {
-            center: CONFIG.DEFAULT_CENTER, zoom: CONFIG.DEFAULT_ZOOM, mapId: CONFIG.MAP_ID, tilt: 0, heading: 0,
-            gestureHandling: "greedy", zoomControl: true, mapTypeControl: false, streetViewControl: false, fullscreenControl: false
-        });
-        this.map.addListener('click', e => this.openModal(e.latLng.lat(), e.latLng.lng()));
-        this.initSearch();
-        this.initGeolocation();
-        this.loadClients();
-        this.bindEvents();
+        try {
+            this.supabase = window.supabase?.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+            this.map = new google.maps.Map(document.getElementById("map"), {
+                center: CONFIG.DEFAULT_CENTER, zoom: CONFIG.DEFAULT_ZOOM, mapId: CONFIG.MAP_ID, tilt: 0, heading: 0,
+                gestureHandling: "greedy", zoomControl: true, mapTypeControl: false, streetViewControl: false, fullscreenControl: false
+            });
+            this.map.addListener('click', e => this.openModal(e.latLng.lat(), e.latLng.lng()));
+            this.initSearch();
+            this.initGeolocation();
+            this.loadClients();
+            this.bindEvents();
+        } catch (e) {
+            console.error('Erro ao inicializar:', e);
+            document.getElementById('map').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;background:#f8f9fa;color:#5f6368;flex-direction:column;padding:20px;text-align:center;"><i class="fas fa-exclamation-triangle" style="font-size:48px;margin-bottom:20px;color:#ea4335;"></i><h2>Erro ao carregar mapa</h2><p>Por favor, recarregue a página.</p></div>';
+        }
     },
 
     initSearch() {
@@ -495,7 +501,30 @@ const App = {
     }
 };
 
-window.initMap = () => App.init();
+window.initMap = () => {
+    console.log('Google Maps carregado com sucesso!');
+    App.init();
+};
+
+window.addEventListener('error', e => {
+    if (e.message && e.message.includes('google')) {
+        console.error('Erro ao carregar Google Maps:', e);
+        const mapEl = document.getElementById('map');
+        if (mapEl) {
+            mapEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;background:#f8f9fa;color:#5f6368;flex-direction:column;padding:20px;text-align:center;"><i class="fas fa-exclamation-triangle" style="font-size:48px;margin-bottom:20px;color:#ea4335;"></i><h2>Erro ao carregar Google Maps</h2><p>Verifique sua conexão e recarregue a página.</p><button onclick="location.reload()" style="margin-top:20px;padding:12px 24px;background:#4285f4;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;">Recarregar Página</button></div>';
+        }
+    }
+}, true);
+
+setTimeout(() => {
+    if (!window.google) {
+        console.error('Timeout: Google Maps não carregou em 10 segundos');
+        const mapEl = document.getElementById('map');
+        if (mapEl && !mapEl.querySelector('.gm-style')) {
+            mapEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;background:#f8f9fa;color:#5f6368;flex-direction:column;padding:20px;text-align:center;"><i class="fas fa-clock" style="font-size:48px;margin-bottom:20px;color:#ea4335;"></i><h2>Mapa demorando para carregar</h2><p>Verifique sua conexão com a internet.</p><button onclick="location.reload()" style="margin-top:20px;padding:12px 24px;background:#4285f4;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;">Tentar Novamente</button></div>';
+        }
+    }
+}, 10000);
     </script>
 </body>
 </html>
