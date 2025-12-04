@@ -1255,6 +1255,9 @@
 <!-- jsQR - Biblioteca de leitura de QR Code -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
+<!-- Marker Clusterer - Agrupamento de marcadores para performance -->
+<script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
+
 <script>
     const SUPABASE_URL = "https://dctlgztkqtktxnmiuqgr.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjdGxnenRrcXRrdHhubWl1cWdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2MzMwNDIsImV4cCI6MjA4MDIwOTA0Mn0.Ctlx8A4QBFxa7Iu6fObw_OthHfA2XrzY47UiMMIhbIU";
@@ -1788,6 +1791,7 @@ let watchId = null;
 let _animating3D = false;
 let locationAccuracy = null;
 let deliveryMarkers = {}; // Armazena marcadores de endereços de entrega
+let markerCluster = null; // Cluster de marcadores para performance
 let directionsService = null; // Serviço de rotas do Google Maps
 let directionsRenderer = null; // Renderizador de rotas
 let routeMode = false; // Modo de planejamento de rota ativo/inativo
@@ -2078,7 +2082,13 @@ function handleGeoError(error, isInitial = false) {
 // ===========================
 
 function addDeliveryMarkers() {
-    console.log('Adicionando marcadores de entrega...');
+    console.log('⚡ Adicionando marcadores de entrega com CLUSTERING...');
+
+    // Limpar cluster anterior
+    if (markerCluster) {
+        markerCluster.clearMarkers();
+        markerCluster = null;
+    }
 
     // Limpar marcadores existentes
     Object.values(deliveryMarkers).forEach(marker => {
@@ -2113,6 +2123,9 @@ function addDeliveryMarkers() {
 
     console.log(`Criando ${uniqueLocations.size} marcadores únicos (de ${Object.keys(addressDatabase).length} endereços)`);
 
+    // Array para armazenar todos os marcadores para o cluster
+    const markers = [];
+
     // Criar marcadores apenas para localizações únicas
     uniqueLocations.forEach(({qrCode, data, count, qrCodes}) => {
         const position = {
@@ -2121,7 +2134,7 @@ function addDeliveryMarkers() {
         };
 
         try {
-            // Usar APENAS Marker clássico otimizado (mais leve)
+            // Criar marcador SEM adicionar ao mapa ainda (será gerenciado pelo cluster)
             const marker = new google.maps.Marker({
                 position,
                 title: data.address.split('\n')[0],
@@ -2143,7 +2156,7 @@ function addDeliveryMarkers() {
                     color: '#ffffff',
                     fontSize: '12px'
                 },
-                optimized: true // IMPORTANTE: habilita otimização de renderização
+                optimized: true
             });
 
             // Adicionar listener de clique
@@ -2168,15 +2181,31 @@ function addDeliveryMarkers() {
                 deliveryMarkers[code] = marker;
             });
 
-            // Adicionar ao mapa apenas uma vez
-            marker.setMap(map);
+            // Adicionar ao array de marcadores
+            markers.push(marker);
 
         } catch (error) {
             console.error('Erro ao criar marcador de entrega:', error);
         }
     });
 
-    console.log(`${uniqueLocations.size} marcadores de entrega adicionados (otimizado)`);
+    // Criar MarkerClusterer para agrupar marcadores automaticamente
+    if (window.markerClusterer && window.markerClusterer.MarkerClusterer) {
+        markerCluster = new markerClusterer.MarkerClusterer({
+            map,
+            markers,
+            algorithm: new markerClusterer.SuperClusterAlgorithm({
+                radius: 100, // Raio de agrupamento em pixels
+                maxZoom: 15  // Zoom máximo onde ainda agrupa (acima disso mostra individual)
+            })
+        });
+        console.log(`✅ ${uniqueLocations.size} marcadores adicionados COM CLUSTERING (super performance)!`);
+    } else {
+        // Fallback: adicionar marcadores diretamente se clustering não carregar
+        console.warn('⚠️ MarkerClusterer não disponível, adicionando marcadores diretamente');
+        markers.forEach(marker => marker.setMap(map));
+        console.log(`${uniqueLocations.size} marcadores adicionados sem clustering`);
+    }
 }
 
 // ===========================
@@ -2952,8 +2981,16 @@ function deactivateRouteMode() {
         window.routePolylines = [];
     }
 
-    // Remover TODOS os marcadores de entrega para deixar o mapa leve
-    console.log('🗑️ Removendo marcadores de entrega...');
+    // Remover cluster e marcadores de entrega para deixar o mapa leve
+    console.log('🗑️ Removendo cluster e marcadores de entrega...');
+
+    // Limpar cluster
+    if (markerCluster) {
+        markerCluster.clearMarkers();
+        markerCluster = null;
+    }
+
+    // Limpar marcadores individuais
     Object.values(deliveryMarkers).forEach(marker => {
         if (marker.setMap) {
             marker.setMap(null);
