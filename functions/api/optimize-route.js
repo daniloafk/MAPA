@@ -125,42 +125,36 @@ export async function onRequestPost(context) {
         // Preparar requisição para Fleet Routing API
         const fleetUrl = `https://cloudoptimization.googleapis.com/v1/projects/${projectId}:optimizeTours`;
 
-        // Montar modelo de otimização
+        // Montar modelo de otimização (snake_case conforme API do Google)
         const currentDate = new Date().toISOString().split('T')[0];
+
         const model = {
-            parent: `projects/${projectId}`,
             shipments: deliveryPoints.map((delivery, index) => ({
                 deliveries: [{
-                    arrivalLocation: {
-                        latLng: {
-                            latitude: delivery.lat,
-                            longitude: delivery.lng
-                        }
+                    arrival_location: {
+                        latitude: parseFloat(delivery.lat),
+                        longitude: parseFloat(delivery.lng)
                     },
                     duration: "300s",
-                    timeWindows: [{
-                        startTime: `${currentDate}T08:00:00Z`,
-                        endTime: `${currentDate}T18:00:00Z`
+                    time_windows: [{
+                        start_time: `${currentDate}T08:00:00Z`,
+                        end_time: `${currentDate}T18:00:00Z`
                     }]
                 }],
                 label: `delivery_${index}`
             })),
             vehicles: [{
                 label: "vehicle_1",
-                startLocation: {
-                    latLng: {
-                        latitude: origin.lat,
-                        longitude: origin.lng
-                    }
+                start_location: {
+                    latitude: parseFloat(origin.lat),
+                    longitude: parseFloat(origin.lng)
                 },
-                endLocation: {
-                    latLng: {
-                        latitude: origin.lat,
-                        longitude: origin.lng
-                    }
+                end_location: {
+                    latitude: parseFloat(origin.lat),
+                    longitude: parseFloat(origin.lng)
                 },
-                costPerKilometer: 1.0,
-                costPerHour: 1.0
+                cost_per_kilometer: 1.0,
+                cost_per_hour: 1.0
             }]
         };
 
