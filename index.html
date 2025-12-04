@@ -1876,7 +1876,8 @@ window.initMap = function () {
         map = new google.maps.Map(document.getElementById("map"), {
             center: {lat: -23.5505, lng: -46.6333},
             zoom: 17,
-            mapId: MAP_ID,
+            // mapId removido temporariamente para permitir todos os tipos de mapa
+            // mapId: MAP_ID,
             mapTypeId: google.maps.MapTypeId.ROADMAP, // 🚀 Iniciar com ROADMAP (mais rápido)
             tilt: 0,
             heading: 0,
@@ -1887,9 +1888,9 @@ window.initMap = function () {
             fullscreenControl: false, // Desabilitar fullscreen para performance
             mapTypeControl: true, // Controle de tipo de mapa (satélite, terreno, etc)
             mapTypeControlOptions: {
-                style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-                position: google.maps.ControlPosition.TOP_RIGHT,
-                mapTypeIds: ['roadmap', 'satellite', 'terrain', 'hybrid'] // Todas as opções disponíveis
+                style: google.maps.MapTypeControlStyle.DROPDOWN_MENU, // Mudado para DROPDOWN para mostrar todos
+                position: google.maps.ControlPosition.TOP_RIGHT
+                // Removi mapTypeIds para usar os padrões do Google (garante que terrain apareça)
             },
             scaleControl: false, // Desabilitar escala
             // Otimizações de renderização
