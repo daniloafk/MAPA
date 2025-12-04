@@ -6,66 +6,29 @@
 <title>Navegação Estilo Google Maps</title>
 
 <style>
-    body,html{
-        margin:0;
-        padding:0;
-        height:100%;
-        width:100%;
-        font-family:sans-serif;
-    }
     #map{
-        height:100%;
-        width:100%;
         position:absolute;
         top:0;left:0;
+        width:100%;
+        height:100%;
     }
-
-    .map-control{
-        position:fixed;
-        top:90px;
-        right:20px;
-        display:flex;
-        flex-direction:column;
-        gap:10px;
-        z-index:9999;
-    }
-
-    .control-btn{
-        width:48px;
-        height:48px;
+    .location-dot{
+        width:22px; height:22px;
+        background:#1a73e8;
         border-radius:50%;
-        border:none;
-        background:white;
-        box-shadow:0 2px 6px rgba(0,0,0,0.3);
-        font-size:18px;
-        cursor:pointer;
+        border:4px solid white;
+        position:relative;
+        box-shadow:0 2px 6px rgba(0,0,0,0.4);
     }
-
-    .control-btn:active{
-        transform:scale(.9);
-    }
-
-    .location-dot {
-        width: 24px;
-        height: 24px;
-        background: #1a73e8;
-        border-radius: 50%;
-        border: 4px solid white;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.5);
-        position: relative;
-    }
-
-    .direction-arrow {
-        width: 0;
-        height: 0;
-        border-left: 8px solid transparent;
-        border-right: 8px solid transparent;
-        border-bottom: 16px solid white;
-        position: absolute;
-        top: -14px;
-        left: 50%;
-        transform: translateX(-50%);
-        filter: drop-shadow(0 0 4px rgba(0,0,0,0.4));
+    .direction-arrow{
+        width:0;height:0;
+        border-left:6px solid transparent;
+        border-right:6px solid transparent;
+        border-bottom:14px solid white;
+        position:absolute;
+        top:-12px; left:50%;
+        transform:translateX(-50%);
+        filter:drop-shadow(0 0 4px rgba(0,0,0,0.4));
     }
 </style>
 </head>
@@ -73,269 +36,189 @@
 
 <div id="map"></div>
 
-<div class="map-control">
-    <button id="btnToggle3D" class="control-btn">3D</button>
-    <button id="btnCenterUser" class="control-btn">📍</button>
-</div>
-
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&callback=initMap&v=beta&libraries=marker" async defer></script>
 
 <script>
-let map;
-let userMarker = null;
-let watchId = null;
-let kalman;
+let map, userMarker, watchId;
+let kalman = new KalmanFilter();
 let lastHeading = 0;
-let lastSpeed = 0;
-let is3D = false;
-let isAnimating3D = false;
 
-/* **************
+/* =====================
    KALMAN FILTER
-   ************** */
-class Kalman {
-    constructor(R=0.0008, Q=0.00001){
-        this.R = R;
-        this.Q = Q;
-        this.A = 1;
-        this.C = 1;
-        this.cov = NaN;
-        this.x = NaN;
-    }
-    filter(z){
-        if(isNaN(this.x)){
-            this.x = z;
-            this.cov = 1;
-        } else {
-            const predX = this.A * this.x;
-            const predCov = this.A * this.cov * this.A + this.Q;
-            const K = predCov * this.C / (this.C * predCov * this.C + this.R);
-            this.x = predX + K*(z - this.C * predX);
+===================== */
+function KalmanFilter(R=0.0008, Q=0.00001){
+    this.R=R; this.Q=Q;
+    this.A=1; this.C=1;
+    this.cov=NaN; this.x=NaN;
+
+    this.filter=function(z){
+        if(isNaN(this.x)){ this.x=z; this.cov=1; }
+        else{
+            const predX = this.A*this.x;
+            const predCov = this.A*this.cov*this.A + this.Q;
+            const K = predCov*this.C / (this.C*predCov*this.C + this.R);
+            this.x = predX + K*(z - this.C*predX);
             this.cov = predCov - K*this.C*predCov;
         }
         return this.x;
-    }
-    filter2D(lat,lng){
-        return {
-            lat:this.filter(lat),
-            lng:this.filter(lng)
-        };
-    }
+    };
+
+    this.filter2D=(lat,lng)=>({ lat:this.filter(lat), lng:this.filter(lng) });
 }
 
-/* ******************************
-   Mecanismo seguro do marcador
-   ****************************** */
-function markerGet(marker) {
-    if (marker.position) return marker.position; // AdvancedMarker
-    if (marker.getPosition) return marker.getPosition(); // Marker
+/* =====================
+   SAFE GET POSITION
+===================== */
+function getMarkerPos(marker){
+    // AdvancedMarkerElement → marker.position
+    if(marker.position){
+        return new google.maps.LatLng(marker.position.lat, marker.position.lng);
+    }
+
+    // Marker comum → marker.getPosition()
+    if(marker.getPosition){
+        return marker.getPosition();
+    }
+
     return null;
 }
 
-function markerSet(marker, pos) {
-    if (marker.position !== undefined) {
-        marker.position = pos;  // AdvancedMarkerElement
+/* =====================
+   SAFE SET POSITION
+===================== */
+function setMarkerPos(marker,pos){
+    // AdvancedMarkerElement usa = object
+    if(marker.position !== undefined){
+        marker.position = { lat: pos.lat(), lng: pos.lng() };
         return;
     }
-    if (marker.setPosition) {
-        marker.setPosition(pos); // Marker comum
+
+    // Marker comum usa setPosition()
+    if(marker.setPosition){
+        marker.setPosition(pos);
     }
 }
 
-/* ******************************
-   Movimento suave (interpolação)
-   ****************************** */
+/* =====================
+   ANIMAÇÃO SUAVE
+===================== */
 function lerp(a,b,t){ return a+(b-a)*t; }
 
 function animateTo(marker, newPos, duration=450){
-    const start = markerGet(marker);
-    if (!start){
-        markerSet(marker, newPos);
+    const start = getMarkerPos(marker);
+    if(!start){
+        setMarkerPos(marker, newPos);
         return;
     }
 
-    const sLat = start.lat();
-    const sLng = start.lng();
-    const eLat = newPos.lat();
-    const eLng = newPos.lng();
-    const t0 = performance.now();
+    const sLat=start.lat(), sLng=start.lng();
+    const eLat=newPos.lat(), eLng=newPos.lng();
+    const startTime=performance.now();
 
     function frame(now){
-        const t = Math.min((now - t0) / duration, 1);
-        const lat = lerp(sLat, eLat, t);
-        const lng = lerp(sLng, eLng, t);
-        markerSet(marker, new google.maps.LatLng(lat,lng));
-        if(t < 1) requestAnimationFrame(frame);
+        const t=Math.min((now-startTime)/duration,1);
+        const lat=lerp(sLat,eLat,t);
+        const lng=lerp(sLng,eLng,t);
+        setMarkerPos(marker,new google.maps.LatLng(lat,lng));
+        if(t<1) requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
 }
 
-/* ******************************
-   Criar marcador Android 13
-   ****************************** */
-function createDirectionMarker(){
-    const container = document.createElement("div");
-    const dot = document.createElement("div");
-    dot.className = "location-dot";
-    const arrow = document.createElement("div");
-    arrow.className = "direction-arrow";
-    container.appendChild(dot);
-    container.appendChild(arrow);
-    return container;
+/* =====================
+   CRIA SETA + PONTO
+===================== */
+function makeMarkerContent(){
+    const wrap=document.createElement("div");
+    const dot=document.createElement("div");
+    dot.className="location-dot";
+    const arrow=document.createElement("div");
+    arrow.className="direction-arrow";
+    wrap.appendChild(dot);
+    wrap.appendChild(arrow);
+    return wrap;
 }
 
-/* ******************************
-   Criar marcador com fallback
-   ****************************** */
+/* =====================
+   CRIA MARCADOR SEGURO
+===================== */
 function createSafeMarker(pos){
-    try {
-        if (google.maps.marker && google.maps.marker.AdvancedMarkerElement){
-            return new google.maps.marker.AdvancedMarkerElement({
-                map,
-                position: pos,
-                content: createDirectionMarker()
-            });
-        }
-    } catch(err){}
+    if(google.maps.marker?.AdvancedMarkerElement){
+        return new google.maps.marker.AdvancedMarkerElement({
+            map,
+            position:pos,
+            content:makeMarkerContent()
+        });
+    }
 
     return new google.maps.Marker({
         map,
-        position: pos,
+        position:pos,
         icon:{
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 10,
-            fillColor: "#1a73e8",
-            fillOpacity: 1,
-            strokeColor: "white",
-            strokeWeight: 3
+            path:google.maps.SymbolPath.CIRCLE,
+            scale:10,
+            fillColor:"#1a73e8",
+            fillOpacity:1,
+            strokeColor:"white",
+            strokeWeight:3
         }
     });
 }
 
-/* ******************************
-   Iniciar mapa
-   ****************************** */
+/* =====================
+   INICIAR MAPA
+===================== */
 function initMap(){
     map = new google.maps.Map(document.getElementById("map"),{
         center:{lat:-23.55,lng:-46.63},
         zoom:18,
         tilt:0,
         heading:0,
-        mapId:"ebb7ca4503045feabc75b373",
-        gestureHandling:"greedy"
+        gestureHandling:"greedy",
+        mapId:"ebb7ca4503045feabc75b373"
     });
 
-    kalman = new Kalman();
-    startTracking();
+    startGPS();
 }
-window.initMap = initMap;
 
-/* ******************************
-   Rastreamento em tempo real
-   ****************************** */
-function startTracking(){
-    if(!navigator.geolocation){
-        alert("Seu navegador não suporta GPS.");
-        return;
-    }
-
+/* =====================
+   INICIAR GPS
+===================== */
+function startGPS(){
     navigator.geolocation.getCurrentPosition(pos=>{
-        const p = new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+        const p=new google.maps.LatLng(pos.coords.latitude,pos.coords.longitude);
         map.setCenter(p);
+        userMarker=createSafeMarker(p);
 
-        userMarker = createSafeMarker(p);
-
-        watchId = navigator.geolocation.watchPosition(updatePosition, gpsError, {
-            enableHighAccuracy:true,
-            timeout:8000,
-            maximumAge:0
+        watchId=navigator.geolocation.watchPosition(updateGPS, err=>alert("GPS erro"), {
+            enableHighAccuracy:true
         });
-    }, gpsError);
+
+    }, err=>alert("Ative o GPS"));
 }
 
-/* ******************************
-   Atualização da posição
-   ****************************** */
-function updatePosition(position){
-    const filtered = kalman.filter2D(position.coords.latitude, position.coords.longitude);
-    const newPos = new google.maps.LatLng(filtered.lat, filtered.lng);
+/* =====================
+   ATUALIZAÇÃO GPS
+===================== */
+function updateGPS(pos){
+    const f=kalman.filter2D(pos.coords.latitude,pos.coords.longitude);
+    const newPos=new google.maps.LatLng(f.lat,f.lng);
 
-    animateTo(userMarker, newPos, 450);
+    animateTo(userMarker,newPos,450);
     map.panTo(newPos);
 
-    if(position.coords.heading != null){
-        const deg = position.coords.heading;
-        lastHeading = deg;
-        rotateArrow(deg);
-        map.setHeading(deg);
-    }
+    if(pos.coords.heading!=null){
+        lastHeading=pos.coords.heading;
+        map.setHeading(lastHeading);
 
-    if(position.coords.speed != null){
-        lastSpeed = position.coords.speed;
-        const tilt = Math.min(60, lastSpeed * 6);
-        map.setTilt(tilt);
-        const zoom = lastSpeed > 8 ? 17.2 : 18;
-        map.setZoom(zoom);
+        if(userMarker.content){
+            const arrow=userMarker.content.querySelector(".direction-arrow");
+            if(arrow){
+                arrow.style.transform=`translateX(-50%) rotate(${lastHeading}deg)`;
+            }
+        }
     }
 }
-
-/* ******************************
-   Girar seta
-   ****************************** */
-function rotateArrow(deg){
-    if(!userMarker.content) return;
-    const arrow = userMarker.content.querySelector(".direction-arrow");
-    if(arrow) arrow.style.transform = `translateX(-50%) rotate(${deg}deg)`;
-}
-
-/* ******************************
-   Erro de GPS
-   ****************************** */
-function gpsError(e){
-    console.warn("GPS erro:", e);
-    alert("Ative o GPS e recarregue.");
-}
-
-/* ******************************
-   Botão centralizar
-   ****************************** */
-document.getElementById("btnCenterUser").onclick = ()=>{
-    if(!userMarker) return;
-    map.panTo(markerGet(userMarker));
-    map.setZoom(18);
-};
-
-/* ******************************
-   Botão 3D
-   ****************************** */
-function animateValue(start,end,dur,onUpdate,onFinish){
-    const t0 = performance.now();
-    function loop(now){
-        const t = Math.min((now-t0)/dur,1);
-        onUpdate(lerp(start,end,t));
-        if(t<1) requestAnimationFrame(loop);
-        else if(onFinish) onFinish();
-    }
-    requestAnimationFrame(loop);
-}
-
-document.getElementById("btnToggle3D").onclick = ()=>{
-    if(isAnimating3D) return;
-    isAnimating3D = true;
-
-    if(!is3D){
-        is3D = true;
-        btnToggle3D.textContent = "2D";
-        animateValue(map.getTilt(),60,600,val=>map.setTilt(val));
-        animateValue(map.getHeading(),lastHeading,600,val=>map.setHeading(val),()=>isAnimating3D=false);
-    } else {
-        is3D = false;
-        btnToggle3D.textContent = "3D";
-        animateValue(map.getTilt(),0,600,val=>map.setTilt(val));
-        animateValue(map.getHeading(),0,600,val=>map.setHeading(val),()=>isAnimating3D=false);
-    }
-};
 </script>
-
 </body>
 </html>
