@@ -161,39 +161,46 @@ export async function onRequestPost(context) {
         console.log('✅ Access token obtido com sucesso');
 
         // Preparar requisição para Fleet Routing API
-        const fleetUrl = `https://cloudoptimization.googleapis.com/v1/projects/${projectId}:optimizeTours`;
+        // IMPORTANTE: Usar routeoptimization.googleapis.com (não cloudoptimization!)
+        const fleetUrl = `https://routeoptimization.googleapis.com/v1/projects/${projectId}:optimizeTours`;
 
-        // Montar modelo de otimização (snake_case conforme API do Google)
-        const currentDate = new Date().toISOString().split('T')[0];
-
-        const model = {
-            shipments: deliveryPoints.map((delivery, index) => ({
-                deliveries: [{
-                    arrival_location: {
-                        latitude: parseFloat(delivery.lat),
-                        longitude: parseFloat(delivery.lng)
+        // Montar modelo de otimização (igual ao Vercel - camelCase!)
+        const payload = {
+            parent: `projects/${projectId}`,
+            model: {
+                shipments: deliveryPoints.map((point, index) => ({
+                    deliveries: [{
+                        arrivalWaypoint: {
+                            location: {
+                                latLng: {
+                                    latitude: parseFloat(point.lat),
+                                    longitude: parseFloat(point.lng)
+                                }
+                            }
+                        }
+                    }],
+                    label: `Entrega ${index + 1}`
+                })),
+                vehicles: [{
+                    startWaypoint: {
+                        location: {
+                            latLng: {
+                                latitude: parseFloat(origin.lat),
+                                longitude: parseFloat(origin.lng)
+                            }
+                        }
                     },
-                    duration: "300s",
-                    time_windows: [{
-                        start_time: `${currentDate}T08:00:00Z`,
-                        end_time: `${currentDate}T18:00:00Z`
-                    }]
-                }],
-                label: `delivery_${index}`
-            })),
-            vehicles: [{
-                label: "vehicle_1",
-                start_location: {
-                    latitude: parseFloat(origin.lat),
-                    longitude: parseFloat(origin.lng)
-                },
-                end_location: {
-                    latitude: parseFloat(origin.lat),
-                    longitude: parseFloat(origin.lng)
-                },
-                cost_per_kilometer: 1.0,
-                cost_per_hour: 1.0
-            }]
+                    endWaypoint: {
+                        location: {
+                            latLng: {
+                                latitude: parseFloat(origin.lat),
+                                longitude: parseFloat(origin.lng)
+                            }
+                        }
+                    },
+                    label: "Veículo 1"
+                }]
+            }
         };
 
         console.log('📤 Chamando Fleet Routing API...');
@@ -206,7 +213,7 @@ export async function onRequestPost(context) {
                 'Authorization': `Bearer ${accessToken}`,
                 'X-Goog-User-Project': projectId
             },
-            body: JSON.stringify({ model })
+            body: JSON.stringify(payload)
         });
 
         console.log(`📥 Resposta Fleet API: ${fleetResponse.status}`);
@@ -227,7 +234,7 @@ export async function onRequestPost(context) {
                 success: false,
                 message: `Fleet Routing API retornou erro: ${fleetResponse.status}`,
                 details: errorDetails,
-                requestModel: model
+                requestModel: payload
             }), {
                 status: fleetResponse.status,
                 headers: { 'Content-Type': 'application/json' }
