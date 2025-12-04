@@ -126,7 +126,9 @@ export async function onRequestPost(context) {
         const fleetUrl = `https://cloudoptimization.googleapis.com/v1/projects/${projectId}:optimizeTours`;
 
         // Montar modelo de otimização
+        const currentDate = new Date().toISOString().split('T')[0];
         const model = {
+            parent: `projects/${projectId}`,
             shipments: deliveryPoints.map((delivery, index) => ({
                 deliveries: [{
                     arrivalLocation: {
@@ -137,13 +139,14 @@ export async function onRequestPost(context) {
                     },
                     duration: "300s",
                     timeWindows: [{
-                        startTime: "2024-01-01T08:00:00Z",
-                        endTime: "2024-01-01T18:00:00Z"
+                        startTime: `${currentDate}T08:00:00Z`,
+                        endTime: `${currentDate}T18:00:00Z`
                     }]
                 }],
-                label: `Entrega ${index + 1}`
+                label: `delivery_${index}`
             })),
             vehicles: [{
+                label: "vehicle_1",
                 startLocation: {
                     latLng: {
                         latitude: origin.lat,
@@ -156,11 +159,9 @@ export async function onRequestPost(context) {
                         longitude: origin.lng
                     }
                 },
-                costPerKilometer: 1,
-                travelDurationMultipleCost: 1
-            }],
-            globalStartTime: "2024-01-01T08:00:00Z",
-            globalEndTime: "2024-01-01T18:00:00Z"
+                costPerKilometer: 1.0,
+                costPerHour: 1.0
+            }]
         };
 
         // Chamar Fleet Routing API
