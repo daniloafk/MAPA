@@ -3080,7 +3080,17 @@ async function renderFleetRoute(fleetResult, origin, deliveryPoints) {
     route.visits.forEach((visit, index) => {
         // A Fleet API retorna apenas o shipmentIndex, não as coordenadas
         // Precisamos buscar as coordenadas nos deliveryPoints originais
-        const shipmentIndex = visit.shipmentIndex;
+        let shipmentIndex = visit.shipmentIndex;
+
+        // Fallback: se shipmentIndex não existe, extrair do shipmentLabel
+        if (shipmentIndex === undefined && visit.shipmentLabel) {
+            // shipmentLabel é "Entrega N" -> extrair N e converter para índice (N-1)
+            const match = visit.shipmentLabel.match(/Entrega (\d+)/);
+            if (match) {
+                shipmentIndex = parseInt(match[1]) - 1; // Label começa em 1, índice em 0
+                console.log(`🔄 Usando label para obter índice: ${visit.shipmentLabel} -> índice ${shipmentIndex}`);
+            }
+        }
 
         if (shipmentIndex !== undefined && deliveryPoints[shipmentIndex]) {
             const point = deliveryPoints[shipmentIndex].location;
