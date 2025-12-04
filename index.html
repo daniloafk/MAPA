@@ -140,6 +140,52 @@ window.initMap = function () {
     startLocationTracking();
 }
 
+/* ============
+   LERP SUAVE
+   ============ */
+
+function lerp(start, end, t) {
+    return start + (end - start) * t;
+}
+
+/* ============
+   MOVIMENTO SUAVIZADO
+   ============ */
+
+function animateMarkerTo(marker, newPos, duration = 600) {
+    if (!marker.position) {
+        marker.setPosition(newPos);
+        return;
+    }
+
+    const startLat = marker.position.lat();
+    const startLng = marker.position.lng();
+    const endLat = newPos.lat();
+    const endLng = newPos.lng();
+
+    const startTime = performance.now();
+
+    function update(time) {
+        const progress = Math.min((time - startTime) / duration, 1);
+        const lat = lerp(startLat, endLat, progress);
+        const lng = lerp(startLng, endLng, progress);
+
+        const interpolated = new google.maps.LatLng(lat, lng);
+
+        if (marker.setPosition) {
+            marker.setPosition(interpolated);
+        } else {
+            marker.position = interpolated;
+        }
+
+        if (progress < 1) {
+            requestAnimationFrame(update);
+        }
+    }
+
+    requestAnimationFrame(update);
+}
+
 /* ===========================
    RASTREAMENTO EM TEMPO REAL
    =========================== */
@@ -204,11 +250,8 @@ function updateUserLocation(position) {
 
     if (!userLocationMarker) return;
 
-    if (userLocationMarker.setPosition) {
-        userLocationMarker.setPosition(newPos);
-    } else {
-        userLocationMarker.position = newPos;
-    }
+    // AGORA MOVIMENTO SUAVE (Google Maps style)
+    animateMarkerTo(userLocationMarker, newPos, 600);
 }
 
 function handleGeoError(error) {
