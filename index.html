@@ -3076,12 +3076,13 @@ async function renderFleetRoute(fleetResult, origin) {
     const allPoints = [origin];
 
     route.visits.forEach(visit => {
-        const shipment = fleetResult.model.shipments[visit.shipmentIndex];
-        const delivery = shipment.deliveries[0];
-        allPoints.push({
-            lat: delivery.arrivalWaypoint.location.latLng.latitude,
-            lng: delivery.arrivalWaypoint.location.latLng.longitude
-        });
+        // A Fleet API retorna as coordenadas diretamente em cada visit
+        if (visit.arrivalWaypoint && visit.arrivalWaypoint.location && visit.arrivalWaypoint.location.latLng) {
+            allPoints.push({
+                lat: visit.arrivalWaypoint.location.latLng.latitude,
+                lng: visit.arrivalWaypoint.location.latLng.longitude
+            });
+        }
     });
 
     // Adicionar retorno à origem
