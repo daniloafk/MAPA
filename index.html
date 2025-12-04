@@ -95,7 +95,6 @@
 
 <div id="map"></div>
 
-<!-- BOTÕES -->
 <div class="map-control">
     <button id="btnToggle3D" class="control-btn">3D</button>
     <button id="btnCenterUser" class="control-btn">📍</button>
@@ -105,14 +104,14 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-    const SUPABASE_URL = "https://fufteldeapyvluynppuv.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1ZnRlbGRlYXB5dmx1eW5wcHV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2MzAyMzIsImV4cCI6MjA4MDIwNjIzMn0.xr6PiskP8cJUzGBEhp_tAfZWMprxJXJyhLuOSmCQleA";
+const SUPABASE_URL = "https://fufteldeapyvluynppuv.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1ZnRlbGRlYXB5dmx1eW5wcHV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2MzAyMzIsImV4cCI6MjA4MDIwNjIzMn0.xr6PiskP8cJUzGBEhp_tAfZWMprxJXJyhLuOSmCQleA";
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
 
 <!-- Google Maps -->
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&callback=initMap&v=beta&libraries=places" async defer></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&callback=initMap&v=beta" async defer></script>
 
 <script>
 let map;
@@ -120,10 +119,96 @@ let is3D = false;
 let userLocationMarker = null;
 let watchId = null;
 let _animating3D = false;
+let kalman = null;
 
 const MAP_ID = "ebb7ca4503045feabc75b373";
 
-window.initMap = function () {
+/* ====================================================
+   FILTRO DE KALMAN (suavização profissional de GPS)
+   ==================================================== */
+
+class KalmanFilter {
+    constructor(R = 0.0008, Q = 0.00001) {
+        this.R = R; // noise measurement
+        this.Q = Q; // process noise
+        this.A = 1; // no change
+        this.B = 0;
+        this.C = 1;
+
+        this.cov = NaN;
+        this.x = NaN;
+    }
+
+    filter(z) {
+        if (isNaN(this.x)) {
+            this.x = z;
+            this.cov = 1;
+        } else {
+            // Prediction
+            const predX = this.A * this.x;
+            const predCov = this.A * this.cov * this.A + this.Q;
+
+            // Kalman Gain
+            const K = predCov * this.C / (this.C * predCov * this.C + this.R);
+
+            // Correction
+            this.x = predX + K * (z - this.C * predX);
+            this.cov = predCov - K * this.C * predCov;
+        }
+
+        return this.x;
+    }
+
+    filter2D(lat, lng) {
+        return {
+            lat: this.filter(lat),
+            lng: this.filter(lng)
+        };
+    }
+}
+
+/* ====================================================
+   LERP + ANIMAÇÃO ULTRA SUAVE
+   ==================================================== */
+
+function lerp(a, b, t) {
+    return a + (b - a) * t;
+}
+
+function animateMarkerTo(marker, newPos, duration = 450) {
+    if (!marker.position) {
+        marker.setPosition(newPos);
+        return;
+    }
+
+    const startLat = marker.position.lat();
+    const startLng = marker.position.lng();
+    const endLat = newPos.lat();
+    const endLng = newPos.lng();
+
+    const startTime = performance.now();
+
+    function step(now) {
+        const t = Math.min((now - startTime) / duration, 1);
+
+        const lat = lerp(startLat, endLat, t);
+        const lng = lerp(startLng, endLng, t);
+
+        const interpolated = new google.maps.LatLng(lat, lng);
+
+        marker.setPosition(interpolated);
+
+        if (t < 1) requestAnimationFrame(step);
+    }
+
+    requestAnimationFrame(step);
+}
+
+/* ====================================================
+   INICIALIZAÇÃO DO MAPA
+   ==================================================== */
+
+window.initMap = () => {
     map = new google.maps.Map(document.getElementById("map"), {
         center:{lat:-23.5505,lng:-46.6333},
         zoom:17,
@@ -137,58 +222,14 @@ window.initMap = function () {
         fullscreenControl:true
     });
 
+    kalman = new KalmanFilter();
+
     startLocationTracking();
-}
+};
 
-/* ============
-   LERP SUAVE
-   ============ */
-
-function lerp(start, end, t) {
-    return start + (end - start) * t;
-}
-
-/* ============
-   MOVIMENTO SUAVIZADO
-   ============ */
-
-function animateMarkerTo(marker, newPos, duration = 600) {
-    if (!marker.position) {
-        marker.setPosition(newPos);
-        return;
-    }
-
-    const startLat = marker.position.lat();
-    const startLng = marker.position.lng();
-    const endLat = newPos.lat();
-    const endLng = newPos.lng();
-
-    const startTime = performance.now();
-
-    function update(time) {
-        const progress = Math.min((time - startTime) / duration, 1);
-        const lat = lerp(startLat, endLat, progress);
-        const lng = lerp(startLng, endLng, progress);
-
-        const interpolated = new google.maps.LatLng(lat, lng);
-
-        if (marker.setPosition) {
-            marker.setPosition(interpolated);
-        } else {
-            marker.position = interpolated;
-        }
-
-        if (progress < 1) {
-            requestAnimationFrame(update);
-        }
-    }
-
-    requestAnimationFrame(update);
-}
-
-/* ===========================
-   RASTREAMENTO EM TEMPO REAL
-   =========================== */
+/* ====================================================
+   RASTREAMENTO EM TEMPO REAL SUAVIZADO
+   ==================================================== */
 
 function startLocationTracking() {
     if (!navigator.geolocation) {
@@ -210,30 +251,12 @@ function startLocationTracking() {
             const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
 
             map.setCenter(c);
-            map.setZoom(17);
 
-            if (google.maps.marker?.AdvancedMarkerElement) {
-                userLocationMarker = new google.maps.marker.AdvancedMarkerElement({
-                    map,
-                    position: c,
-                    content: markerDiv,
-                    title: "Sua Localização"
-                });
-            } else {
-                userLocationMarker = new google.maps.Marker({
-                    map,
-                    position: c,
-                    title: "Sua Localização",
-                    icon: {
-                        path: google.maps.SymbolPath.CIRCLE,
-                        scale: 8,
-                        fillColor: "#4285f4",
-                        fillOpacity: 1,
-                        strokeColor: "white",
-                        strokeWeight: 3
-                    }
-                });
-            }
+            userLocationMarker = new google.maps.marker.AdvancedMarkerElement({
+                map,
+                position: c,
+                content: markerDiv
+            });
 
             watchId = navigator.geolocation.watchPosition(updateUserLocation, handleGeoError, geoOptions);
         },
@@ -243,30 +266,30 @@ function startLocationTracking() {
 }
 
 function updateUserLocation(position) {
-    const newPos = new google.maps.LatLng(
-        position.coords.latitude,
-        position.coords.longitude
-    );
+    const rawLat = position.coords.latitude;
+    const rawLng = position.coords.longitude;
 
-    if (!userLocationMarker) return;
+    // FILTRO KALMAN
+    const filtered = kalman.filter2D(rawLat, rawLng);
 
-    // AGORA MOVIMENTO SUAVE (Google Maps style)
-    animateMarkerTo(userLocationMarker, newPos, 600);
+    const newPos = new google.maps.LatLng(filtered.lat, filtered.lng);
+
+    // ANIMAÇÃO SUAVE
+    animateMarkerTo(userLocationMarker, newPos, 500);
 }
 
 function handleGeoError(error) {
-    console.warn("Erro de geolocalização:", error);
-    alert("Não foi possível acessar sua localização. Ative o GPS e recarregue.");
-    map.setCenter({ lat:-23.5505, lng:-46.6333 });
+    console.warn("Erro de GPS:", error);
+    alert("Ative o GPS e recarregue o app.");
 }
 
-/* ===========================
+/* ====================================================
    CENTRALIZAR USUÁRIO
-   =========================== */
+   ==================================================== */
 
 function centerOnUser() {
     if (!userLocationMarker || !userLocationMarker.position) {
-        alert("Aguardando localização GPS...");
+        alert("Aguardando localização...");
         return;
     }
 
@@ -276,27 +299,21 @@ function centerOnUser() {
 
 document.getElementById("btnCenterUser").onclick = centerOnUser;
 
-/* ===========================
-   ANIMAÇÃO 2D ⇄ 3D
-   =========================== */
+/* ====================================================
+   MODO 3D
+   ==================================================== */
 
-function animateValue(start, end, duration, onUpdate, onFinish){
+function animateValue(start, end, duration, callback, finish) {
     const startTime = performance.now();
 
-    function frame(time){
-        const progress = Math.min((time - startTime) / duration, 1);
-        const value = start + (end - start) * progress;
-
-        onUpdate(value);
-
-        if(progress < 1){
-            requestAnimationFrame(frame);
-        } else {
-            if (onFinish) onFinish();
-        }
+    function step(now) {
+        const t = Math.min((now - startTime) / duration, 1);
+        const value = lerp(start, end, t);
+        callback(value);
+        if (t < 1) requestAnimationFrame(step);
+        else if (finish) finish();
     }
-
-    requestAnimationFrame(frame);
+    requestAnimationFrame(step);
 }
 
 document.getElementById("btnToggle3D").onclick = () => {
@@ -324,10 +341,6 @@ document.getElementById("btnToggle3D").onclick = () => {
     }
 };
 
-window.addEventListener('beforeunload', () => {
-    if (watchId) navigator.geolocation.clearWatch(watchId);
-});
 </script>
-
 </body>
 </html>
