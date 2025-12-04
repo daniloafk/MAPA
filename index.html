@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Mapa de Clientes - Google Maps</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📍</text></svg>">
 
 <style>
     :root {
@@ -555,28 +556,13 @@ function startLocationTracking() {
             map.setCenter(c);
             map.setZoom(17);
 
-            if (google.maps.marker?.AdvancedMarkerElement) {
-                userLocationMarker = new google.maps.marker.AdvancedMarkerElement({
-                    map,
-                    position: c,
-                    content: markerDiv,
-                    title: "Sua Localização"
-                });
-            } else {
-                userLocationMarker = new google.maps.Marker({
-                    map,
-                    position: c,
-                    title: "Sua Localização",
-                    icon: {
-                        path: google.maps.SymbolPath.CIRCLE,
-                        scale: 8,
-                        fillColor: "#4285f4",
-                        fillOpacity: 1,
-                        strokeColor: "white",
-                        strokeWeight: 3
-                    }
-                });
-            }
+            // Usa AdvancedMarkerElement (recomendado pelo Google desde 2024)
+            userLocationMarker = new google.maps.marker.AdvancedMarkerElement({
+                map,
+                position: c,
+                content: markerDiv,
+                title: "Sua Localização"
+            });
 
             hideLoadingScreen();
 
@@ -604,18 +590,15 @@ function startLocationTracking() {
 }
 
 function updateUserLocation(position) {
-    const newPos = new google.maps.LatLng(
-        position.coords.latitude,
-        position.coords.longitude
-    );
+    const newPos = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+    };
 
     if (!userLocationMarker) return;
 
-    if (userLocationMarker.setPosition) {
-        userLocationMarker.setPosition(newPos);
-    } else {
-        userLocationMarker.position = newPos;
-    }
+    // AdvancedMarkerElement usa a propriedade 'position'
+    userLocationMarker.position = newPos;
 
     // Atualiza precisão
     locationAccuracy = position.coords.accuracy;
@@ -724,15 +707,8 @@ document.getElementById("btnCenterLocation").onclick = () => {
         return;
     }
 
-    // Pega a posição atual do marcador
-    let currentPosition;
-    if (userLocationMarker.position) {
-        // AdvancedMarkerElement
-        currentPosition = userLocationMarker.position;
-    } else if (userLocationMarker.getPosition) {
-        // Marker tradicional
-        currentPosition = userLocationMarker.getPosition();
-    }
+    // Pega a posição atual do marcador (AdvancedMarkerElement)
+    const currentPosition = userLocationMarker.position;
 
     if (!currentPosition) {
         showToast('Erro ao centralizar', 'Posição não encontrada', 'error', 3000);
