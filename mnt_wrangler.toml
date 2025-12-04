@@ -1,6 +1,8 @@
 name = "mapas-clientes"
 compatibility_date = "2025-12-04"
-pages_build_output_dir = "."
 
-# Cloudflare Pages - arquivos estáticos na raiz
-# Funções serverless em /functions/
+# Cloudflare Pages - site estático com funções serverless
+[site]
+bucket = "."
+
+# Funções serverless em /functions/ são automaticamente detectadas
