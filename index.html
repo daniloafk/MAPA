@@ -6,27 +6,24 @@
 <title>Navegação Estilo Google Maps</title>
 
 <style>
-    #map{
-        position:absolute;
-        top:0;left:0;
-        width:100%;
-        height:100%;
-    }
+    #map{ position:absolute; top:0; left:0; width:100%; height:100%; }
+
     .location-dot{
         width:22px; height:22px;
         background:#1a73e8;
         border-radius:50%;
         border:4px solid white;
-        position:relative;
         box-shadow:0 2px 6px rgba(0,0,0,0.4);
+        position:relative;
     }
+
     .direction-arrow{
         width:0;height:0;
         border-left:6px solid transparent;
         border-right:6px solid transparent;
         border-bottom:14px solid white;
         position:absolute;
-        top:-12px; left:50%;
+        top:-12px;left:50%;
         transform:translateX(-50%);
         filter:drop-shadow(0 0 4px rgba(0,0,0,0.4));
     }
@@ -43,22 +40,18 @@ let map, userMarker, watchId;
 let kalman = new KalmanFilter();
 let lastHeading = 0;
 
-/* =====================
-   KALMAN FILTER
-===================== */
+/* ===================== Kalman ===================== */
 function KalmanFilter(R=0.0008, Q=0.00001){
-    this.R=R; this.Q=Q;
-    this.A=1; this.C=1;
-    this.cov=NaN; this.x=NaN;
+    this.R=R; this.Q=Q; this.A=1; this.C=1; this.cov=NaN; this.x=NaN;
 
-    this.filter=function(z){
+    this.filter=z=>{
         if(isNaN(this.x)){ this.x=z; this.cov=1; }
         else{
-            const predX = this.A*this.x;
-            const predCov = this.A*this.cov*this.A + this.Q;
-            const K = predCov*this.C / (this.C*predCov*this.C + this.R);
-            this.x = predX + K*(z - this.C*predX);
-            this.cov = predCov - K*this.C*predCov;
+            const px=this.A*this.x;
+            const pc=this.A*this.cov*this.A + this.Q;
+            const K=pc*this.C / (this.C*pc*this.C+this.R);
+            this.x=px+K*(z-this.C*px);
+            this.cov=pc-K*this.C*pc;
         }
         return this.x;
     };
@@ -66,69 +59,45 @@ function KalmanFilter(R=0.0008, Q=0.00001){
     this.filter2D=(lat,lng)=>({ lat:this.filter(lat), lng:this.filter(lng) });
 }
 
-/* =====================
-   SAFE GET POSITION
-===================== */
-function getMarkerPos(marker){
-    // AdvancedMarkerElement → marker.position
-    if(marker.position){
-        return new google.maps.LatLng(marker.position.lat, marker.position.lng);
-    }
-
-    // Marker comum → marker.getPosition()
-    if(marker.getPosition){
-        return marker.getPosition();
-    }
-
+/* GET */
+function getPos(m){
+    if(m.position) return new google.maps.LatLng(m.position.lat, m.position.lng);
+    if(m.getPosition) return m.getPosition();
     return null;
 }
 
-/* =====================
-   SAFE SET POSITION
-===================== */
-function setMarkerPos(marker,pos){
-    // AdvancedMarkerElement usa = object
-    if(marker.position !== undefined){
-        marker.position = { lat: pos.lat(), lng: pos.lng() };
+/* SET */
+function setPos(m,pos){
+    if(m.position !== undefined){
+        m.position = {lat:pos.lat(), lng:pos.lng()};
         return;
     }
-
-    // Marker comum usa setPosition()
-    if(marker.setPosition){
-        marker.setPosition(pos);
-    }
+    if(m.setPosition) m.setPosition(pos);
 }
 
-/* =====================
-   ANIMAÇÃO SUAVE
-===================== */
+/* INTERPOLAÇÃO SUAVE */
 function lerp(a,b,t){ return a+(b-a)*t; }
 
-function animateTo(marker, newPos, duration=450){
-    const start = getMarkerPos(marker);
-    if(!start){
-        setMarkerPos(marker, newPos);
-        return;
-    }
+function animateTo(marker,newPos,dur=450){
+    const start=getPos(marker);
+    if(!start){ setPos(marker,newPos); return; }
 
     const sLat=start.lat(), sLng=start.lng();
     const eLat=newPos.lat(), eLng=newPos.lng();
-    const startTime=performance.now();
+    const t0=performance.now();
 
-    function frame(now){
-        const t=Math.min((now-startTime)/duration,1);
+    function step(now){
+        const t=Math.min((now-t0)/dur,1);
         const lat=lerp(sLat,eLat,t);
         const lng=lerp(sLng,eLng,t);
-        setMarkerPos(marker,new google.maps.LatLng(lat,lng));
-        if(t<1) requestAnimationFrame(frame);
+        setPos(marker,new google.maps.LatLng(lat,lng));
+        if(t<1) requestAnimationFrame(step);
     }
-    requestAnimationFrame(frame);
+    requestAnimationFrame(step);
 }
 
-/* =====================
-   CRIA SETA + PONTO
-===================== */
-function makeMarkerContent(){
+/* MARCADOR HTML */
+function markerContent(){
     const wrap=document.createElement("div");
     const dot=document.createElement("div");
     dot.className="location-dot";
@@ -139,21 +108,17 @@ function makeMarkerContent(){
     return wrap;
 }
 
-/* =====================
-   CRIA MARCADOR SEGURO
-===================== */
-function createSafeMarker(pos){
-    if(google.maps.marker?.AdvancedMarkerElement){
-        return new google.maps.marker.AdvancedMarkerElement({
-            map,
-            position:pos,
-            content:makeMarkerContent()
-        });
-    }
-
+/* CRIA MARCADOR */
+function createMarker(pos){
+    try{
+        if(google.maps.marker?.AdvancedMarkerElement){
+            return new google.maps.marker.AdvancedMarkerElement({
+                map, position:pos, content:markerContent()
+            });
+        }
+    }catch(e){}
     return new google.maps.Marker({
-        map,
-        position:pos,
+        map, position:pos,
         icon:{
             path:google.maps.SymbolPath.CIRCLE,
             scale:10,
@@ -165,41 +130,32 @@ function createSafeMarker(pos){
     });
 }
 
-/* =====================
-   INICIAR MAPA
-===================== */
+/* ===================== MAPA ===================== */
 function initMap(){
     map = new google.maps.Map(document.getElementById("map"),{
         center:{lat:-23.55,lng:-46.63},
-        zoom:18,
-        tilt:0,
-        heading:0,
-        gestureHandling:"greedy",
+        zoom:18, tilt:0, heading:0, gestureHandling:"greedy",
         mapId:"ebb7ca4503045feabc75b373"
     });
 
     startGPS();
 }
 
-/* =====================
-   INICIAR GPS
-===================== */
+/* ===================== GPS ===================== */
 function startGPS(){
     navigator.geolocation.getCurrentPosition(pos=>{
         const p=new google.maps.LatLng(pos.coords.latitude,pos.coords.longitude);
         map.setCenter(p);
-        userMarker=createSafeMarker(p);
+        userMarker=createMarker(p);
 
-        watchId=navigator.geolocation.watchPosition(updateGPS, err=>alert("GPS erro"), {
-            enableHighAccuracy:true
-        });
+        watchId=navigator.geolocation.watchPosition(updateGPS, err=>{
+            console.log("GPS erro:",err);
+        },{enableHighAccuracy:true});
 
-    }, err=>alert("Ative o GPS"));
+    }, err=>console.log("Erro inicial:",err));
 }
 
-/* =====================
-   ATUALIZAÇÃO GPS
-===================== */
+/* ===================== ATUALIZAÇÃO GPS ===================== */
 function updateGPS(pos){
     const f=kalman.filter2D(pos.coords.latitude,pos.coords.longitude);
     const newPos=new google.maps.LatLng(f.lat,f.lng);
@@ -207,18 +163,21 @@ function updateGPS(pos){
     animateTo(userMarker,newPos,450);
     map.panTo(newPos);
 
+    /* Heading */
     if(pos.coords.heading!=null){
         lastHeading=pos.coords.heading;
-        map.setHeading(lastHeading);
 
+        /* seta corrigida (heading correto) */
         if(userMarker.content){
             const arrow=userMarker.content.querySelector(".direction-arrow");
-            if(arrow){
-                arrow.style.transform=`translateX(-50%) rotate(${lastHeading}deg)`;
-            }
+            arrow.style.transform=
+                `translateX(-50%) rotate(${lastHeading}deg)`;
         }
+
+        map.setHeading(lastHeading);
     }
 }
 </script>
+
 </body>
 </html>
