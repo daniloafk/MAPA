@@ -2077,12 +2077,143 @@ function handleGeoError(error, isInitial = false) {
 // MARCADORES DE ENTREGAS
 // ===========================
 
+// ===========================
+// RENDERIZAÇÃO OTIMIZADA DE MARCADORES
+// Apenas marcadores visíveis + baseados em zoom
+// ===========================
+
+let allDeliveryPoints = []; // Cache de todos os pontos
+let visibleMarkers = []; // Marcadores atualmente renderizados
+let updateMarkersTimeout = null;
+
 function addDeliveryMarkers() {
-    // NOVA ABORDAGEM: NÃO CRIAR MARCADORES!
-    // A rota já mostra visualmente onde estão os pontos de entrega
-    // Isso mantém o mapa super leve e rápido
-    console.log('✅ Modo otimizado: marcadores não serão exibidos (apenas a rota)');
-    console.log('💡 Os 52 pontos de entrega serão visíveis através da linha da rota');
+    console.log('🎯 Inicializando sistema de marcadores otimizado (viewport-based)');
+
+    // Preparar todos os pontos de entrega (apenas uma vez)
+    allDeliveryPoints = Object.entries(addressDatabase).map(([qrCode, data]) => ({
+        qrCode,
+        position: { lat: data.latitude, lng: data.longitude },
+        address: data.address
+    }));
+
+    console.log(`📍 ${allDeliveryPoints.length} pontos de entrega preparados`);
+
+    // Criar marcadores apenas quando necessário (zoom perto)
+    // Listener para atualizar marcadores quando mover/zoom o mapa
+    google.maps.event.addListener(map, 'idle', updateVisibleMarkers);
+
+    // Renderizar marcadores iniciais
+    updateVisibleMarkers();
+}
+
+// Atualizar marcadores baseado no viewport e zoom atual
+function updateVisibleMarkers() {
+    // Debounce para evitar atualizações muito frequentes
+    if (updateMarkersTimeout) {
+        clearTimeout(updateMarkersTimeout);
+    }
+
+    updateMarkersTimeout = setTimeout(() => {
+        const zoom = map.getZoom();
+        const bounds = map.getBounds();
+
+        if (!bounds) return;
+
+        // REGRA: Só mostrar marcadores quando zoom >= 14 (próximo)
+        // De longe (zoom < 14): apenas rota
+        // De perto (zoom >= 14): rota + marcadores na viewport
+        if (zoom < 14) {
+            // Zoom distante: remover todos os marcadores
+            clearVisibleMarkers();
+            console.log('🔭 Zoom distante: marcadores ocultados');
+            return;
+        }
+
+        // Zoom perto: mostrar marcadores na viewport
+        const pointsInView = allDeliveryPoints.filter(point =>
+            bounds.contains(point.position)
+        );
+
+        // Limitar quantidade para performance (máximo 30 marcadores simultâneos)
+        const pointsToShow = pointsInView.slice(0, 30);
+
+        // Verificar quais já existem e quais precisam ser criados/removidos
+        updateMarkerSet(pointsToShow);
+
+        console.log(`📍 Marcadores visíveis: ${visibleMarkers.length}/${allDeliveryPoints.length} (zoom: ${zoom.toFixed(1)})`);
+    }, 200); // Aguardar 200ms após parar de mover
+}
+
+// Atualizar conjunto de marcadores (adicionar novos, remover antigos)
+function updateMarkerSet(newPoints) {
+    const newPointsMap = new Map(newPoints.map(p => [p.qrCode, p]));
+    const currentPointsMap = new Map(visibleMarkers.map(m => [m.qrCode, m]));
+
+    // Remover marcadores que não estão mais visíveis
+    visibleMarkers = visibleMarkers.filter(marker => {
+        if (!newPointsMap.has(marker.qrCode)) {
+            // Remover do mapa
+            marker.marker.map = null;
+            return false;
+        }
+        return true;
+    });
+
+    // Adicionar novos marcadores que ainda não existem
+    newPoints.forEach(point => {
+        if (!currentPointsMap.has(point.qrCode)) {
+            createLightweightMarker(point);
+        }
+    });
+}
+
+// Criar marcador ultra-leve (círculo SVG simples)
+function createLightweightMarker(point) {
+    // Criar círculo SVG leve (muito mais rápido que AdvancedMarkerElement com HTML)
+    const circle = new google.maps.Circle({
+        map: map,
+        center: point.position,
+        radius: 15, // 15 metros de raio (visível mas pequeno)
+        fillColor: '#ea4335',
+        fillOpacity: 0.8,
+        strokeColor: '#ffffff',
+        strokeWeight: 2,
+        strokeOpacity: 1,
+        clickable: true,
+        zIndex: 100
+    });
+
+    // InfoWindow para mostrar endereço ao clicar
+    const infoWindow = new google.maps.InfoWindow({
+        content: `
+            <div style="padding: 8px; max-width: 250px;">
+                <div style="font-weight: 600; margin-bottom: 4px;">📦 Ponto de Entrega</div>
+                <div style="font-size: 13px; color: #666;">${point.address}</div>
+            </div>
+        `
+    });
+
+    // Mostrar info ao clicar
+    circle.addListener('click', () => {
+        infoWindow.setPosition(point.position);
+        infoWindow.open(map);
+    });
+
+    // Armazenar referência
+    visibleMarkers.push({
+        qrCode: point.qrCode,
+        marker: circle,
+        infoWindow: infoWindow
+    });
+}
+
+// Limpar todos os marcadores visíveis
+function clearVisibleMarkers() {
+    visibleMarkers.forEach(marker => {
+        marker.marker.map = null;
+        marker.infoWindow.close();
+    });
+    visibleMarkers = [];
 }
 
 // ===========================
@@ -2858,8 +2989,9 @@ function deactivateRouteMode() {
         window.routePolylines = [];
     }
 
-    // Nada para limpar - marcadores não são mais criados
-    console.log('🗑️ Limpando apenas a rota (marcadores não existem)');
+    // Limpar marcadores visíveis
+    clearVisibleMarkers();
+    console.log('🗑️ Limpando rota e marcadores');
 
     showToast(
         'Modo de rota desativado',
