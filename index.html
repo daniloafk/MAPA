@@ -3072,16 +3072,25 @@ async function renderFleetRoute(fleetResult, origin) {
         return;
     }
 
+    // DEBUG: Ver estrutura da resposta
+    console.log('🔍 DEBUG - Estrutura completa da rota:', JSON.stringify(route, null, 2));
+    console.log('🔍 DEBUG - Primeira visita:', JSON.stringify(route.visits?.[0], null, 2));
+
     // Criar lista de pontos otimizados (origem + visitas + volta à origem)
     const allPoints = [origin];
 
-    route.visits.forEach(visit => {
+    route.visits.forEach((visit, index) => {
+        console.log(`🔍 DEBUG - Visit ${index}:`, JSON.stringify(visit, null, 2));
+
         // A Fleet API retorna as coordenadas diretamente em cada visit
         if (visit.arrivalWaypoint && visit.arrivalWaypoint.location && visit.arrivalWaypoint.location.latLng) {
             allPoints.push({
                 lat: visit.arrivalWaypoint.location.latLng.latitude,
                 lng: visit.arrivalWaypoint.location.latLng.longitude
             });
+            console.log(`✅ Ponto ${index} adicionado:`, visit.arrivalWaypoint.location.latLng);
+        } else {
+            console.log(`❌ Ponto ${index} IGNORADO - estrutura inválida`);
         }
     });
 
