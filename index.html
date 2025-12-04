@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mapa de Clientes - Google Maps</title>
+
+<style>
+    body,html{
+        margin:0;
+        padding:0;
+        height:100%;
+        width:100%;
+        overflow:hidden;
+        font-family:sans-serif;
+    }
+    #map{
+        height:100%;
+        width:100%;
+        position:absolute;
+        top:0;left:0;
+    }
+
+    .map-control{
+        position:fixed;
+        top:90px;
+        right:20px;
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+        z-index:9999;
+    }
+
+    .control-btn{
+        width:48px;
+        height:48px;
+        border-radius:50%;
+        border:none;
+        background:white;
+        box-shadow:0 2px 6px rgba(0,0,0,0.3);
+        font-size:20px;
+        cursor:pointer;
+    }
+
+    .control-btn:active{
+        transform:scale(.9);
+    }
+
+    /* Marcador de localização customizado */
+    .location-marker {
+        width: 20px;
+        height: 20px;
+        background: #4285f4;
+        border: 3px solid white;
+        border-radius: 50%;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        position: relative;
+    }
+
+    .location-marker::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 8px;
+        height: 8px;
+        background: white;
+        border-radius: 50%;
+    }
+
+    /* Animação de pulso */
+    @keyframes pulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(66, 133, 244, 0.7);
+        }
+        70% {
+            box-shadow: 0 0 0 10px rgba(66, 133, 244, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(66, 133, 244, 0);
+        }
+    }
+
+    .location-marker.active {
+        animation: pulse 2s infinite;
+    }
+
+    /* Responsividade Mobile */
+    @media (max-width: 768px) {
+        .map-control {
+            top: 70px;
+            right: 10px;
+        }
+
+        .control-btn {
+            width: 44px;
+            height: 44px;
+            font-size: 18px;
+        }
+    }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="map-control">
+    <button id="btnToggle3D" class="control-btn">3D</button>
+</div>
+
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+    const SUPABASE_URL = "https://fufteldeapyvluynppuv.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1ZnRlbGRlYXB5dmx1eW5wcHV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2MzAyMzIsImV4cCI6MjA4MDIwNjIzMn0.xr6PiskP8cJUzGBEhp_tAfZWMprxJXJyhLuOSmCQleA";
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+</script>
+
+<!-- Google Maps -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&callback=initMap&v=beta&libraries=places" async defer></script>
+
+<script>
+let map;
+let is3D = false;
+let userLocationMarker = null;
+let watchId = null;
+
+const MAP_ID = "ebb7ca4503045feabc75b373";
+
+function initMap(){
+    map = new google.maps.Map(document.getElementById("map"),{
+        center:{lat:-23.5505,lng:-46.6333},
+        zoom:17,
+        mapId:MAP_ID,
+        tilt:0,
+        heading:0,
+        gestureHandling:"greedy",
+        rotateControl:true,
+        zoomControl:true,
+        streetViewControl:false,
+        fullscreenControl:true
+    });
+
+    // Iniciar rastreamento de localização em tempo real
+    startLocationTracking();
+}
+
+/* ===========================
+   RASTREAMENTO DE LOCALIZAÇÃO EM TEMPO REAL
+   =========================== */
+
+function startLocationTracking() {
+    if (!navigator.geolocation) {
+        console.error("Geolocalização não suportada pelo navegador");
+        return;
+    }
+
+    // Criar marcador customizado
+    const markerDiv = document.createElement('div');
+    markerDiv.className = 'location-marker active';
+
+    // Opções de geolocalização
+    const geoOptions = {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0
+    };
+
+    // Primeira posição para centralizar o mapa
+    navigator.geolocation.getCurrentPosition(
+        position => {
+            const pos = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+            };
+
+            // Centralizar mapa na localização atual
+            map.setCenter(pos);
+            map.setZoom(17);
+
+            // Criar marcador avançado
+            if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+                userLocationMarker = new google.maps.marker.AdvancedMarkerElement({
+                    map: map,
+                    position: pos,
+                    content: markerDiv,
+                    title: "Sua Localização"
+                });
+            } else {
+                // Fallback para marcador padrão
+                userLocationMarker = new google.maps.Marker({
+                    map: map,
+                    position: pos,
+                    title: "Sua Localização",
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: "#4285f4",
+                        fillOpacity: 1,
+                        strokeColor: "white",
+                        strokeWeight: 3
+                    }
+                });
+            }
+
+            // Iniciar watchPosition para atualizar em tempo real
+            watchId = navigator.geolocation.watchPosition(
+                position => {
+                    updateUserLocation(position);
+                },
+                error => {
+                    console.error("Erro ao rastrear localização:", error);
+                },
+                geoOptions
+            );
+        },
+        error => {
+            console.error("Erro ao obter localização inicial:", error);
+        },
+        geoOptions
+    );
+}
+
+function updateUserLocation(position) {
+    const newPos = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+    };
+
+    if (userLocationMarker) {
+        userLocationMarker.position = newPos;
+    }
+}
+
+/* ===========================
+   ANIMAÇÃO SUAVE 2D ⇄ 3D
+   =========================== */
+
+function animateValue(start, end, duration, onUpdate, onFinish){
+    const startTime = performance.now();
+
+    function frame(time){
+        const progress = Math.min((time - startTime) / duration, 1);
+        const value = start + (end - start) * progress;
+
+        onUpdate(value);
+
+        if(progress < 1){
+            requestAnimationFrame(frame);
+        } else if(onFinish){
+            onFinish();
+        }
+    }
+
+    requestAnimationFrame(frame);
+}
+
+document.getElementById("btnToggle3D").onclick = ()=>{
+
+    if(!is3D){
+        is3D = true;
+        document.getElementById("btnToggle3D").textContent = "2D";
+
+        animateValue(map.getTilt(), 67, 600, val => map.setTilt(val));
+        animateValue(map.getHeading(), 45, 600, val => map.setHeading(val));
+
+    } else {
+        is3D = false;
+        document.getElementById("btnToggle3D").textContent = "3D";
+
+        animateValue(map.getTilt(), 0, 600, val => map.setTilt(val));
+        animateValue(map.getHeading(), 0, 600, val => map.setHeading(val));
+    }
+};
+
+// Limpar watch ao fechar a página
+window.addEventListener('beforeunload', () => {
+    if (watchId) {
+        navigator.geolocation.clearWatch(watchId);
+    }
+});
+</script>
+
+</body>
+</html>
