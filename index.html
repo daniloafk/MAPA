@@ -23,7 +23,7 @@
         top:0;left:0;
     }
 
-    /* botões */
+    /* BOTÕES */
     .map-control{
         position:fixed;
         top:90px;
@@ -33,6 +33,7 @@
         gap:10px;
         z-index:9999;
     }
+
     .control-btn{
         width:48px;
         height:48px;
@@ -44,44 +45,16 @@
         cursor:pointer;
     }
 
-    /* === 🔵 MARCADOR OFICIAL DO GOOGLE MAPS === */
-    .gm-blue-dot-wrapper {
-        width:40px;
-        height:40px;
-        position:relative;
-        transform:translate(-50%,-50%);
+    .control-btn:active{
+        transform:scale(.9);
     }
-
-    .gm-blue-dot {
-        width:22px;
-        height:22px;
-        background:#1a73e8;           /* azul padrão Google */
-        border-radius:50%;
-        border:4px solid #ffffff;     /* borda branca */
-        position:absolute;
-        top:9px;
-        left:9px;
-        box-shadow:0 2px 6px rgba(0,0,0,.5);
-    }
-
-    .gm-blue-center {
-        width:8px;
-        height:8px;
-        background:white;
-        border-radius:50%;
-        position:absolute;
-        top:50%;
-        left:50%;
-        transform:translate(-50%,-50%);
-    }
-
 </style>
 </head>
 <body>
 
 <div id="map"></div>
 
-<!-- botões -->
+<!-- BOTÕES -->
 <div class="map-control">
     <button id="btnToggle3D" class="control-btn">3D</button>
     <button id="btnCenterUser" class="control-btn">📍</button>
@@ -111,24 +84,22 @@ let currentHeading = 0;
 let is3D = false;
 let animating3D = false;
 
-/* cria ponto azul oficial */
-function createBlueDot() {
-    const wrap = document.createElement("div");
-    wrap.className = "gm-blue-dot-wrapper";
+const MAP_ID = "ebb7ca4503045feabc75b373";
 
-    const dot = document.createElement("div");
-    dot.className = "gm-blue-dot";
+/* =====================================================
+   ÍCONE OFICIAL: BOLINHA AZUL DO GOOGLE MAPS
+===================================================== */
+const BLUE_DOT_ICON = {
+    url: "data:image/svg+xml;utf-8," +
+         "<svg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'>" +
+         "<circle cx='16' cy='16' r='8' fill='%231A73E8' stroke='%23FFFFFF' stroke-width='4'/></svg>",
+    scaledSize: new google.maps.Size(32, 32),
+    anchor: new google.maps.Point(16, 16)
+};
 
-    const center = document.createElement("div");
-    center.className = "gm-blue-center";
-
-    dot.appendChild(center);
-    wrap.appendChild(dot);
-
-    return wrap;
-}
-
-/* giroscópio */
+/* =====================================================
+   GIROSCÓPIO
+===================================================== */
 function enableGyro() {
     if (window.DeviceOrientationEvent &&
         typeof DeviceOrientationEvent.requestPermission === "function") {
@@ -154,7 +125,9 @@ function onGyro(ev){
     }
 }
 
-/* animação suave */
+/* =====================================================
+   ANIMAÇÃO SUAVE
+===================================================== */
 function lerp(a,b,t){ return a+(b-a)*t; }
 
 function animateMarkerTo(marker,newPos,duration=450){
@@ -176,7 +149,9 @@ function animateMarkerTo(marker,newPos,duration=450){
     requestAnimationFrame(step);
 }
 
-/* GPS */
+/* =====================================================
+   GPS
+===================================================== */
 function startGPS(){
     if (!navigator.geolocation) return;
 
@@ -190,11 +165,12 @@ function startGPS(){
         const c = {lat:pos.coords.latitude,lng:pos.coords.longitude};
 
         map.setCenter(c);
+        map.setZoom(17);
 
         userMarker = new google.maps.Marker({
             map,
             position:c,
-            icon:{ element:createBlueDot() }
+            icon: BLUE_DOT_ICON
         });
 
         watchId = navigator.geolocation.watchPosition(updateUser,()=>{},opt);
@@ -212,14 +188,18 @@ function updateUser(pos){
     }
 }
 
-/* centralizar */
+/* =====================================================
+   CENTRALIZAR
+===================================================== */
 function centerUser(){
     if (!userMarker) return;
     map.panTo(userMarker.getPosition());
 }
 document.getElementById("btnCenterUser").onclick = centerUser;
 
-/* 2D / 3D */
+/* =====================================================
+   MODO 2D / 3D
+===================================================== */
 function animateValue(start,end,dur,onUpdate,onFinish){
     const t0 = performance.now();
     function frame(t){
@@ -239,29 +219,32 @@ document.getElementById("btnToggle3D").onclick = ()=>{
         is3D = true;
         btnToggle3D.textContent = "2D";
 
-        animateValue(map.getTilt(),67,800,val=>map.setTilt(val));
-        animateValue(map.getHeading(),45,800,val=>map.setHeading(val),
+        animateValue(map.getTilt(),67,700,val=>map.setTilt(val));
+        animateValue(map.getHeading(),45,700,val=>map.setHeading(val),
             ()=>animating3D=false);
 
     } else {
         is3D = false;
         btnToggle3D.textContent = "3D";
 
-        animateValue(map.getTilt(),0,800,val=>map.setTilt(val));
-        animateValue(map.getHeading(),0,800,val=>map.setHeading(val),
+        animateValue(map.getTilt(),0,700,val=>map.setTilt(val));
+        animateValue(map.getHeading(),0,700,val=>map.setHeading(val),
             ()=>animating3D=false);
     }
 };
 
-/* iniciar mapa */
+/* =====================================================
+   INICIAR MAPA
+===================================================== */
 function initMap(){
     map = new google.maps.Map(document.getElementById("map"),{
         center:{lat:-23.55,lng:-46.63},
         zoom:17,
         tilt:0,
         heading:0,
-        mapId:"ebb7ca4503045feabc75b373",
-        gestureHandling:"greedy"
+        mapId:MAP_ID,
+        gestureHandling:"greedy",
+        streetViewControl:false
     });
 
     enableGyro();
