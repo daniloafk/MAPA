@@ -1,0 +1,16 @@
+{
+  "name": "sistema-entregas",
+  "version": "1.0.0",
+  "description": "Sistema de rastreamento de entregas com Fleet Routing API",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Build complete'"
+  },
+  "dependencies": {
+    "google-auth-library": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
