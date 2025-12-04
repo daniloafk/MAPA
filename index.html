@@ -2909,6 +2909,14 @@ function deactivateRouteMode() {
         directionsRenderer.setDirections({routes: []});
     }
 
+    // Limpar polylines (rotas em segmentos)
+    if (window.routePolylines) {
+        window.routePolylines.forEach(polyline => {
+            polyline.setMap(null);
+        });
+        window.routePolylines = [];
+    }
+
     showToast(
         'Modo de rota desativado',
         'Marcadores de entrega restaurados',
@@ -3049,7 +3057,7 @@ async function calculateFleetRoute(origin, deliveryPoints) {
 }
 
 // Renderizar resultado da Fleet Routing API
-function renderFleetRoute(fleetResult, origin) {
+async function renderFleetRoute(fleetResult, origin) {
     const route = fleetResult.routes[0];
 
     if (!route || !route.visits) {
@@ -3063,71 +3071,139 @@ function renderFleetRoute(fleetResult, origin) {
         return;
     }
 
-    // Criar waypoints a partir das visitas otimizadas
-    const optimizedWaypoints = route.visits.map(visit => {
+    // Criar lista de pontos otimizados (origem + visitas + volta à origem)
+    const allPoints = [origin];
+
+    route.visits.forEach(visit => {
         const shipment = fleetResult.model.shipments[visit.shipmentIndex];
         const delivery = shipment.deliveries[0];
-        return {
-            location: {
-                lat: delivery.arrivalWaypoint.location.latLng.latitude,
-                lng: delivery.arrivalWaypoint.location.latLng.longitude
-            }
-        };
+        allPoints.push({
+            lat: delivery.arrivalWaypoint.location.latLng.latitude,
+            lng: delivery.arrivalWaypoint.location.latLng.longitude
+        });
     });
 
-    console.log(`Rota otimizada com ${optimizedWaypoints.length} pontos`);
+    // Adicionar retorno à origem
+    allPoints.push(origin);
 
-    // Usar Directions API para renderizar a rota visual
-    const waypoints = optimizedWaypoints.slice(0, -1).map(wp => ({
-        location: wp.location,
-        stopover: true
-    }));
+    console.log(`Rota otimizada com ${route.visits.length} pontos de entrega`);
+    console.log(`Total de pontos na rota: ${allPoints.length} (incluindo origem e retorno)`);
 
-    const destination = optimizedWaypoints[optimizedWaypoints.length - 1].location;
+    // Desenhar a rota DIRETAMENTE usando múltiplas requisições à Directions API
+    // Dividir em segmentos de até 25 pontos cada
+    await drawRouteInSegments(allPoints, route.visits.length);
+}
 
-    const request = {
-        origin: origin,
-        destination: destination,
-        waypoints: waypoints,
-        optimizeWaypoints: false, // Já foi otimizado pela Fleet API
-        travelMode: google.maps.TravelMode.DRIVING
-    };
+// Desenhar rota em múltiplos segmentos (para mais de 25 pontos)
+async function drawRouteInSegments(allPoints, totalDeliveries) {
+    console.log(`Desenhando rota com ${allPoints.length} pontos totais`);
 
-    directionsService.route(request, (result, status) => {
-        if (status === 'OK') {
-            directionsRenderer.setDirections(result);
+    // Limpar rotas anteriores
+    if (directionsRenderer) {
+        directionsRenderer.setMap(null);
+    }
 
-            // Calcular distância e tempo total
-            let totalDistance = 0;
-            let totalDuration = 0;
+    // Dividir pontos em segmentos de até 25 (origem + 23 waypoints + destino)
+    const segments = [];
+    const maxWaypoints = 23;
 
+    for (let i = 0; i < allPoints.length - 1; i += maxWaypoints + 1) {
+        const segmentStart = i;
+        const segmentEnd = Math.min(i + maxWaypoints + 1, allPoints.length - 1);
+
+        const origin = allPoints[segmentStart];
+        const destination = allPoints[segmentEnd];
+        const waypoints = [];
+
+        for (let j = segmentStart + 1; j < segmentEnd; j++) {
+            waypoints.push({
+                location: allPoints[j],
+                stopover: true
+            });
+        }
+
+        segments.push({ origin, destination, waypoints });
+    }
+
+    console.log(`Rota dividida em ${segments.length} segmento(s)`);
+
+    // Desenhar todos os segmentos
+    const polylines = [];
+    const bounds = new google.maps.LatLngBounds();
+    let totalDistance = 0;
+    let totalDuration = 0;
+
+    for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+
+        try {
+            const result = await new Promise((resolve, reject) => {
+                directionsService.route({
+                    origin: segment.origin,
+                    destination: segment.destination,
+                    waypoints: segment.waypoints,
+                    optimizeWaypoints: false, // JÁ otimizado pela Fleet API
+                    travelMode: google.maps.TravelMode.DRIVING
+                }, (result, status) => {
+                    if (status === 'OK') {
+                        resolve(result);
+                    } else {
+                        reject(new Error(`Segment ${i + 1} failed: ${status}`));
+                    }
+                });
+            });
+
+            // Calcular distância e tempo
             result.routes[0].legs.forEach(leg => {
                 totalDistance += leg.distance.value;
                 totalDuration += leg.duration.value;
             });
 
-            const distanceKm = (totalDistance / 1000).toFixed(1);
-            const durationMin = Math.round(totalDuration / 60);
+            // Criar polyline para este segmento
+            const path = result.routes[0].overview_path;
+            const polyline = new google.maps.Polyline({
+                path: path,
+                strokeColor: '#4285f4',
+                strokeWeight: 5,
+                strokeOpacity: 0.7,
+                map: map
+            });
 
-            showToast(
-                '✓ Rota otimizada calculada!',
-                `${optimizedWaypoints.length} entregas • ${distanceKm} km • ${durationMin} min`,
-                'success',
-                8000
-            );
+            polylines.push(polyline);
 
-            console.log(`Fleet route: ${optimizedWaypoints.length} pontos, ${distanceKm}km, ${durationMin}min`);
+            // Expandir bounds
+            path.forEach(point => bounds.extend(point));
 
-            // Ajustar zoom
-            const bounds = new google.maps.LatLngBounds();
-            result.routes[0].overview_path.forEach(point => bounds.extend(point));
-            map.fitBounds(bounds);
-        } else {
-            console.error('Erro ao renderizar rota:', status);
-            showToast('Erro ao exibir rota', status, 'error', 5000);
-            deactivateRouteMode();
+            console.log(`Segmento ${i + 1}/${segments.length} desenhado: ${segment.waypoints.length + 2} pontos`);
+
+        } catch (error) {
+            console.error(`Erro no segmento ${i + 1}:`, error);
         }
-    });
+
+        // Pequeno delay entre requisições para evitar rate limit
+        if (i < segments.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+    }
+
+    // Armazenar polylines para limpeza posterior
+    window.routePolylines = polylines;
+
+    // Ajustar zoom para mostrar toda a rota
+    map.fitBounds(bounds);
+
+    // Mostrar estatísticas
+    const distanceKm = (totalDistance / 1000).toFixed(1);
+    const durationMin = Math.round(totalDuration / 60);
+
+    showToast(
+        '✓ Rota otimizada completa!',
+        `${totalDeliveries} entregas • ${distanceKm} km • ${durationMin} min`,
+        'success',
+        10000
+    );
+
+    console.log(`✓ Rota completa: ${totalDeliveries} entregas, ${distanceKm}km, ${durationMin}min`);
 }
 
 // Fallback: Directions API (até 23 pontos)
