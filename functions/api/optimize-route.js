@@ -178,10 +178,19 @@ export async function onRequestPost(context) {
             const errorText = await fleetResponse.text();
             console.error('❌ Fleet Routing API error:', errorText);
 
+            let errorDetails = errorText;
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorDetails = JSON.stringify(errorJson, null, 2);
+            } catch (e) {
+                // Se não for JSON, mantém como texto
+            }
+
             return new Response(JSON.stringify({
                 success: false,
                 message: `Fleet Routing API retornou erro: ${fleetResponse.status}`,
-                details: errorText
+                details: errorDetails,
+                requestModel: model // Incluir modelo enviado para debug
             }), {
                 status: fleetResponse.status,
                 headers: { 'Content-Type': 'application/json' }
