@@ -224,7 +224,17 @@
     <div class="toast" id="toast"><div class="toast-icon"><i class="fas fa-check"></i></div><div class="toast-message" id="toastMessage"></div></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&callback=initMap&v=beta&libraries=places" async defer></script>
+    <script>
+        console.log('1. Scripts iniciando...');
+        window.gm_authFailure = function() {
+            console.error('ERRO: API Key do Google Maps inválida ou com problema de autenticação!');
+            const mapEl = document.getElementById('map');
+            if (mapEl) {
+                mapEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;background:#f8f9fa;color:#5f6368;flex-direction:column;padding:20px;text-align:center;"><i class="fas fa-exclamation-triangle" style="font-size:48px;margin-bottom:20px;color:#ea4335;"></i><h2>Erro de Autenticação</h2><p style="max-width:500px;">A API Key do Google Maps está inválida ou expirou.<br>Por favor, verifique suas credenciais no Google Cloud Console.</p></div>';
+            }
+        };
+    </script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&callback=initMap&libraries=places" async defer></script>
     <script>
 'use strict';
 const CONFIG = {
@@ -241,19 +251,56 @@ const App = {
 
     init() {
         try {
+            console.log('2. Inicializando App...');
+            console.log('3. Google Maps disponível?', typeof google !== 'undefined');
+            console.log('4. Supabase disponível?', typeof window.supabase !== 'undefined');
+
             this.supabase = window.supabase?.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
-            this.map = new google.maps.Map(document.getElementById("map"), {
-                center: CONFIG.DEFAULT_CENTER, zoom: CONFIG.DEFAULT_ZOOM, mapId: CONFIG.MAP_ID, tilt: 0, heading: 0,
-                gestureHandling: "greedy", zoomControl: true, mapTypeControl: false, streetViewControl: false, fullscreenControl: false
-            });
+            console.log('5. Supabase criado:', !!this.supabase);
+
+            const mapOptions = {
+                center: CONFIG.DEFAULT_CENTER,
+                zoom: CONFIG.DEFAULT_ZOOM,
+                gestureHandling: "greedy",
+                zoomControl: true,
+                mapTypeControl: false,
+                streetViewControl: false,
+                fullscreenControl: false,
+                tilt: 0,
+                heading: 0
+            };
+
+            // Tenta com mapId primeiro, se falhar, tenta sem
+            try {
+                mapOptions.mapId = CONFIG.MAP_ID;
+                this.map = new google.maps.Map(document.getElementById("map"), mapOptions);
+                console.log('6. Mapa criado com Map ID');
+            } catch (mapIdError) {
+                console.warn('Map ID falhou, tentando sem Map ID:', mapIdError);
+                delete mapOptions.mapId;
+                this.map = new google.maps.Map(document.getElementById("map"), mapOptions);
+                console.log('6. Mapa criado SEM Map ID');
+            }
+
+            console.log('7. Adicionando listeners...');
             this.map.addListener('click', e => this.openModal(e.latLng.lat(), e.latLng.lng()));
+
+            console.log('8. Inicializando busca...');
             this.initSearch();
+
+            console.log('9. Inicializando geolocalização...');
             this.initGeolocation();
+
+            console.log('10. Carregando clientes...');
             this.loadClients();
+
+            console.log('11. Binding eventos...');
             this.bindEvents();
+
+            console.log('✅ Inicialização completa!');
         } catch (e) {
-            console.error('Erro ao inicializar:', e);
-            document.getElementById('map').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;background:#f8f9fa;color:#5f6368;flex-direction:column;padding:20px;text-align:center;"><i class="fas fa-exclamation-triangle" style="font-size:48px;margin-bottom:20px;color:#ea4335;"></i><h2>Erro ao carregar mapa</h2><p>Por favor, recarregue a página.</p></div>';
+            console.error('❌ ERRO FATAL ao inicializar:', e);
+            document.getElementById('map').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;background:#f8f9fa;color:#5f6368;flex-direction:column;padding:20px;text-align:center;"><i class="fas fa-exclamation-triangle" style="font-size:48px;margin-bottom:20px;color:#ea4335;"></i><h2>Erro ao carregar mapa</h2><p>'+e.message+'</p><button onclick="location.reload()" style="margin-top:20px;padding:12px 24px;background:#4285f4;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;">Recarregar</button></div>';
         }
     },
 
@@ -275,11 +322,24 @@ const App = {
         navigator.geolocation.getCurrentPosition(pos => {
             const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
             this.map.setCenter(p);
-            const div = document.createElement('div');
-            div.className = 'location-marker';
-            this.userMarker = new google.maps.marker.AdvancedMarkerElement({ map: this.map, position: p, content: div, title: "Você" });
+
+            // Tenta usar AdvancedMarkerElement, se não funcionar usa Marker padrão
+            try {
+                const div = document.createElement('div');
+                div.className = 'location-marker';
+                this.userMarker = new google.maps.marker.AdvancedMarkerElement({
+                    map: this.map, position: p, content: div, title: "Você"
+                });
+            } catch (e) {
+                console.warn('AdvancedMarkerElement não disponível, usando Marker padrão');
+                this.userMarker = new google.maps.Marker({
+                    map: this.map, position: p, title: "Você",
+                    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#4285f4', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 3 }
+                });
+            }
+
             this.watchId = navigator.geolocation.watchPosition(pos => {
-                if (this.userMarker) this.userMarker.position = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                if (this.userMarker) this.userMarker.setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
             }, null, { enableHighAccuracy: true });
         }, null, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
     },
@@ -322,17 +382,40 @@ const App = {
         this.markers.forEach(m => m.setMap(null));
         this.markers.clear();
         this.clients.forEach(c => {
-            const div = document.createElement('div');
-            div.className = 'client-marker';
-            div.innerHTML = '<i class="fas fa-user"></i>';
-            const m = new google.maps.marker.AdvancedMarkerElement({
-                map: this.map, position: { lat: c.latitude, lng: c.longitude }, content: div, title: c.name
-            });
-            m.addListener('click', () => {
-                this.selectClient(c.id);
-                if (window.innerWidth <= 768) document.getElementById('sidebar').classList.add('open');
-            });
-            this.markers.set(c.id, m);
+            try {
+                const div = document.createElement('div');
+                div.className = 'client-marker';
+                div.innerHTML = '<i class="fas fa-user"></i>';
+                const m = new google.maps.marker.AdvancedMarkerElement({
+                    map: this.map, position: { lat: c.latitude, lng: c.longitude }, content: div, title: c.name
+                });
+                m.addListener('click', () => {
+                    this.selectClient(c.id);
+                    if (window.innerWidth <= 768) document.getElementById('sidebar').classList.add('open');
+                });
+                this.markers.set(c.id, m);
+            } catch (e) {
+                // Fallback para Marker padrão
+                console.warn('Usando Marker padrão para cliente:', c.name);
+                const m = new google.maps.Marker({
+                    map: this.map,
+                    position: { lat: c.latitude, lng: c.longitude },
+                    title: c.name,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 15,
+                        fillColor: '#667eea',
+                        fillOpacity: 1,
+                        strokeColor: '#fff',
+                        strokeWeight: 2
+                    }
+                });
+                m.addListener('click', () => {
+                    this.selectClient(c.id);
+                    if (window.innerWidth <= 768) document.getElementById('sidebar').classList.add('open');
+                });
+                this.markers.set(c.id, m);
+            }
         });
     },
 
