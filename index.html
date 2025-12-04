@@ -6,26 +6,44 @@
 <title>Navegação Estilo Google Maps</title>
 
 <style>
-    #map{ position:absolute; top:0; left:0; width:100%; height:100%; }
-
-    .location-dot{
-        width:22px; height:22px;
-        background:#1a73e8;
-        border-radius:50%;
-        border:4px solid white;
-        box-shadow:0 2px 6px rgba(0,0,0,0.4);
-        position:relative;
+    #map {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
     }
 
-    .direction-arrow{
-        width:0;height:0;
-        border-left:6px solid transparent;
-        border-right:6px solid transparent;
-        border-bottom:14px solid white;
-        position:absolute;
-        top:-12px;left:50%;
-        transform:translateX(-50%);
-        filter:drop-shadow(0 0 4px rgba(0,0,0,0.4));
+    /* Marcador HTML */
+    .marker-wrapper {
+        width: 40px;
+        height: 40px;
+        position: relative;
+    }
+
+    .location-dot {
+        width: 22px;
+        height: 22px;
+        background: #1a73e8;
+        border-radius: 50%;
+        border: 4px solid white;
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+
+    .direction-arrow {
+        width: 0;
+        height: 0;
+        border-left: 8px solid transparent;
+        border-right: 8px solid transparent;
+        border-bottom: 18px solid white;
+        position: absolute;
+        top: -4px;
+        left: 50%;
+        transform: translateX(-50%);
+        filter: drop-shadow(0 0 4px rgba(0,0,0,0.4));
     }
 </style>
 </head>
@@ -33,148 +51,155 @@
 
 <div id="map"></div>
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&callback=initMap&v=beta&libraries=marker" async defer></script>
+<!-- Google Maps -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&callback=initMap&v=beta" async defer></script>
 
 <script>
-let map, userMarker, watchId;
-let kalman = new KalmanFilter();
-let lastHeading = 0;
+let map;
+let userMarker;
+let watchId;
+let currentHeading = 0; // heading real
+let canUseGyro = false;
 
-/* ===================== Kalman ===================== */
-function KalmanFilter(R=0.0008, Q=0.00001){
-    this.R=R; this.Q=Q; this.A=1; this.C=1; this.cov=NaN; this.x=NaN;
+/* ================================
+   PERMISSÃO DO GIROSCÓPIO (Android)
+================================ */
+function enableGyroscope() {
+    if (typeof DeviceOrientationEvent !== "undefined" &&
+        typeof DeviceOrientationEvent.requestPermission === "function") {
 
-    this.filter=z=>{
-        if(isNaN(this.x)){ this.x=z; this.cov=1; }
-        else{
-            const px=this.A*this.x;
-            const pc=this.A*this.cov*this.A + this.Q;
-            const K=pc*this.C / (this.C*pc*this.C+this.R);
-            this.x=px+K*(z-this.C*px);
-            this.cov=pc-K*this.C*pc;
-        }
-        return this.x;
-    };
-
-    this.filter2D=(lat,lng)=>({ lat:this.filter(lat), lng:this.filter(lng) });
-}
-
-/* GET */
-function getPos(m){
-    if(m.position) return new google.maps.LatLng(m.position.lat, m.position.lng);
-    if(m.getPosition) return m.getPosition();
-    return null;
-}
-
-/* SET */
-function setPos(m,pos){
-    if(m.position !== undefined){
-        m.position = {lat:pos.lat(), lng:pos.lng()};
-        return;
+        DeviceOrientationEvent.requestPermission()
+            .then(response => {
+                if (response === "granted") {
+                    canUseGyro = true;
+                    window.addEventListener("deviceorientation", handleOrientation);
+                    console.log("Giroscópio ativado!");
+                } else {
+                    console.log("Usuário negou o giroscópio");
+                }
+            })
+            .catch(console.error);
+    } else {
+        // Chrome Desktop ou navegador sem permissão especial
+        canUseGyro = true;
+        window.addEventListener("deviceorientation", handleOrientation);
     }
-    if(m.setPosition) m.setPosition(pos);
 }
 
-/* INTERPOLAÇÃO SUAVE */
-function lerp(a,b,t){ return a+(b-a)*t; }
+/* =============== HÁNDLING DO GIROSCÓPIO ================== */
+function handleOrientation(event) {
+    if (!canUseGyro) return;
 
-function animateTo(marker,newPos,dur=450){
-    const start=getPos(marker);
-    if(!start){ setPos(marker,newPos); return; }
-
-    const sLat=start.lat(), sLng=start.lng();
-    const eLat=newPos.lat(), eLng=newPos.lng();
-    const t0=performance.now();
-
-    function step(now){
-        const t=Math.min((now-t0)/dur,1);
-        const lat=lerp(sLat,eLat,t);
-        const lng=lerp(sLng,eLng,t);
-        setPos(marker,new google.maps.LatLng(lat,lng));
-        if(t<1) requestAnimationFrame(step);
+    // event.alpha = rotação do celular em graus (0–360)
+    if (event.alpha != null) {
+        currentHeading = event.alpha; // mais preciso que GPS
+        rotateMarker(currentHeading);
+        map.setHeading(currentHeading);
     }
-    requestAnimationFrame(step);
 }
 
-/* MARCADOR HTML */
-function markerContent(){
-    const wrap=document.createElement("div");
-    const dot=document.createElement("div");
-    dot.className="location-dot";
-    const arrow=document.createElement("div");
-    arrow.className="direction-arrow";
-    wrap.appendChild(dot);
-    wrap.appendChild(arrow);
-    return wrap;
+/* ================================
+   CRIA MARCADOR HTML
+================================ */
+function createHtmlMarker() {
+    const div = document.createElement("div");
+    div.className = "marker-wrapper";
+
+    const dot = document.createElement("div");
+    dot.className = "location-dot";
+
+    const arrow = document.createElement("div");
+    arrow.className = "direction-arrow";
+
+    div.appendChild(dot);
+    div.appendChild(arrow);
+
+    return div;
 }
 
-/* CRIA MARCADOR */
-function createMarker(pos){
-    try{
-        if(google.maps.marker?.AdvancedMarkerElement){
-            return new google.maps.marker.AdvancedMarkerElement({
-                map, position:pos, content:markerContent()
-            });
-        }
-    }catch(e){}
-    return new google.maps.Marker({
-        map, position:pos,
-        icon:{
-            path:google.maps.SymbolPath.CIRCLE,
-            scale:10,
-            fillColor:"#1a73e8",
-            fillOpacity:1,
-            strokeColor:"white",
-            strokeWeight:3
-        }
-    });
+/* ================================
+   ROTACIONAR SETA
+================================ */
+function rotateMarker(deg) {
+    if (!userMarker) return;
+
+    const markerDiv = userMarker.getIcon().element;
+    if (!markerDiv) return;
+
+    const arrow = markerDiv.querySelector(".direction-arrow");
+    if (arrow) {
+        arrow.style.transform = `translateX(-50%) rotate(${deg}deg)`;
+    }
 }
 
-/* ===================== MAPA ===================== */
-function initMap(){
-    map = new google.maps.Map(document.getElementById("map"),{
-        center:{lat:-23.55,lng:-46.63},
-        zoom:18, tilt:0, heading:0, gestureHandling:"greedy",
-        mapId:"ebb7ca4503045feabc75b373"
+/* ================================
+   INICIAR MAPA
+================================ */
+function initMap() {
+    map = new google.maps.Map(document.getElementById("map"), {
+        center: {lat: -23.55, lng: -46.63},
+        zoom: 18,
+        tilt: 60,
+        heading: 0,
+        mapId: "ebb7ca4503045feabc75b373",
+        gestureHandling: "greedy"
     });
 
+    enableGyroscope();
     startGPS();
 }
 
-/* ===================== GPS ===================== */
-function startGPS(){
-    navigator.geolocation.getCurrentPosition(pos=>{
-        const p=new google.maps.LatLng(pos.coords.latitude,pos.coords.longitude);
-        map.setCenter(p);
-        userMarker=createMarker(p);
+/* ================================
+   INICIAR GPS
+================================ */
+function startGPS() {
+    if (!navigator.geolocation) {
+        console.log("Geolocalização não suportada.");
+        return;
+    }
 
-        watchId=navigator.geolocation.watchPosition(updateGPS, err=>{
-            console.log("GPS erro:",err);
-        },{enableHighAccuracy:true});
+    navigator.geolocation.getCurrentPosition(pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
 
-    }, err=>console.log("Erro inicial:",err));
+        const htmlMarker = createHtmlMarker();
+
+        userMarker = new google.maps.marker.AdvancedMarkerElement({
+            map,
+            position: {lat, lng},
+            content: htmlMarker
+        });
+
+        map.setCenter({lat, lng});
+
+        watchId = navigator.geolocation.watchPosition(updatePosition, err => {
+            console.log("Erro no GPS:", err);
+        }, { enableHighAccuracy: true });
+
+    }, err => {
+        console.log("Erro ao iniciar GPS:", err);
+    });
 }
 
-/* ===================== ATUALIZAÇÃO GPS ===================== */
-function updateGPS(pos){
-    const f=kalman.filter2D(pos.coords.latitude,pos.coords.longitude);
-    const newPos=new google.maps.LatLng(f.lat,f.lng);
+/* ================================
+   ATUALIZA POSIÇÃO SUAVEMENTE
+================================ */
+function updatePosition(pos) {
 
-    animateTo(userMarker,newPos,450);
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+
+    const newPos = { lat, lng };
+
+    // Atualiza o mapa e marcador
+    userMarker.position = newPos;
     map.panTo(newPos);
 
-    /* Heading */
-    if(pos.coords.heading!=null){
-        lastHeading=pos.coords.heading;
-
-        /* seta corrigida (heading correto) */
-        if(userMarker.content){
-            const arrow=userMarker.content.querySelector(".direction-arrow");
-            arrow.style.transform=
-                `translateX(-50%) rotate(${lastHeading}deg)`;
-        }
-
-        map.setHeading(lastHeading);
+    // Usa heading do GPS APENAS se giroscópio estiver indisponível
+    if (!canUseGyro && pos.coords.heading != null) {
+        currentHeading = pos.coords.heading;
+        rotateMarker(currentHeading);
+        map.setHeading(currentHeading);
     }
 }
 </script>
