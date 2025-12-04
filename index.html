@@ -12,6 +12,7 @@
         height:100%;
         width:100%;
         font-family:sans-serif;
+        background:#f0f0f0;
     }
     #map{
         height:100%;
@@ -80,24 +81,48 @@
     <button id="btnCenterUser" class="control-btn">📍</button>
 </div>
 
-
 <!-- GOOGLE MAPS COM LIBRARY MARKER (OBRIGATÓRIO) -->
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&callback=initMap&v=beta&libraries=marker" async defer></script>
-
 
 <script>
 let map;
 let userMarker = null;
 let watchId = null;
+let is3D = false;
+let _anim3D = false;
 let kalman = null;
 let lastHeading = 0;
 let lastSpeed = 0;
-let is3D = false;
-let _anim3D = false;
 
-/* ==============================
-   FUNÇÕES DE SEGURANÇA
-   ============================== */
+/* ============================================================
+   FUNÇÕES SEGUROAS PARA LIDAR COM ADVANCEDMARKER + MARKER NORMAL
+   ============================================================ */
+
+function getMarkerPosition(marker) {
+    if (!marker) return null;
+
+    if (marker.position) return marker.position; // AdvancedMarkerElement
+    if (marker.getPosition) return marker.getPosition(); // Marker normal
+
+    return null;
+}
+
+function setMarkerPosition(marker, pos) {
+    if (!marker) return;
+
+    if (marker.position !== undefined) {
+        marker.position = pos; // AdvancedMarkerElement
+        return;
+    }
+
+    if (marker.setPosition) {
+        marker.setPosition(pos); // Marker normal
+    }
+}
+
+/* ============================================================
+   FALLBACK AUTOMÁTICO PARA MARCADOR NORMAL
+   ============================================================ */
 
 function safeAdvancedMarker(pos, content) {
     try {
@@ -108,8 +133,8 @@ function safeAdvancedMarker(pos, content) {
                 content: content
             });
         }
-    } catch(e) {
-        console.warn("AdvancedMarkerElement falhou, usando Marker comum.");
+    } catch (e) {
+        console.warn("AdvancedMarkerElement falhou, usando Marker normal.");
     }
 
     return new google.maps.Marker({
@@ -126,10 +151,9 @@ function safeAdvancedMarker(pos, content) {
     });
 }
 
-/* ==============================
+/* ============================================================
    KALMAN FILTER
-   ============================== */
-
+   ============================================================ */
 class Kalman {
     constructor(R=0.0008, Q=0.00001){
         this.R = R;
@@ -144,11 +168,11 @@ class Kalman {
             this.x = z;
             this.cov = 1;
         } else {
-            const predX = this.A * this.x;
-            const predCov = this.A * this.cov * this.A + this.Q;
-            const K = predCov * this.C / (this.C * predCov * this.C + this.R);
-            this.x = predX + K * (z - this.C * predX);
-            this.cov = predCov - K * this.C * predCov;
+            const predX = this.A*this.x;
+            const predCov = this.A*this.cov*this.A + this.Q;
+            const K = predCov*this.C / (this.C*predCov*this.C + this.R);
+            this.x = predX + K*(z - this.C*predX);
+            this.cov = predCov - K*this.C*predCov;
         }
         return this.x;
     }
@@ -157,37 +181,43 @@ class Kalman {
     }
 }
 
-/* ==============================
-   INTERPOLAÇÃO SUAVE
-   ============================== */
+/* ============================================================
+   INTERPOLAÇÃO SUAVE SEM TREPIDAÇÃO
+   ============================================================ */
+
 function lerp(a,b,t){ return a+(b-a)*t; }
 
-function animateTo(marker, newPos, duration=450){
-    if(!marker.getPosition){
-        marker.setPosition(newPos);
+function animateTo(marker, newPos, duration=450) {
+    const startPos = getMarkerPosition(marker);
+
+    if (!startPos) {
+        setMarkerPosition(marker, newPos);
         return;
     }
 
-    const start = marker.getPosition();
-    const sLat = start.lat();
-    const sLng = start.lng();
+    const sLat = startPos.lat();
+    const sLng = startPos.lng();
     const eLat = newPos.lat();
     const eLng = newPos.lng();
     const startTime = performance.now();
 
-    function frame(now){
+    function frame(now) {
         const t = Math.min((now - startTime) / duration, 1);
         const lat = lerp(sLat, eLat, t);
         const lng = lerp(sLng, eLng, t);
-        marker.setPosition(new google.maps.LatLng(lat, lng));
-        if(t < 1) requestAnimationFrame(frame);
+
+        setMarkerPosition(marker, new google.maps.LatLng(lat, lng));
+
+        if (t < 1) requestAnimationFrame(frame);
     }
+
     requestAnimationFrame(frame);
 }
 
-/* ==============================
-   MARCADOR (D)
-   ============================== */
+/* ============================================================
+   MARCADOR ESTILO ANDROID 13 (OPÇÃO D)
+   ============================================================ */
+
 function createDirectionMarker(){
     const root = document.createElement("div");
     const dot = document.createElement("div");
@@ -199,9 +229,9 @@ function createDirectionMarker(){
     return root;
 }
 
-/* ==============================
+/* ============================================================
    INICIAR MAPA
-   ============================== */
+   ============================================================ */
 function initMap(){
     map = new google.maps.Map(document.getElementById("map"),{
         center:{lat:-23.55,lng:-46.63},
@@ -213,14 +243,14 @@ function initMap(){
     });
 
     kalman = new Kalman();
-
     startTracking();
 }
 window.initMap = initMap;
 
-/* ==============================
-   RASTREAMENTO GPS
-   ============================== */
+/* ============================================================
+   RASTREAMENTO EM TEMPO REAL
+   ============================================================ */
+
 function startTracking(){
     if(!navigator.geolocation){
         alert("Seu navegador não suporta GPS.");
@@ -239,78 +269,73 @@ function startTracking(){
     }, gpsError, opt);
 }
 
-/* ==============================
-   ATUALIZAÇÃO DO GPS
-   ============================== */
+/* ============================================================
+   ATUALIZAÇÃO DO GPS + HEADING + TILT DINÂMICO
+   ============================================================ */
+
 function updatePosition(position){
-    const rawLat = position.coords.latitude;
-    const rawLng = position.coords.longitude;
-
-    const filtered = kalman.filter2D(rawLat, rawLng);
-
+    const filtered = kalman.filter2D(position.coords.latitude, position.coords.longitude);
     const newPos = new google.maps.LatLng(filtered.lat, filtered.lng);
 
     animateTo(userMarker, newPos, 450);
 
-    /* Heading */
+    map.panTo(newPos);
+
     if(position.coords.heading !== null){
-        lastHeading = position.coords.heading;
-        rotateArrow(lastHeading);
-        map.setHeading(lastHeading);
+        const deg = position.coords.heading;
+        lastHeading = deg;
+
+        rotateArrow(deg);
+        map.setHeading(deg);
     }
 
-    /* Velocidade → tilt + zoom */
     if(position.coords.speed !== null){
         lastSpeed = position.coords.speed;
         const tilt = Math.min(60, lastSpeed * 6);
         map.setTilt(tilt);
-        map.setZoom(lastSpeed > 8 ? 17.2 : 18);
+        const zoom = (lastSpeed > 8) ? 17.2 : 18;
+        map.setZoom(zoom);
     }
-
-    /* Seguir o usuário */
-    map.panTo(newPos);
 }
 
-/* ==============================
-   Seta direcional
-   ============================== */
+/* ============================================================
+   ROTAÇÃO DA SETA
+   ============================================================ */
 function rotateArrow(deg){
     if(!userMarker.content) return;
     const arrow = userMarker.content.querySelector(".direction-arrow");
-    if(arrow){
-        arrow.style.transform = `translateX(-50%) rotate(${deg}deg)`;
-    }
+    if(arrow) arrow.style.transform = `translateX(-50%) rotate(${deg}deg)`;
 }
 
-/* ==============================
+/* ============================================================
    ERRO DE GPS
-   ============================== */
+   ============================================================ */
 function gpsError(e){
-    console.warn(e);
+    console.warn("GPS error:",e);
     alert("Ative o GPS e recarregue.");
 }
 
-/* ==============================
-   CENTRALIZAR MANUAL
-   ============================== */
+/* ============================================================
+   BOTÃO: CENTRALIZAR
+   ============================================================ */
 document.getElementById("btnCenterUser").onclick = ()=>{
     if(!userMarker) return;
-    map.panTo(userMarker.getPosition());
+    map.panTo(getMarkerPosition(userMarker));
     map.setZoom(18);
 };
 
-/* ==============================
+/* ============================================================
    MODO 3D
-   ============================== */
+   ============================================================ */
 function animateValue(start,end,dur,onUpdate,onFinish){
     const t0 = performance.now();
-    function f(now){
+    function step(now){
         const t = Math.min((now-t0)/dur,1);
-        onUpdate( lerp(start,end,t) );
-        if(t<1) requestAnimationFrame(f);
+        onUpdate(lerp(start,end,t));
+        if(t<1) requestAnimationFrame(step);
         else if(onFinish) onFinish();
     }
-    requestAnimationFrame(f);
+    requestAnimationFrame(step);
 }
 
 document.getElementById("btnToggle3D").onclick = ()=>{
@@ -321,7 +346,7 @@ document.getElementById("btnToggle3D").onclick = ()=>{
         is3D = true;
         btnToggle3D.textContent="2D";
         animateValue(map.getTilt(),60,600,val=>map.setTilt(val));
-        animateValue(map.getHeading(),lastHeading||0,600,val=>map.setHeading(val),()=>_anim3D=false);
+        animateValue(map.getHeading(),lastHeading,600,val=>map.setHeading(val),()=>_anim3D=false);
     } else {
         is3D = false;
         btnToggle3D.textContent="3D";
