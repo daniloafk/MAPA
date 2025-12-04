@@ -1777,8 +1777,8 @@
 };
 </script>
 
-<!-- Google Maps - Carregamento otimizado -->
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&loading=async&callback=initMap&v=beta&libraries=geometry"></script>
+<!-- Google Maps -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&loading=async&callback=initMap&v=beta&libraries=places,geometry"></script>
 
 <script>
 let map;
@@ -1886,7 +1886,7 @@ window.initMap = function () {
         directionsService = new google.maps.DirectionsService();
         directionsRenderer = new google.maps.DirectionsRenderer({
             map: map,
-            suppressMarkers: false,
+            suppressMarkers: false, // Não suprimir marcadores (A, B, C, etc.)
             polylineOptions: {
                 strokeColor: '#4285f4',
                 strokeWeight: 5,
@@ -1985,9 +1985,8 @@ function startLocationTracking() {
                 hideLoadingScreen();
                 showAddClientButton(); // Mostrar botão adicionar cliente
 
-                // NÃO adicionar marcadores automaticamente (deixa o mapa leve)
-                // Os marcadores serão adicionados apenas ao ativar o modo de rota
-                console.log('Mapa carregado. Marcadores serão exibidos ao calcular rota.');
+                // Adicionar marcadores de entrega após carregar o mapa
+                addDeliveryMarkers();
             } catch (error) {
                 console.error('Erro ao criar marcador:', error);
                 hideLoadingScreen();
@@ -2077,174 +2076,113 @@ function handleGeoError(error, isInitial = false) {
 // MARCADORES DE ENTREGAS
 // ===========================
 
-// ===========================
-// RENDERIZAÇÃO OTIMIZADA DE MARCADORES
-// Apenas marcadores visíveis + baseados em zoom
-// ===========================
-
-let allDeliveryPoints = []; // Cache de todos os pontos
-let visibleMarkers = []; // Marcadores atualmente renderizados
-let updateMarkersTimeout = null;
-let lastBounds = null; // Cache do último bounds calculado
-let lastZoom = null; // Cache do último zoom
-
 function addDeliveryMarkers() {
-    console.log('🎯 Inicializando sistema de marcadores otimizado (viewport-based)');
+    console.log('Adicionando marcadores de entrega...');
 
-    // Preparar todos os pontos de entrega (apenas uma vez)
-    allDeliveryPoints = Object.entries(addressDatabase).map(([qrCode, data]) => ({
-        qrCode,
-        position: { lat: data.latitude, lng: data.longitude },
-        address: data.address
-    }));
-
-    console.log(`📍 ${allDeliveryPoints.length} pontos de entrega preparados`);
-
-    // Criar marcadores apenas quando necessário (zoom perto)
-    google.maps.event.addListener(map, 'idle', updateVisibleMarkers);
-
-    // Renderizar marcadores iniciais
-    updateVisibleMarkers();
-}
-
-// Atualizar marcadores baseado no viewport e zoom atual
-function updateVisibleMarkers() {
-    // Debounce para evitar atualizações muito frequentes
-    if (updateMarkersTimeout) {
-        clearTimeout(updateMarkersTimeout);
-    }
-
-    updateMarkersTimeout = setTimeout(() => {
-        const zoom = map.getZoom();
-        const bounds = map.getBounds();
-
-        if (!bounds) return;
-
-        // Cache: verificar se bounds ou zoom mudaram significativamente
-        const zoomChanged = lastZoom === null || Math.abs(zoom - lastZoom) > 0.5;
-        const boundsChanged = lastBounds === null || !lastBounds.equals(bounds);
-
-        if (!zoomChanged && !boundsChanged) {
-            return; // Sem mudanças significativas, não atualizar
-        }
-
-        lastZoom = zoom;
-        lastBounds = bounds;
-
-        // REGRA: Só mostrar marcadores quando zoom >= 15 (bem próximo)
-        if (zoom < 15) {
-            clearVisibleMarkers();
-            console.log('🔭 Zoom distante: marcadores ocultados');
-            return;
-        }
-
-        // Usar requestIdleCallback para processar quando navegador estiver ocioso
-        if ('requestIdleCallback' in window) {
-            requestIdleCallback(() => {
-                renderMarkersInViewport(bounds);
-            }, { timeout: 500 });
-        } else {
-            renderMarkersInViewport(bounds);
-        }
-    }, 300);
-}
-
-// Função separada para renderizar marcadores (pode ser chamada via requestIdleCallback)
-function renderMarkersInViewport(bounds) {
-    // Zoom perto: mostrar marcadores na viewport
-    const pointsInView = allDeliveryPoints.filter(point =>
-        bounds.contains(point.position)
-    );
-
-    // Limitar quantidade para performance (máximo 20 marcadores simultâneos)
-    const pointsToShow = pointsInView.slice(0, 20);
-
-    // Verificar quais já existem e quais precisam ser criados/removidos
-    updateMarkerSet(pointsToShow);
-
-    console.log(`📍 Marcadores visíveis: ${visibleMarkers.length}/${allDeliveryPoints.length} (zoom: ${lastZoom.toFixed(1)})`);
-}
-
-// Atualizar conjunto de marcadores (adicionar novos, remover antigos)
-function updateMarkerSet(newPoints) {
-    const newPointsMap = new Map(newPoints.map(p => [p.qrCode, p]));
-    const currentPointsMap = new Map(visibleMarkers.map(m => [m.qrCode, m]));
-
-    // Remover marcadores que não estão mais visíveis
-    visibleMarkers = visibleMarkers.filter(marker => {
-        if (!newPointsMap.has(marker.qrCode)) {
-            // Remover do mapa
-            marker.marker.map = null;
-            return false;
-        }
-        return true;
-    });
-
-    // Adicionar novos marcadores que ainda não existem
-    newPoints.forEach(point => {
-        if (!currentPointsMap.has(point.qrCode)) {
-            createLightweightMarker(point);
+    // Limpar marcadores existentes
+    Object.values(deliveryMarkers).forEach(marker => {
+        if (marker.map) {
+            marker.map = null; // Remove do mapa
         }
     });
-}
+    deliveryMarkers = {};
 
-// Criar marcador ultra-leve (círculo SVG simples)
-function createLightweightMarker(point) {
-    // Usar requestAnimationFrame para renderização suave
-    requestAnimationFrame(() => {
-        // Criar círculo SVG leve
-        const circle = new google.maps.Circle({
-            map: map,
-            center: point.position,
-            radius: 12,
-            fillColor: '#ea4335',
-            fillOpacity: 0.85,
-            strokeColor: '#ffffff',
-            strokeWeight: 2,
-            strokeOpacity: 1,
-            clickable: true,
-            zIndex: 100,
-            optimized: true,
-            visible: true
+    // Adicionar marcador para cada endereço no banco de dados
+    Object.entries(addressDatabase).forEach(([qrCode, data]) => {
+        const position = {
+            lat: data.latitude,
+            lng: data.longitude
+        };
+
+        // Criar elemento do marcador (pacote/caixa)
+        const markerDiv = document.createElement('div');
+        markerDiv.style.width = '30px';
+        markerDiv.style.height = '30px';
+        markerDiv.style.background = '#ea4335';
+        markerDiv.style.border = '2px solid white';
+        markerDiv.style.borderRadius = '4px';
+        markerDiv.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4)';
+        markerDiv.style.display = 'flex';
+        markerDiv.style.alignItems = 'center';
+        markerDiv.style.justifyContent = 'center';
+        markerDiv.style.fontSize = '16px';
+        markerDiv.innerHTML = '📦';
+        markerDiv.style.cursor = 'pointer';
+        markerDiv.style.transition = 'transform 0.2s';
+
+        markerDiv.addEventListener('mouseenter', () => {
+            markerDiv.style.transform = 'scale(1.2)';
+        });
+        markerDiv.addEventListener('mouseleave', () => {
+            markerDiv.style.transform = 'scale(1)';
         });
 
-        // InfoWindow para mostrar endereço ao clicar (lazy loading)
-        let infoWindow = null;
-
-        // Mostrar info ao clicar (criar InfoWindow apenas quando necessário)
-        circle.addListener('click', () => {
-            if (!infoWindow) {
-                infoWindow = new google.maps.InfoWindow({
-                    content: `
-                        <div style="padding: 8px; max-width: 250px;">
-                            <div style="font-weight: 600; margin-bottom: 4px;">📦 Ponto de Entrega</div>
-                            <div style="font-size: 13px; color: #666;">${point.address}</div>
-                        </div>
-                    `
+        try {
+            // Criar marcador usando AdvancedMarkerElement (se disponível) ou Marker clássico
+            if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+                const marker = new google.maps.marker.AdvancedMarkerElement({
+                    map,
+                    position,
+                    content: markerDiv,
+                    title: data.address.split('\n')[0] // Primeira linha do endereço
                 });
+
+                // Adicionar listener de clique no marcador
+                marker.addListener('click', () => {
+                    map.setCenter(position);
+                    map.setZoom(18);
+
+                    showToast(
+                        '📦 Pacote',
+                        data.address,
+                        'info',
+                        5000
+                    );
+                });
+
+                deliveryMarkers[qrCode] = marker;
+            } else {
+                // Fallback: usar Marker clássico com ícone personalizado
+                const marker = new google.maps.Marker({
+                    map,
+                    position,
+                    title: data.address.split('\n')[0],
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        fillColor: '#ea4335',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2,
+                        scale: 10
+                    },
+                    label: {
+                        text: '📦',
+                        color: '#ffffff',
+                        fontSize: '14px'
+                    }
+                });
+
+                // Adicionar listener de clique
+                marker.addListener('click', () => {
+                    map.setCenter(position);
+                    map.setZoom(18);
+
+                    showToast(
+                        '📦 Pacote',
+                        data.address,
+                        'info',
+                        5000
+                    );
+                });
+
+                deliveryMarkers[qrCode] = marker;
             }
-            infoWindow.setPosition(point.position);
-            infoWindow.open(map);
-        });
-
-        // Armazenar referência
-        visibleMarkers.push({
-            qrCode: point.qrCode,
-            marker: circle,
-            infoWindow: infoWindow
-        });
-    });
-}
-
-// Limpar todos os marcadores visíveis
-function clearVisibleMarkers() {
-    visibleMarkers.forEach(marker => {
-        marker.marker.setMap(null);
-        if (marker.infoWindow) {
-            marker.infoWindow.close();
+        } catch (error) {
+            console.error('Erro ao criar marcador de entrega:', error);
         }
     });
-    visibleMarkers = [];
+
+    console.log(`${Object.keys(deliveryMarkers).length} marcadores de entrega adicionados`);
 }
 
 // ===========================
@@ -2972,12 +2910,6 @@ function activateRouteMode() {
     routeMode = true;
     btnToggleRoute.classList.add('active');
 
-    // Adicionar marcadores quando ativar modo de rota (se ainda não existirem)
-    if (Object.keys(deliveryMarkers).length === 0) {
-        console.log('⚡ Adicionando marcadores de entrega...');
-        addDeliveryMarkers();
-    }
-
     // Obter posição atual do usuário
     let currentPosition;
     if (userLocationMarker) {
@@ -3020,13 +2952,9 @@ function deactivateRouteMode() {
         window.routePolylines = [];
     }
 
-    // Limpar marcadores visíveis
-    clearVisibleMarkers();
-    console.log('🗑️ Limpando rota e marcadores');
-
     showToast(
         'Modo de rota desativado',
-        'Mapa restaurado (marcadores removidos)',
+        'Marcadores de entrega restaurados',
         'info',
         2000
     );
@@ -3289,7 +3217,6 @@ async function drawRouteInSegments(allPoints, totalDeliveries) {
 
             // Criar polyline para este segmento
             const path = result.routes[0].overview_path;
-
             const polyline = new google.maps.Polyline({
                 path: path,
                 strokeColor: '#4285f4',
