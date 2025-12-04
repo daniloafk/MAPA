@@ -1576,7 +1576,7 @@ function stopCamera() {
 
 // Iniciar loop de scanning
 function startScanning() {
-    const canvasContext = qrCanvas.getContext('2d');
+    const canvasContext = qrCanvas.getContext('2d', { willReadFrequently: true });
 
     scanningInterval = setInterval(() => {
         if (qrVideo.readyState === qrVideo.HAVE_ENOUGH_DATA) {
