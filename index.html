@@ -3295,6 +3295,12 @@ async function drawRouteInSegments(allPoints, totalDeliveries) {
         const segment = segments[i];
 
         try {
+            console.log(`🚗 Chamando Directions API para segmento ${i + 1}/${segments.length}:`, {
+                origin: segment.origin,
+                destination: segment.destination,
+                waypoints: segment.waypoints.length
+            });
+
             const result = await new Promise((resolve, reject) => {
                 directionsService.route({
                     origin: segment.origin,
@@ -3304,8 +3310,10 @@ async function drawRouteInSegments(allPoints, totalDeliveries) {
                     travelMode: google.maps.TravelMode.DRIVING
                 }, (result, status) => {
                     if (status === 'OK') {
+                        console.log(`✅ Directions API retornou para segmento ${i + 1}: ${status}`);
                         resolve(result);
                     } else {
+                        console.error(`❌ Directions API FALHOU para segmento ${i + 1}: ${status}`);
                         reject(new Error(`Segment ${i + 1} failed: ${status}`));
                     }
                 });
@@ -3317,20 +3325,11 @@ async function drawRouteInSegments(allPoints, totalDeliveries) {
                 totalDuration += leg.duration.value;
             });
 
-            // Criar polyline para este segmento (otimizada)
-            let path = result.routes[0].overview_path;
+            // Criar polyline para este segmento
+            const path = result.routes[0].overview_path;
 
-            // Simplificar path para reduzir pontos (melhor performance)
-            // Usar algoritmo de simplificação: manter 1 de cada 3 pontos em rotas longas
-            if (path.length > 100) {
-                const simplifiedPath = [path[0]]; // Sempre manter primeiro ponto
-                for (let k = 2; k < path.length - 1; k += 2) {
-                    simplifiedPath.push(path[k]);
-                }
-                simplifiedPath.push(path[path.length - 1]); // Sempre manter último ponto
-                path = simplifiedPath;
-                console.log(`Path simplificado: ${result.routes[0].overview_path.length} → ${path.length} pontos`);
-            }
+            // DEBUG: verificar se o path está correto
+            console.log(`Segmento ${i + 1}: ${path.length} pontos no caminho`);
 
             const polyline = new google.maps.Polyline({
                 path: path,
@@ -3350,7 +3349,16 @@ async function drawRouteInSegments(allPoints, totalDeliveries) {
             console.log(`Segmento ${i + 1}/${segments.length} desenhado: ${segment.waypoints.length + 2} pontos`);
 
         } catch (error) {
-            console.error(`Erro no segmento ${i + 1}:`, error);
+            console.error(`❌ ERRO CRÍTICO no segmento ${i + 1}:`, error);
+            console.error(`Detalhes do erro:`, error.message);
+
+            // Mostrar toast de erro
+            showToast(
+                `Erro no segmento ${i + 1}`,
+                error.message || 'Falha ao calcular rota',
+                'error',
+                5000
+            );
         }
 
         // Pequeno delay entre requisições para evitar rate limit
