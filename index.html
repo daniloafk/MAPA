@@ -1888,9 +1888,14 @@ window.initMap = function () {
             fullscreenControl: false, // Desabilitar fullscreen para performance
             mapTypeControl: true, // Controle de tipo de mapa (satélite, terreno, etc)
             mapTypeControlOptions: {
-                style: google.maps.MapTypeControlStyle.DROPDOWN_MENU, // Mudado para DROPDOWN para mostrar todos
-                position: google.maps.ControlPosition.TOP_RIGHT
-                // Removi mapTypeIds para usar os padrões do Google (garante que terrain apareça)
+                style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+                position: google.maps.ControlPosition.TOP_RIGHT,
+                mapTypeIds: [
+                    google.maps.MapTypeId.ROADMAP,
+                    google.maps.MapTypeId.SATELLITE,
+                    google.maps.MapTypeId.TERRAIN,
+                    google.maps.MapTypeId.HYBRID
+                ]
             },
             scaleControl: false, // Desabilitar escala
             // Otimizações de renderização
