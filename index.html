@@ -34,10 +34,6 @@
         left: 0;
         opacity: 0;
         transition: opacity 0.5s ease-in-out;
-        /* Aceleração por hardware */
-        transform: translateZ(0);
-        will-change: transform;
-        backface-visibility: hidden;
     }
 
     #map.loaded {
@@ -1877,38 +1873,24 @@ window.initMap = function () {
             center: {lat: -23.5505, lng: -46.6333},
             zoom: 17,
             mapId: MAP_ID,
-            mapTypeId: google.maps.MapTypeId.ROADMAP, // 🚀 Iniciar com ROADMAP (mais rápido)
             tilt: 0,
             heading: 0,
             gestureHandling: "greedy",
             rotateControl: true,
             zoomControl: true,
             streetViewControl: false,
-            fullscreenControl: false,
-            mapTypeControl: true,
-            mapTypeControlOptions: {
-                style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-                position: google.maps.ControlPosition.TOP_RIGHT,
-                mapTypeIds: ['roadmap', 'satellite', 'hybrid']
-            },
-            scaleControl: false,
-            clickableIcons: false,
-            disableDefaultUI: false,
-            backgroundColor: '#e5e3df'
+            fullscreenControl: true
         });
 
         // Inicializar serviços de rota
         directionsService = new google.maps.DirectionsService();
         directionsRenderer = new google.maps.DirectionsRenderer({
             map: map,
-            suppressMarkers: false, // Não suprimir marcadores (A, B, C, etc.)
-            preserveViewport: true, // Não ajustar viewport automaticamente (mais rápido)
+            suppressMarkers: false,
             polylineOptions: {
                 strokeColor: '#4285f4',
-                strokeWeight: 4,
-                strokeOpacity: 0.75,
-                geodesic: true,
-                clickable: false
+                strokeWeight: 5,
+                strokeOpacity: 0.7
             }
         });
 
@@ -3311,11 +3293,9 @@ async function drawRouteInSegments(allPoints, totalDeliveries) {
             const polyline = new google.maps.Polyline({
                 path: path,
                 strokeColor: '#4285f4',
-                strokeWeight: 4, // Reduzido de 5 para 4 (mais leve)
-                strokeOpacity: 0.75,
-                map: map,
-                geodesic: true, // Renderização otimizada para longas distâncias
-                clickable: false // Desabilitar cliques na linha (mais leve)
+                strokeWeight: 5,
+                strokeOpacity: 0.7,
+                map: map
             });
 
             polylines.push(polyline);
