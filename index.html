@@ -3043,9 +3043,16 @@ async function calculateFleetRoute(origin, deliveryPoints) {
     // Chamar API serverless do backend (Vercel Function)
     const backendUrl = '/api/optimize-route';
 
+    // Transformar deliveryPoints para o formato esperado pelo backend
+    const formattedPoints = deliveryPoints.map(point => ({
+        lat: point.location.lat,
+        lng: point.location.lng,
+        address: point.address || ''
+    }));
+
     const payload = {
         origin: origin,
-        deliveryPoints: deliveryPoints,
+        deliveryPoints: formattedPoints,
         projectId: GOOGLE_CLOUD_PROJECT_ID
     };
 
