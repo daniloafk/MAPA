@@ -2922,14 +2922,30 @@ function calculateOptimizedRoute(origin) {
     );
 
     // Obter todos os pontos de entrega
-    const deliveryPoints = Object.values(addressDatabase).map(data => ({
+    let deliveryPoints = Object.values(addressDatabase).map(data => ({
         location: {lat: data.latitude, lng: data.longitude},
         address: data.address
     }));
 
-    // Google Maps Directions API suporta até 25 waypoints
-    // Vamos pegar os 8 pontos mais próximos para demonstração
-    const nearestPoints = deliveryPoints
+    console.log(`Total de endereços na planilha: ${deliveryPoints.length}`);
+
+    // Remover pontos duplicados (mesmas coordenadas)
+    const uniquePoints = [];
+    const seenCoords = new Set();
+
+    deliveryPoints.forEach(point => {
+        const coordKey = `${point.location.lat.toFixed(6)},${point.location.lng.toFixed(6)}`;
+        if (!seenCoords.has(coordKey)) {
+            seenCoords.add(coordKey);
+            uniquePoints.push(point);
+        }
+    });
+
+    console.log(`Endereços únicos (sem duplicatas): ${uniquePoints.length}`);
+
+    // Google Maps Directions API suporta até 25 pontos total (origem + 23 waypoints + destino)
+    // Vamos usar os 23 pontos mais próximos
+    const nearestPoints = uniquePoints
         .map(point => ({
             ...point,
             distance: google.maps.geometry.spherical.computeDistanceBetween(
@@ -2938,7 +2954,9 @@ function calculateOptimizedRoute(origin) {
             )
         }))
         .sort((a, b) => a.distance - b.distance)
-        .slice(0, 8); // Limitar a 8 pontos
+        .slice(0, 23); // Limitar a 23 pontos (máximo permitido pela API)
+
+    console.log(`Pontos selecionados para rota: ${nearestPoints.length}`);
 
     if (nearestPoints.length === 0) {
         showToast(
@@ -2951,13 +2969,18 @@ function calculateOptimizedRoute(origin) {
         return;
     }
 
-    // Preparar waypoints para a API
+    // Preparar waypoints para a API (todos exceto o último)
     const waypoints = nearestPoints.slice(0, -1).map(point => ({
         location: point.location,
         stopover: true
     }));
 
     const destination = nearestPoints[nearestPoints.length - 1].location;
+
+    console.log(`Origem: sua localização`);
+    console.log(`Waypoints (paradas): ${waypoints.length}`);
+    console.log(`Destino: último ponto`);
+    console.log(`Total de pontos na rota: ${waypoints.length + 2}`);
 
     // Requisitar rota ao Google Directions API
     const request = {
@@ -2985,12 +3008,16 @@ function calculateOptimizedRoute(origin) {
             const distanceKm = (totalDistance / 1000).toFixed(1);
             const durationMin = Math.round(totalDuration / 60);
 
+            const totalPoints = waypoints.length + 2; // origem + waypoints + destino
+
             showToast(
                 '✓ Rota calculada!',
-                `${nearestPoints.length} entregas • ${distanceKm} km • ${durationMin} min`,
+                `${totalPoints} pontos de entrega • ${distanceKm} km • ${durationMin} min`,
                 'success',
-                6000
+                8000
             );
+
+            console.log(`Rota traçada com sucesso: ${totalPoints} pontos, ${distanceKm}km, ${durationMin}min`);
 
             // Ajustar zoom para mostrar toda a rota
             const bounds = new google.maps.LatLngBounds();
