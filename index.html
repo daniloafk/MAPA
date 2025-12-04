@@ -1986,8 +1986,8 @@ function startLocationTracking() {
                 hideLoadingScreen();
                 showAddClientButton(); // Mostrar botão adicionar cliente
 
-                // Adicionar marcadores de entrega após carregar o mapa
-                addDeliveryMarkers();
+                // NÃO adicionar marcadores automaticamente
+                // Eles serão adicionados apenas quando o usuário ativar o modo de rota
             } catch (error) {
                 console.error('Erro ao criar marcador:', error);
                 hideLoadingScreen();
@@ -2953,15 +2953,27 @@ function deactivateRouteMode() {
         window.routePolylines = [];
     }
 
+    // Remover marcadores de entrega
+    Object.values(deliveryMarkers).forEach(marker => {
+        if (marker.map) {
+            marker.map = null; // Remove do mapa
+        } else if (marker.setMap) {
+            marker.setMap(null);
+        }
+    });
+
     showToast(
         'Modo de rota desativado',
-        'Marcadores de entrega restaurados',
+        'Marcadores de entrega ocultados',
         'info',
         2000
     );
 }
 
 async function calculateOptimizedRoute(origin) {
+    // Mostrar marcadores de entrega ao ativar modo de rota
+    addDeliveryMarkers();
+
     showToast(
         'Calculando rota otimizada...',
         'Usando Fleet Routing API para todos os 73 endereços',
