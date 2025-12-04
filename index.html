@@ -1876,15 +1876,25 @@ window.initMap = function () {
         map = new google.maps.Map(document.getElementById("map"), {
             center: {lat: -23.5505, lng: -46.6333},
             zoom: 17,
-            mapTypeId: 'roadmap',
+            mapId: MAP_ID,
+            mapTypeId: google.maps.MapTypeId.ROADMAP, // 🚀 Iniciar com ROADMAP (mais rápido)
+            tilt: 0,
+            heading: 0,
             gestureHandling: "greedy",
+            rotateControl: true,
             zoomControl: true,
             streetViewControl: false,
             fullscreenControl: false,
+            mapTypeControl: true,
+            mapTypeControlOptions: {
+                style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+                position: google.maps.ControlPosition.TOP_RIGHT,
+                mapTypeIds: ['roadmap', 'satellite', 'hybrid']
+            },
+            scaleControl: false,
             clickableIcons: false,
-            backgroundColor: '#e5e3df',
-            // Controle de tipo de mapa padrão do Google
-            mapTypeControl: true
+            disableDefaultUI: false,
+            backgroundColor: '#e5e3df'
         });
 
         // Inicializar serviços de rota
