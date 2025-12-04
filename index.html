@@ -1880,7 +1880,11 @@ window.initMap = function () {
             zoomControl: true,
             streetViewControl: false,
             fullscreenControl: false, // Desabilitar fullscreen para performance
-            mapTypeControl: false, // Desabilitar controle de tipo de mapa
+            mapTypeControl: true, // Controle de tipo de mapa (satélite, terreno, etc)
+            mapTypeControlOptions: {
+                style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+                position: google.maps.ControlPosition.TOP_RIGHT
+            },
             scaleControl: false, // Desabilitar escala
             // Otimizações de renderização
             clickableIcons: false, // Desabilitar POIs clicáveis (melhora performance)
