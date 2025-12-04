@@ -1777,8 +1777,8 @@
 };
 </script>
 
-<!-- Google Maps -->
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&loading=async&callback=initMap&v=beta&libraries=places,geometry"></script>
+<!-- Google Maps - Carregamento otimizado -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&loading=async&callback=initMap&v=beta&libraries=geometry"></script>
 
 <script>
 let map;
@@ -1879,7 +1879,13 @@ window.initMap = function () {
             rotateControl: true,
             zoomControl: true,
             streetViewControl: false,
-            fullscreenControl: true
+            fullscreenControl: false, // Desabilitar fullscreen para performance
+            mapTypeControl: false, // Desabilitar controle de tipo de mapa
+            scaleControl: false, // Desabilitar escala
+            // Otimizações de renderização
+            clickableIcons: false, // Desabilitar POIs clicáveis (melhora performance)
+            disableDefaultUI: false,
+            backgroundColor: '#e5e3df' // Cor de fundo enquanto carrega tiles
         });
 
         // Inicializar serviços de rota
@@ -1887,10 +1893,13 @@ window.initMap = function () {
         directionsRenderer = new google.maps.DirectionsRenderer({
             map: map,
             suppressMarkers: false, // Não suprimir marcadores (A, B, C, etc.)
+            preserveViewport: true, // Não ajustar viewport automaticamente (mais rápido)
             polylineOptions: {
                 strokeColor: '#4285f4',
-                strokeWeight: 5,
-                strokeOpacity: 0.7
+                strokeWeight: 4,
+                strokeOpacity: 0.75,
+                geodesic: true,
+                clickable: false
             }
         });
 
@@ -2119,10 +2128,10 @@ function updateVisibleMarkers() {
 
         if (!bounds) return;
 
-        // REGRA: Só mostrar marcadores quando zoom >= 14 (próximo)
-        // De longe (zoom < 14): apenas rota
-        // De perto (zoom >= 14): rota + marcadores na viewport
-        if (zoom < 14) {
+        // REGRA: Só mostrar marcadores quando zoom >= 15 (bem próximo)
+        // De longe (zoom < 15): apenas rota
+        // De perto (zoom >= 15): rota + marcadores na viewport
+        if (zoom < 15) {
             // Zoom distante: remover todos os marcadores
             clearVisibleMarkers();
             console.log('🔭 Zoom distante: marcadores ocultados');
@@ -2134,14 +2143,14 @@ function updateVisibleMarkers() {
             bounds.contains(point.position)
         );
 
-        // Limitar quantidade para performance (máximo 30 marcadores simultâneos)
-        const pointsToShow = pointsInView.slice(0, 30);
+        // Limitar quantidade para performance (máximo 20 marcadores simultâneos)
+        const pointsToShow = pointsInView.slice(0, 20);
 
         // Verificar quais já existem e quais precisam ser criados/removidos
         updateMarkerSet(pointsToShow);
 
         console.log(`📍 Marcadores visíveis: ${visibleMarkers.length}/${allDeliveryPoints.length} (zoom: ${zoom.toFixed(1)})`);
-    }, 200); // Aguardar 200ms após parar de mover
+    }, 300); // Aguardar 300ms após parar de mover (reduz atualizações)
 }
 
 // Atualizar conjunto de marcadores (adicionar novos, remover antigos)
@@ -2173,14 +2182,17 @@ function createLightweightMarker(point) {
     const circle = new google.maps.Circle({
         map: map,
         center: point.position,
-        radius: 15, // 15 metros de raio (visível mas pequeno)
+        radius: 12, // 12 metros de raio (menor = mais leve)
         fillColor: '#ea4335',
-        fillOpacity: 0.8,
+        fillOpacity: 0.85,
         strokeColor: '#ffffff',
         strokeWeight: 2,
         strokeOpacity: 1,
         clickable: true,
-        zIndex: 100
+        zIndex: 100,
+        // Otimizações adicionais
+        optimized: true, // Renderização otimizada do Google Maps
+        visible: true
     });
 
     // InfoWindow para mostrar endereço ao clicar
@@ -3256,14 +3268,16 @@ async function drawRouteInSegments(allPoints, totalDeliveries) {
                 totalDuration += leg.duration.value;
             });
 
-            // Criar polyline para este segmento
+            // Criar polyline para este segmento (otimizada)
             const path = result.routes[0].overview_path;
             const polyline = new google.maps.Polyline({
                 path: path,
                 strokeColor: '#4285f4',
-                strokeWeight: 5,
-                strokeOpacity: 0.7,
-                map: map
+                strokeWeight: 4, // Reduzido de 5 para 4 (mais leve)
+                strokeOpacity: 0.75,
+                map: map,
+                geodesic: true, // Renderização otimizada para longas distâncias
+                clickable: false // Desabilitar cliques na linha (mais leve)
             });
 
             polylines.push(polyline);
