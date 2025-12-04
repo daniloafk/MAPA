@@ -2,7 +2,8 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport"
+      content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>Mapa de Clientes - Google Maps</title>
 
 <style>
@@ -12,7 +13,9 @@
         height:100%;
         width:100%;
         font-family:sans-serif;
+        overflow:hidden;
     }
+
     #map{
         height:100%;
         width:100%;
@@ -20,6 +23,7 @@
         top:0;left:0;
     }
 
+    /* BOTÕES */
     .map-control{
         position:fixed;
         top:90px;
@@ -45,50 +49,39 @@
         transform:scale(.9);
     }
 
-    .location-marker {
-        width: 20px;
-        height: 20px;
-        background: #4285f4;
-        border: 3px solid white;
-        border-radius: 50%;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-        position: relative;
-    }
-
-    .location-marker::after {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 50%;
+    /* MARCADOR HTML (PONTO + SETA) */
+    .marker-wrapper{
+        width:40px;
+        height:40px;
+        position:relative;
         transform: translate(-50%, -50%);
-        width: 8px;
-        height: 8px;
-        background: white;
-        border-radius: 50%;
     }
 
-    @keyframes pulse {
-        0% { box-shadow: 0 0 0 0 rgba(66,133,244,0.7); }
-        70% { box-shadow: 0 0 0 10px rgba(66,133,244,0); }
-        100% { box-shadow: 0 0 0 0 rgba(66,133,244,0); }
+    .location-dot{
+        width:22px;
+        height:22px;
+        background:#1a73e8;
+        border-radius:50%;
+        border:4px solid white;
+        position:absolute;
+        top:10px;
+        left:9px;
+        box-shadow:0 2px 6px rgba(0,0,0,.5);
     }
 
-    .location-marker.active {
-        animation: pulse 2s infinite;
+    .direction-arrow{
+        width:0;
+        height:0;
+        border-left:6px solid transparent;
+        border-right:6px solid transparent;
+        border-bottom:14px solid white;
+        position:absolute;
+        top:-2px;
+        left:50%;
+        transform:translateX(-50%) rotate(0deg);
+        filter:drop-shadow(0 0 4px rgba(0,0,0,.4));
     }
 
-    @media (max-width: 768px) {
-        .map-control {
-            top: 70px;
-            right: 10px;
-        }
-
-        .control-btn {
-            width: 44px;
-            height: 44px;
-            font-size: 16px;
-        }
-    }
 </style>
 </head>
 <body>
@@ -105,228 +98,246 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-    const SUPABASE_URL = "https://fufteldeapyvluynppuv.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1ZnRlbGRlYXB5dmx1eW5wcHV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2MzAyMzIsImV4cCI6MjA4MDIwNjIzMn0.xr6PiskP8cJUzGBEhp_tAfZWMprxJXJyhLuOSmCQleA";
+const SUPABASE_URL = "https://fufteldeapyvluynppuv.supabase.co";
+const SUPABASE_ANON_KEY =
+"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1ZnRlbGRlYXB5dmx1eW5wcHV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2MzAyMzIsImV4cCI6MjA4MDIwNjIzMn0.xr6PiskP8cJUzGBEhp_tAfZWMprxJXJyhLuOSmCQleA";
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
 
 <!-- Google Maps -->
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&callback=initMap&v=beta&libraries=places" async defer></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&callback=initMap&v=beta"
+        async defer></script>
 
 <script>
 let map;
-let is3D = false;
-let userLocationMarker = null;
+let userMarker = null;
 let watchId = null;
-let _animating3D = false;
+let currentHeading = 0;
+let useGyro = false;
+let is3D = false;
+let animating3D = false;
 
 const MAP_ID = "ebb7ca4503045feabc75b373";
 
-window.initMap = function () {
-    map = new google.maps.Map(document.getElementById("map"), {
-        center:{lat:-23.5505,lng:-46.6333},
-        zoom:17,
-        mapId:MAP_ID,
-        tilt:0,
-        heading:0,
-        gestureHandling:"greedy",
-        rotateControl:true,
-        zoomControl:true,
-        streetViewControl:false,
-        fullscreenControl:true
-    });
+/* =====================================================
+   PERMISSÃO DO GIROSCÓPIO
+===================================================== */
+function enableGyroscope() {
+    if (window.DeviceOrientationEvent &&
+        typeof DeviceOrientationEvent.requestPermission === "function") {
 
-    startLocationTracking();
+        DeviceOrientationEvent.requestPermission().then(res => {
+            if (res === "granted") {
+                useGyro = true;
+                window.addEventListener("deviceorientation", onGyro, true);
+            }
+        });
+
+    } else {
+        // Desktop ou Android sem permissão especial
+        useGyro = true;
+        window.addEventListener("deviceorientation", onGyro, true);
+    }
 }
 
-/* ============
-   LERP SUAVE
-   ============ */
+function onGyro(ev) {
+    if (!useGyro) return;
 
-function lerp(start, end, t) {
-    return start + (end - start) * t;
+    if (ev.alpha != null) {
+        currentHeading = ev.alpha;
+        rotateMarker(currentHeading);
+        map.setHeading(currentHeading);
+    }
 }
 
-/* ============
-   MOVIMENTO SUAVIZADO
-   ============ */
+/* =====================================================
+   ROTACIONA O MARCADOR
+===================================================== */
+function rotateMarker(deg) {
+    if (!userMarker) return;
 
-function animateMarkerTo(marker, newPos, duration = 600) {
-    if (!marker.position) {
-        marker.setPosition(newPos);
-        return;
+    const el = userMarker.getIcon().element;
+    if (!el) return;
+
+    const arrow = el.querySelector(".direction-arrow");
+    if (arrow) {
+        arrow.style.transform = `translateX(-50%) rotate(${deg}deg)`;
+    }
+}
+
+/* =====================================================
+   CRIA MARCADOR HTML
+===================================================== */
+function createHtmlMarker() {
+    const wrap = document.createElement("div");
+    wrap.className = "marker-wrapper";
+
+    const dot = document.createElement("div");
+    dot.className = "location-dot";
+
+    const arrow = document.createElement("div");
+    arrow.className = "direction-arrow";
+
+    wrap.appendChild(dot);
+    wrap.appendChild(arrow);
+
+    return wrap;
+}
+
+/* =====================================================
+   INTERPOLAÇÃO SUAVE
+===================================================== */
+function lerp(a,b,t){ return a+(b-a)*t; }
+
+function animateMarkerTo(marker,newPos,duration=500){
+    const start = marker.getPosition();
+    const sLat = start.lat();
+    const sLng = start.lng();
+    const eLat = newPos.lat();
+    const eLng = newPos.lng();
+
+    const t0 = performance.now();
+
+    function step(t){
+        const p = Math.min((t - t0) / duration, 1);
+        const lat = lerp(sLat, eLat, p);
+        const lng = lerp(sLng, eLng, p);
+
+        marker.setPosition({lat,lng});
+
+        if (p < 1) requestAnimationFrame(step);
     }
 
-    const startLat = marker.position.lat();
-    const startLng = marker.position.lng();
-    const endLat = newPos.lat();
-    const endLng = newPos.lng();
-
-    const startTime = performance.now();
-
-    function update(time) {
-        const progress = Math.min((time - startTime) / duration, 1);
-        const lat = lerp(startLat, endLat, progress);
-        const lng = lerp(startLng, endLng, progress);
-
-        const interpolated = new google.maps.LatLng(lat, lng);
-
-        if (marker.setPosition) {
-            marker.setPosition(interpolated);
-        } else {
-            marker.position = interpolated;
-        }
-
-        if (progress < 1) {
-            requestAnimationFrame(update);
-        }
-    }
-
-    requestAnimationFrame(update);
+    requestAnimationFrame(step);
 }
 
-/* ===========================
-   RASTREAMENTO EM TEMPO REAL
-   =========================== */
-
-function startLocationTracking() {
+/* =====================================================
+   GPS
+===================================================== */
+function startLocation(){
     if (!navigator.geolocation) {
-        alert("Seu navegador não suporta geolocalização.");
+        console.log("Geolocalização não suportada.");
         return;
     }
 
-    const markerDiv = document.createElement('div');
-    markerDiv.className = 'location-marker active';
-
-    const geoOptions = {
-        enableHighAccuracy: true,
-        timeout: 7000,
-        maximumAge: 0
+    const options = {
+        enableHighAccuracy:true,
+        timeout:10000,
+        maximumAge:0
     };
 
-    navigator.geolocation.getCurrentPosition(
-        pos => {
-            const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    navigator.geolocation.getCurrentPosition(pos=>{
+        const {latitude,longitude} = pos.coords;
+        const c = {lat:latitude,lng:longitude};
 
-            map.setCenter(c);
-            map.setZoom(17);
+        map.setCenter(c);
+        map.setZoom(18);
 
-            if (google.maps.marker?.AdvancedMarkerElement) {
-                userLocationMarker = new google.maps.marker.AdvancedMarkerElement({
-                    map,
-                    position: c,
-                    content: markerDiv,
-                    title: "Sua Localização"
-                });
-            } else {
-                userLocationMarker = new google.maps.Marker({
-                    map,
-                    position: c,
-                    title: "Sua Localização",
-                    icon: {
-                        path: google.maps.SymbolPath.CIRCLE,
-                        scale: 8,
-                        fillColor: "#4285f4",
-                        fillOpacity: 1,
-                        strokeColor: "white",
-                        strokeWeight: 3
-                    }
-                });
+        userMarker = new google.maps.Marker({
+            map,
+            position:c,
+            icon:{
+                element:createHtmlMarker()
             }
+        });
 
-            watchId = navigator.geolocation.watchPosition(updateUserLocation, handleGeoError, geoOptions);
-        },
-        handleGeoError,
-        geoOptions
-    );
+        // NODE: Suporte a HTML marker
+        const iconObj = {
+            element: createHtmlMarker()
+        };
+        userMarker.setIcon(iconObj);
+
+        watchId = navigator.geolocation.watchPosition(updateUserPosition,err=>{
+            console.log("Erro watch:",err);
+        },options);
+
+    },err=>{
+        console.log("Erro inicial:",err);
+    },options);
 }
 
-function updateUserLocation(position) {
-    const newPos = new google.maps.LatLng(
-        position.coords.latitude,
-        position.coords.longitude
-    );
+function updateUserPosition(pos){
+    const c = new google.maps.LatLng(pos.coords.latitude,pos.coords.longitude);
+    animateMarkerTo(userMarker,c,400);
+    map.panTo(c);
 
-    if (!userLocationMarker) return;
-
-    // AGORA MOVIMENTO SUAVE (Google Maps style)
-    animateMarkerTo(userLocationMarker, newPos, 600);
-}
-
-function handleGeoError(error) {
-    console.warn("Erro de geolocalização:", error);
-    alert("Não foi possível acessar sua localização. Ative o GPS e recarregue.");
-    map.setCenter({ lat:-23.5505, lng:-46.6333 });
-}
-
-/* ===========================
-   CENTRALIZAR USUÁRIO
-   =========================== */
-
-function centerOnUser() {
-    if (!userLocationMarker || !userLocationMarker.position) {
-        alert("Aguardando localização GPS...");
-        return;
+    if (!useGyro && pos.coords.heading != null){
+        currentHeading = pos.coords.heading;
+        rotateMarker(currentHeading);
+        map.setHeading(currentHeading);
     }
+}
 
-    map.panTo(userLocationMarker.position);
-    map.setZoom(17);
+/* =====================================================
+   BOTÃO CENTRALIZAR
+===================================================== */
+function centerOnUser(){
+    if (!userMarker) return;
+    const p = userMarker.getPosition();
+    map.panTo(p);
+    map.setZoom(18);
 }
 
 document.getElementById("btnCenterUser").onclick = centerOnUser;
 
-/* ===========================
-   ANIMAÇÃO 2D ⇄ 3D
-   =========================== */
+/* =====================================================
+   ANIMAÇÃO 2D / 3D
+===================================================== */
+function animateValue(start,end,duration,onUpdate,onFinish){
+    const t0 = performance.now();
 
-function animateValue(start, end, duration, onUpdate, onFinish){
-    const startTime = performance.now();
-
-    function frame(time){
-        const progress = Math.min((time - startTime) / duration, 1);
-        const value = start + (end - start) * progress;
-
-        onUpdate(value);
-
-        if(progress < 1){
-            requestAnimationFrame(frame);
-        } else {
-            if (onFinish) onFinish();
-        }
+    function frame(t){
+        const p = Math.min((t-t0)/duration,1);
+        const v = start + (end-start)*p;
+        onUpdate(v);
+        if (p < 1) requestAnimationFrame(frame);
+        else if (onFinish) onFinish();
     }
 
     requestAnimationFrame(frame);
 }
 
 document.getElementById("btnToggle3D").onclick = () => {
+    if (animating3D) return;
+    animating3D = true;
 
-    if (_animating3D) return;
-    _animating3D = true;
-
-    if (!is3D) {
+    if (!is3D){
         is3D = true;
         btnToggle3D.textContent = "2D";
 
-        animateValue(map.getTilt(), 67, 600, val => map.setTilt(val));
-        animateValue(map.getHeading(), 45, 600, val => map.setHeading(val), () => {
-            _animating3D = false;
-        });
+        animateValue(map.getTilt(),67,600,val=>map.setTilt(val));
+        animateValue(map.getHeading(),45,600,val=>map.setHeading(val),
+            ()=>{ animating3D=false; });
 
     } else {
         is3D = false;
         btnToggle3D.textContent = "3D";
 
-        animateValue(map.getTilt(), 0, 600, val => map.setTilt(val));
-        animateValue(map.getHeading(), 0, 600, val => map.setHeading(val), () => {
-            _animating3D = false;
-        });
+        animateValue(map.getTilt(),0,600,val=>map.setTilt(val));
+        animateValue(map.getHeading(),0,600,val=>map.setHeading(val),
+            ()=>{ animating3D=false; });
     }
 };
 
-window.addEventListener('beforeunload', () => {
-    if (watchId) navigator.geolocation.clearWatch(watchId);
-});
+/* =====================================================
+   INICIAR MAPA
+===================================================== */
+function initMap(){
+    map = new google.maps.Map(document.getElementById("map"),{
+        center:{lat:-23.55,lng:-46.63},
+        zoom:18,
+        mapId:MAP_ID,
+        tilt:0,
+        heading:0,
+        gestureHandling:"greedy",
+        streetViewControl:false
+    });
+
+    enableGyroscope();
+    startLocation();
+}
+
 </script>
 
 </body>
