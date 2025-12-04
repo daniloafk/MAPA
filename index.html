@@ -505,26 +505,44 @@ function updateStatus(text, active = true) {
 // ===========================
 
 window.initMap = function () {
+    console.log('Iniciando mapa...');
     updateLoadingScreen('Carregando mapa...', 'Preparando visualização');
 
-    map = new google.maps.Map(document.getElementById("map"), {
-        center: {lat: -23.5505, lng: -46.6333},
-        zoom: 17,
-        mapId: MAP_ID,
-        tilt: 0,
-        heading: 0,
-        gestureHandling: "greedy",
-        rotateControl: true,
-        zoomControl: true,
-        streetViewControl: false,
-        fullscreenControl: true
-    });
+    try {
+        map = new google.maps.Map(document.getElementById("map"), {
+            center: {lat: -23.5505, lng: -46.6333},
+            zoom: 17,
+            mapId: MAP_ID,
+            tilt: 0,
+            heading: 0,
+            gestureHandling: "greedy",
+            rotateControl: true,
+            zoomControl: true,
+            streetViewControl: false,
+            fullscreenControl: true
+        });
 
-    // Espera o mapa carregar completamente
-    google.maps.event.addListenerOnce(map, 'tilesloaded', () => {
-        updateLoadingScreen('Obtendo sua localização...', 'Ative o GPS para melhor precisão');
-        startLocationTracking();
-    });
+        console.log('Mapa criado, aguardando tiles...');
+
+        // Timeout de segurança: se o mapa não carregar em 15s, força o início do tracking
+        const safetyTimeout = setTimeout(() => {
+            console.warn('Timeout: forçando início do tracking de localização');
+            updateLoadingScreen('Obtendo sua localização...', 'Ative o GPS para melhor precisão');
+            startLocationTracking();
+        }, 15000);
+
+        // Espera o mapa carregar completamente
+        google.maps.event.addListenerOnce(map, 'tilesloaded', () => {
+            clearTimeout(safetyTimeout);
+            console.log('Tiles carregados, iniciando tracking...');
+            updateLoadingScreen('Obtendo sua localização...', 'Ative o GPS para melhor precisão');
+            startLocationTracking();
+        });
+    } catch (error) {
+        console.error('Erro ao criar mapa:', error);
+        hideLoadingScreen();
+        showToast('Erro ao inicializar mapa', error.message, 'error', 8000);
+    }
 }
 
 // ===========================
@@ -532,7 +550,10 @@ window.initMap = function () {
 // ===========================
 
 function startLocationTracking() {
+    console.log('Iniciando rastreamento de localização...');
+
     if (!navigator.geolocation) {
+        console.error('Geolocalização não suportada');
         hideLoadingScreen();
         showToast('GPS não suportado', 'Seu navegador não suporta geolocalização', 'error', 6000);
         updateStatus('GPS indisponível', false);
@@ -548,23 +569,53 @@ function startLocationTracking() {
         maximumAge: 0
     };
 
+    console.log('Solicitando posição do GPS...');
     navigator.geolocation.getCurrentPosition(
         pos => {
-            const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-            locationAccuracy = pos.coords.accuracy;
+            try {
+                console.log('Posição obtida:', pos.coords.latitude, pos.coords.longitude);
+                const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                locationAccuracy = pos.coords.accuracy;
 
-            map.setCenter(c);
-            map.setZoom(17);
+                map.setCenter(c);
+                map.setZoom(17);
 
-            // Usa AdvancedMarkerElement (recomendado pelo Google desde 2024)
-            userLocationMarker = new google.maps.marker.AdvancedMarkerElement({
-                map,
-                position: c,
-                content: markerDiv,
-                title: "Sua Localização"
-            });
+                // Tenta usar AdvancedMarkerElement (recomendado pelo Google desde 2024)
+                if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+                    console.log('Criando AdvancedMarkerElement...');
+                    userLocationMarker = new google.maps.marker.AdvancedMarkerElement({
+                        map,
+                        position: c,
+                        content: markerDiv,
+                        title: "Sua Localização"
+                    });
+                    console.log('AdvancedMarkerElement criado com sucesso');
+                } else {
+                    // Fallback para Marker clássico se AdvancedMarker não estiver disponível
+                    console.warn('AdvancedMarkerElement não disponível, usando Marker clássico');
+                    userLocationMarker = new google.maps.Marker({
+                        map,
+                        position: c,
+                        title: "Sua Localização",
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            scale: 8,
+                            fillColor: "#4285f4",
+                            fillOpacity: 1,
+                            strokeColor: "white",
+                            strokeWeight: 3
+                        }
+                    });
+                    console.log('Marker clássico criado com sucesso');
+                }
 
-            hideLoadingScreen();
+                console.log('Escondendo loading screen...');
+                hideLoadingScreen();
+            } catch (error) {
+                console.error('Erro ao criar marcador:', error);
+                hideLoadingScreen();
+                showToast('Erro ao criar marcador', error.message, 'error', 6000);
+            }
 
             showToast(
                 'Localização obtida!',
@@ -597,12 +648,21 @@ function updateUserLocation(position) {
 
     if (!userLocationMarker) return;
 
-    // AdvancedMarkerElement usa a propriedade 'position'
-    userLocationMarker.position = newPos;
+    try {
+        // AdvancedMarkerElement usa a propriedade 'position'
+        if (userLocationMarker.position !== undefined) {
+            userLocationMarker.position = newPos;
+        } else if (userLocationMarker.setPosition) {
+            // Fallback para Marker clássico
+            userLocationMarker.setPosition(newPos);
+        }
 
-    // Atualiza precisão
-    locationAccuracy = position.coords.accuracy;
-    updateStatus(`Precisão: ${Math.round(locationAccuracy)}m`, true);
+        // Atualiza precisão
+        locationAccuracy = position.coords.accuracy;
+        updateStatus(`Precisão: ${Math.round(locationAccuracy)}m`, true);
+    } catch (error) {
+        console.error('Erro ao atualizar posição do marcador:', error);
+    }
 }
 
 function handleGeoError(error, isInitial = false) {
@@ -707,8 +767,13 @@ document.getElementById("btnCenterLocation").onclick = () => {
         return;
     }
 
-    // Pega a posição atual do marcador (AdvancedMarkerElement)
-    const currentPosition = userLocationMarker.position;
+    // Pega a posição atual do marcador (compatível com ambos os tipos)
+    let currentPosition;
+    if (userLocationMarker.position) {
+        currentPosition = userLocationMarker.position;
+    } else if (userLocationMarker.getPosition) {
+        currentPosition = userLocationMarker.getPosition();
+    }
 
     if (!currentPosition) {
         showToast('Erro ao centralizar', 'Posição não encontrada', 'error', 3000);
