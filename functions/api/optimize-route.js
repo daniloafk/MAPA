@@ -1,86 +1,121 @@
 // Cloudflare Pages Function para Fleet Routing API
 // Rota: /api/optimize-route
 
-// Função para criar JWT para autenticação Google Cloud
-async function createJWT(serviceAccount) {
+// Função auxiliar para converter ArrayBuffer para base64url
+function arrayBufferToBase64Url(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+}
+
+// Função auxiliar para converter string para base64url
+function stringToBase64Url(str) {
+    return btoa(str)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+}
+
+// Converter PEM para CryptoKey
+async function importPrivateKey(pem) {
+    // Remove headers e footers do PEM
+    const pemContents = pem
+        .replace(/-----BEGIN PRIVATE KEY-----/, '')
+        .replace(/-----END PRIVATE KEY-----/, '')
+        .replace(/\s/g, '');
+
+    // Decode base64 para ArrayBuffer
+    const binaryString = atob(pemContents);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    // Importar como CryptoKey
+    return await crypto.subtle.importKey(
+        'pkcs8',
+        bytes.buffer,
+        {
+            name: 'RSASSA-PKCS1-v1_5',
+            hash: 'SHA-256',
+        },
+        false,
+        ['sign']
+    );
+}
+
+// Criar JWT assinado
+async function createSignedJWT(serviceAccount) {
     const header = {
         alg: 'RS256',
-        typ: 'JWT'
+        typ: 'JWT',
+        kid: serviceAccount.private_key_id
     };
 
     const now = Math.floor(Date.now() / 1000);
     const payload = {
         iss: serviceAccount.client_email,
-        scope: 'https://www.googleapis.com/auth/cloud-platform',
+        sub: serviceAccount.client_email,
         aud: 'https://oauth2.googleapis.com/token',
-        exp: now + 3600,
-        iat: now
+        scope: 'https://www.googleapis.com/auth/cloud-platform',
+        iat: now,
+        exp: now + 3600
     };
 
-    const encodedHeader = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-    const encodedPayload = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    // Encode header e payload
+    const encodedHeader = stringToBase64Url(JSON.stringify(header));
+    const encodedPayload = stringToBase64Url(JSON.stringify(payload));
     const unsignedToken = `${encodedHeader}.${encodedPayload}`;
 
-    // Importar chave privada
-    const privateKey = await crypto.subtle.importKey(
-        'pkcs8',
-        pemToArrayBuffer(serviceAccount.private_key),
-        {
-            name: 'RSASSA-PKCS1-v1_5',
-            hash: 'SHA-256'
-        },
-        false,
-        ['sign']
-    );
+    // Importar private key
+    const privateKey = await importPrivateKey(serviceAccount.private_key);
 
     // Assinar
+    const encoder = new TextEncoder();
+    const data = encoder.encode(unsignedToken);
     const signature = await crypto.subtle.sign(
         'RSASSA-PKCS1-v1_5',
         privateKey,
-        new TextEncoder().encode(unsignedToken)
+        data
     );
 
-    const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)))
-        .replace(/=/g, '')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_');
+    // Encode signature
+    const encodedSignature = arrayBufferToBase64Url(signature);
 
     return `${unsignedToken}.${encodedSignature}`;
 }
 
-// Converter PEM para ArrayBuffer
-function pemToArrayBuffer(pem) {
-    const b64 = pem
-        .replace(/-----BEGIN PRIVATE KEY-----/, '')
-        .replace(/-----END PRIVATE KEY-----/, '')
-        .replace(/\s/g, '');
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes.buffer;
-}
-
 // Obter Access Token do Google
 async function getAccessToken(serviceAccount) {
-    const jwt = await createJWT(serviceAccount);
+    try {
+        const jwt = await createSignedJWT(serviceAccount);
 
-    const response = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
-    });
+        const response = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
+        });
 
-    if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Falha ao obter access token: ${error}`);
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Erro ao obter token:', errorText);
+            throw new Error(`Falha ao obter access token: ${errorText}`);
+        }
+
+        const data = await response.json();
+        return data.access_token;
+    } catch (error) {
+        console.error('❌ Erro no getAccessToken:', error);
+        throw error;
     }
-
-    const data = await response.json();
-    return data.access_token;
 }
 
 export async function onRequestPost(context) {
@@ -116,11 +151,14 @@ export async function onRequestPost(context) {
         console.log('🚗 Fleet Routing - Otimizando rota:', {
             origin,
             deliveryCount: deliveryPoints.length,
-            projectId
+            projectId,
+            serviceAccountEmail: serviceAccount.client_email
         });
 
         // Obter access token
+        console.log('🔑 Obtendo access token...');
         const accessToken = await getAccessToken(serviceAccount);
+        console.log('✅ Access token obtido com sucesso');
 
         // Preparar requisição para Fleet Routing API
         const fleetUrl = `https://cloudoptimization.googleapis.com/v1/projects/${projectId}:optimizeTours`;
@@ -158,15 +196,20 @@ export async function onRequestPost(context) {
             }]
         };
 
+        console.log('📤 Chamando Fleet Routing API...');
+
         // Chamar Fleet Routing API
         const fleetResponse = await fetch(fleetUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`
+                'Authorization': `Bearer ${accessToken}`,
+                'X-Goog-User-Project': projectId
             },
             body: JSON.stringify({ model })
         });
+
+        console.log(`📥 Resposta Fleet API: ${fleetResponse.status}`);
 
         if (!fleetResponse.ok) {
             const errorText = await fleetResponse.text();
@@ -184,7 +227,7 @@ export async function onRequestPost(context) {
                 success: false,
                 message: `Fleet Routing API retornou erro: ${fleetResponse.status}`,
                 details: errorDetails,
-                requestModel: model // Incluir modelo enviado para debug
+                requestModel: model
             }), {
                 status: fleetResponse.status,
                 headers: { 'Content-Type': 'application/json' }
@@ -211,10 +254,12 @@ export async function onRequestPost(context) {
 
     } catch (error) {
         console.error('❌ Erro no backend:', error);
+        console.error('Stack:', error.stack);
 
         return new Response(JSON.stringify({
             success: false,
-            message: error.message || 'Erro desconhecido no backend'
+            message: error.message || 'Erro desconhecido no backend',
+            stack: error.stack
         }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
