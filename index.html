@@ -49,7 +49,7 @@
         transform:scale(.9);
     }
 
-    /* MARCADOR HTML (PONTO + SETA) */
+    /* MARCADOR HTML (VERMELHO + SETA) */
     .marker-wrapper{
         width:40px;
         height:40px;
@@ -60,7 +60,7 @@
     .location-dot{
         width:22px;
         height:22px;
-        background:#1a73e8;
+        background:#e53935;   /* vermelho */
         border-radius:50%;
         border:4px solid white;
         position:absolute;
@@ -237,16 +237,8 @@ function startLocation(){
         userMarker = new google.maps.Marker({
             map,
             position:c,
-            icon:{
-                element:createHtmlMarker()
-            }
+            icon:{ element:createHtmlMarker() }
         });
-
-        // NODE: Suporte a HTML marker
-        const iconObj = {
-            element: createHtmlMarker()
-        };
-        userMarker.setIcon(iconObj);
 
         watchId = navigator.geolocation.watchPosition(updateUserPosition,err=>{
             console.log("Erro watch:",err);
@@ -306,16 +298,16 @@ document.getElementById("btnToggle3D").onclick = () => {
         is3D = true;
         btnToggle3D.textContent = "2D";
 
-        animateValue(map.getTilt(),67,600,val=>map.setTilt(val));
-        animateValue(map.getHeading(),45,600,val=>map.setHeading(val),
+        animateValue(map.getTilt(),67,800,val=>map.setTilt(val));
+        animateValue(map.getHeading(),45,800,val=>map.setHeading(val),
             ()=>{ animating3D=false; });
 
     } else {
         is3D = false;
         btnToggle3D.textContent = "3D";
 
-        animateValue(map.getTilt(),0,600,val=>map.setTilt(val));
-        animateValue(map.getHeading(),0,600,val=>map.setHeading(val),
+        animateValue(map.getTilt(),0,800,val=>map.setTilt(val));
+        animateValue(map.getHeading(),0,800,val=>map.setHeading(val),
             ()=>{ animating3D=false; });
     }
 };
