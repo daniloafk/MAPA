@@ -402,6 +402,7 @@
 <!-- Controles -->
 <div class="map-control">
     <button id="btnToggle3D" class="control-btn" title="Alternar visualização 3D">3D</button>
+    <button id="btnCenterLocation" class="control-btn" title="Centralizar na minha localização">📍</button>
 </div>
 
 <!-- Container de Notificações -->
@@ -709,6 +710,59 @@ document.getElementById("btnToggle3D").onclick = () => {
             showToast('Modo 2D ativado', '', 'success', 2000);
         });
     }
+};
+
+// ===========================
+// CENTRALIZAR LOCALIZAÇÃO
+// ===========================
+
+document.getElementById("btnCenterLocation").onclick = () => {
+    const btn = document.getElementById("btnCenterLocation");
+
+    if (!userLocationMarker) {
+        showToast('Localização não disponível', 'Aguarde obter sua posição GPS', 'warning', 3000);
+        return;
+    }
+
+    // Pega a posição atual do marcador
+    let currentPosition;
+    if (userLocationMarker.position) {
+        // AdvancedMarkerElement
+        currentPosition = userLocationMarker.position;
+    } else if (userLocationMarker.getPosition) {
+        // Marker tradicional
+        currentPosition = userLocationMarker.getPosition();
+    }
+
+    if (!currentPosition) {
+        showToast('Erro ao centralizar', 'Posição não encontrada', 'error', 3000);
+        return;
+    }
+
+    // Feedback visual no botão
+    btn.classList.add('loading');
+    btn.disabled = true;
+
+    // Anima o zoom e centraliza
+    map.panTo(currentPosition);
+
+    // Se estiver muito distante, ajusta o zoom
+    const currentZoom = map.getZoom();
+    if (currentZoom < 16) {
+        map.setZoom(17);
+    }
+
+    // Remove o loading após a animação
+    setTimeout(() => {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+        showToast(
+            'Centralizado!',
+            `Precisão: ${Math.round(locationAccuracy)}m`,
+            'success',
+            2000
+        );
+    }, 400);
 };
 
 // ===========================
