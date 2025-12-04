@@ -45,7 +45,6 @@
         transform:scale(.9);
     }
 
-    /* Marcador da localização */
     .location-marker {
         width: 20px;
         height: 20px;
@@ -68,7 +67,6 @@
         border-radius: 50%;
     }
 
-    /* Animação */
     @keyframes pulse {
         0% { box-shadow: 0 0 0 0 rgba(66,133,244,0.7); }
         70% { box-shadow: 0 0 0 10px rgba(66,133,244,0); }
@@ -97,8 +95,10 @@
 
 <div id="map"></div>
 
+<!-- BOTÕES -->
 <div class="map-control">
     <button id="btnToggle3D" class="control-btn">3D</button>
+    <button id="btnCenterUser" class="control-btn">📍</button>
 </div>
 
 <!-- Supabase -->
@@ -108,11 +108,6 @@
     const SUPABASE_URL = "https://fufteldeapyvluynppuv.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1ZnRlbGRlYXB5dmx1eW5wcHV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2MzAyMzIsImV4cCI6MjA4MDIwNjIzMn0.xr6PiskP8cJUzGBEhp_tAfZWMprxJXJyhLuOSmCQleA";
 
-    /* Recomendação de segurança:
-       - Ativar RLS no supabase
-       - Restringir permissões
-       - Idealmente retirar operações críticas do frontend
-    */
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
 
@@ -218,11 +213,25 @@ function updateUserLocation(position) {
 
 function handleGeoError(error) {
     console.warn("Erro de geolocalização:", error);
-
-    alert("Não foi possível acessar a localização. Ative o GPS e recarregue.");
-
+    alert("Não foi possível acessar sua localização. Ative o GPS e recarregue.");
     map.setCenter({ lat:-23.5505, lng:-46.6333 });
 }
+
+/* ===========================
+   CENTRALIZAR USUÁRIO
+   =========================== */
+
+function centerOnUser() {
+    if (!userLocationMarker || !userLocationMarker.position) {
+        alert("Aguardando localização GPS...");
+        return;
+    }
+
+    map.panTo(userLocationMarker.position);
+    map.setZoom(17);
+}
+
+document.getElementById("btnCenterUser").onclick = centerOnUser;
 
 /* ===========================
    ANIMAÇÃO 2D ⇄ 3D
