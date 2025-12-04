@@ -1255,8 +1255,8 @@
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
 <script>
-    const SUPABASE_URL = "https://fufteldeapyvluynppuv.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1ZnRlbGRlYXB5dmx1eW5wcHV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2MzAyMzIsImV4cCI6MjA4MDIwNjIzMn0.xr6PiskP8cJUzGBEhp_tAfZWMprxJXJyhLuOSmCQleA";
+    const SUPABASE_URL = "https://dctlgztkqtktxnmiuqgr.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjdGxnenRrcXRrdHhubWl1cWdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2MzMwNDIsImV4cCI6MjA4MDIwOTA0Mn0.Ctlx8A4QBFxa7Iu6fObw_OthHfA2XrzY47UiMMIhbIU";
 
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -2084,7 +2084,10 @@ async function loadClients() {
             .select('*')
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+            console.error('Erro do Supabase:', error);
+            throw error;
+        }
 
         allClients = data || [];
         filteredClients = allClients;
@@ -2092,14 +2095,29 @@ async function loadClients() {
         renderClients(filteredClients);
         updateClientCount(allClients.length);
 
+        console.log(`${allClients.length} cliente(s) carregado(s)`);
+
     } catch (error) {
         console.error('Erro ao carregar clientes:', error);
+
+        // Mostrar mensagem mais específica
+        let errorMsg = 'Não foi possível carregar a lista de clientes';
+
+        if (error.message && error.message.includes('Failed to fetch')) {
+            errorMsg = 'Verifique se a tabela "clients" existe no Supabase';
+        } else if (error.code) {
+            errorMsg = `Erro Supabase: ${error.message}`;
+        }
+
         showToast(
             'Erro ao carregar',
-            'Não foi possível carregar a lista de clientes',
+            errorMsg,
             'error',
-            4000
+            6000
         );
+
+        // Mostrar empty state mesmo com erro
+        renderClients([]);
     }
 }
 
