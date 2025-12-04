@@ -3053,12 +3053,12 @@ async function calculateFleetRoute(origin, deliveryPoints) {
     console.log('✅ Fleet Routing result:', data.result);
     console.log(`Rotas retornadas: ${data.result.routes?.length || 0}`);
 
-    // Renderizar rota otimizada no mapa
-    renderFleetRoute(data.result, origin);
+    // Renderizar rota otimizada no mapa (passar deliveryPoints originais para mapear shipmentIndex)
+    renderFleetRoute(data.result, origin, deliveryPoints);
 }
 
 // Renderizar resultado da Fleet Routing API
-async function renderFleetRoute(fleetResult, origin) {
+async function renderFleetRoute(fleetResult, origin, deliveryPoints) {
     const route = fleetResult.routes[0];
 
     if (!route || !route.visits) {
@@ -3072,25 +3072,25 @@ async function renderFleetRoute(fleetResult, origin) {
         return;
     }
 
-    // DEBUG: Ver estrutura da resposta
-    console.log('🔍 DEBUG - Estrutura completa da rota:', JSON.stringify(route, null, 2));
-    console.log('🔍 DEBUG - Primeira visita:', JSON.stringify(route.visits?.[0], null, 2));
-
     // Criar lista de pontos otimizados (origem + visitas + volta à origem)
     const allPoints = [origin];
 
-    route.visits.forEach((visit, index) => {
-        console.log(`🔍 DEBUG - Visit ${index}:`, JSON.stringify(visit, null, 2));
+    console.log(`📍 Processando ${route.visits.length} visitas na ordem otimizada...`);
 
-        // A Fleet API retorna as coordenadas diretamente em cada visit
-        if (visit.arrivalWaypoint && visit.arrivalWaypoint.location && visit.arrivalWaypoint.location.latLng) {
+    route.visits.forEach((visit, index) => {
+        // A Fleet API retorna apenas o shipmentIndex, não as coordenadas
+        // Precisamos buscar as coordenadas nos deliveryPoints originais
+        const shipmentIndex = visit.shipmentIndex;
+
+        if (shipmentIndex !== undefined && deliveryPoints[shipmentIndex]) {
+            const point = deliveryPoints[shipmentIndex].location;
             allPoints.push({
-                lat: visit.arrivalWaypoint.location.latLng.latitude,
-                lng: visit.arrivalWaypoint.location.latLng.longitude
+                lat: point.lat,
+                lng: point.lng
             });
-            console.log(`✅ Ponto ${index} adicionado:`, visit.arrivalWaypoint.location.latLng);
+            console.log(`✅ Visita ${index + 1}: Entrega #${shipmentIndex + 1} - ${visit.shipmentLabel}`);
         } else {
-            console.log(`❌ Ponto ${index} IGNORADO - estrutura inválida`);
+            console.warn(`⚠️ Visita ${index} sem shipmentIndex válido:`, visit);
         }
     });
 
