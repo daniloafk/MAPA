@@ -789,6 +789,207 @@
     }
 
     /* ===========================
+       MENU LATERAL (SIDEBAR)
+       =========================== */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: -400px;
+        width: 400px;
+        height: 100%;
+        background: white;
+        box-shadow: 2px 0 12px rgba(0,0,0,0.15);
+        z-index: 10003;
+        transition: left 0.3s ease;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .sidebar.open {
+        left: 0;
+    }
+
+    .sidebar-header {
+        padding: 20px;
+        border-bottom: 2px solid #e0e0e0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .sidebar-title {
+        font-size: 20px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .sidebar-close {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        color: white;
+        font-size: 18px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+
+    .sidebar-close:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: rotate(90deg);
+    }
+
+    .sidebar-search {
+        padding: 16px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .search-container {
+        position: relative;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 18px;
+        color: #999;
+        pointer-events: none;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 12px 12px 12px 42px;
+        border: 2px solid #e0e0e0;
+        border-radius: 24px;
+        font-size: 15px;
+        font-family: inherit;
+        transition: all 0.2s ease;
+        box-sizing: border-box;
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
+    }
+
+    .search-input::placeholder {
+        color: #999;
+    }
+
+    .sidebar-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+    }
+
+    .clients-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .client-card {
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 16px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .client-card:hover {
+        border-color: var(--primary-color);
+        box-shadow: 0 2px 8px rgba(66, 133, 244, 0.15);
+        transform: translateY(-2px);
+    }
+
+    .client-name {
+        font-size: 16px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .client-info {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .client-info-icon {
+        font-size: 14px;
+        opacity: 0.7;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #999;
+    }
+
+    .empty-state-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+
+    .empty-state-text {
+        font-size: 16px;
+        font-weight: 500;
+        margin-bottom: 8px;
+    }
+
+    .empty-state-subtext {
+        font-size: 14px;
+    }
+
+    .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 10002;
+        display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .sidebar-overlay.active {
+        display: block;
+        opacity: 1;
+    }
+
+    .client-count {
+        display: inline-block;
+        background: rgba(255, 255, 255, 0.2);
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    /* ===========================
        RESPONSIVO
        =========================== */
     @media (max-width: 768px) {
@@ -879,6 +1080,27 @@
         .btn {
             width: 100%;
         }
+
+        .sidebar {
+            width: 100%;
+            left: -100%;
+        }
+
+        .sidebar.open {
+            left: 0;
+        }
+
+        .sidebar-title {
+            font-size: 18px;
+        }
+
+        .sidebar-content {
+            padding: 12px;
+        }
+
+        .client-card {
+            padding: 14px;
+        }
     }
 </style>
 </head>
@@ -900,6 +1122,7 @@
 <div class="map-control">
     <button id="btnToggle3D" class="control-btn" title="Alternar visualização 3D">3D</button>
     <button id="btnCenterLocation" class="control-btn" title="Centralizar na minha localização">📍</button>
+    <button id="btnOpenSidebar" class="control-btn" title="Ver lista de clientes">👥</button>
 </div>
 
 <!-- Container de Notificações -->
@@ -916,6 +1139,43 @@
     <span>➕</span>
     <span>Adicionar Cliente</span>
 </button>
+
+<!-- Sidebar - Menu Lateral -->
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <div class="sidebar-title">
+            <span>👥</span>
+            <span>Clientes</span>
+            <span class="client-count" id="client-count">0</span>
+        </div>
+        <button class="sidebar-close" id="sidebar-close">✕</button>
+    </div>
+
+    <div class="sidebar-search">
+        <div class="search-container">
+            <span class="search-icon">🔍</span>
+            <input
+                type="text"
+                class="search-input"
+                id="search-input"
+                placeholder="Buscar por nome, endereço ou telefone..."
+            >
+        </div>
+    </div>
+
+    <div class="sidebar-content">
+        <div class="clients-list" id="clients-list">
+            <!-- Lista de clientes será inserida aqui -->
+            <div class="empty-state">
+                <div class="empty-state-icon">📋</div>
+                <div class="empty-state-text">Nenhum cliente cadastrado</div>
+                <div class="empty-state-subtext">Adicione clientes para vê-los aqui</div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Modal Adicionar Cliente -->
 <div class="modal-overlay" id="modal-add-client">
@@ -1741,7 +2001,8 @@ form.addEventListener('submit', async (e) => {
             4000
         );
 
-        // TODO: Adicionar marcador no mapa
+        // Atualizar lista de clientes no sidebar
+        await loadClients();
 
         closeModal();
 
@@ -1758,6 +2019,164 @@ form.addEventListener('submit', async (e) => {
         btnSave.disabled = false;
     }
 });
+
+// ===========================
+// SIDEBAR - MENU LATERAL
+// ===========================
+
+const sidebar = document.getElementById('sidebar');
+const sidebarOverlay = document.getElementById('sidebar-overlay');
+const btnOpenSidebar = document.getElementById('btnOpenSidebar');
+const btnCloseSidebar = document.getElementById('sidebar-close');
+const clientsList = document.getElementById('clients-list');
+const searchInput = document.getElementById('search-input');
+const clientCount = document.getElementById('client-count');
+
+let allClients = [];
+let filteredClients = [];
+
+// Abrir sidebar
+btnOpenSidebar.addEventListener('click', () => {
+    openSidebar();
+    loadClients();
+});
+
+// Fechar sidebar
+btnCloseSidebar.addEventListener('click', closeSidebar);
+sidebarOverlay.addEventListener('click', closeSidebar);
+
+function openSidebar() {
+    sidebar.classList.add('open');
+    sidebarOverlay.classList.add('active');
+}
+
+function closeSidebar() {
+    sidebar.classList.remove('open');
+    sidebarOverlay.classList.remove('active');
+}
+
+// Busca em tempo real
+searchInput.addEventListener('input', (e) => {
+    const searchTerm = e.target.value.toLowerCase().trim();
+
+    if (searchTerm === '') {
+        filteredClients = allClients;
+    } else {
+        filteredClients = allClients.filter(client => {
+            const name = (client.name || '').toLowerCase();
+            const address = (client.address || '').toLowerCase();
+            const phone = (client.phone || '').toLowerCase();
+
+            return name.includes(searchTerm) ||
+                   address.includes(searchTerm) ||
+                   phone.includes(searchTerm);
+        });
+    }
+
+    renderClients(filteredClients);
+});
+
+// Carregar clientes do Supabase
+async function loadClients() {
+    try {
+        const { data, error } = await supabase
+            .from('clients')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        allClients = data || [];
+        filteredClients = allClients;
+
+        renderClients(filteredClients);
+        updateClientCount(allClients.length);
+
+    } catch (error) {
+        console.error('Erro ao carregar clientes:', error);
+        showToast(
+            'Erro ao carregar',
+            'Não foi possível carregar a lista de clientes',
+            'error',
+            4000
+        );
+    }
+}
+
+// Renderizar lista de clientes
+function renderClients(clients) {
+    if (!clients || clients.length === 0) {
+        clientsList.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">📋</div>
+                <div class="empty-state-text">Nenhum cliente encontrado</div>
+                <div class="empty-state-subtext">${searchInput.value ? 'Tente outra busca' : 'Adicione clientes para vê-los aqui'}</div>
+            </div>
+        `;
+        return;
+    }
+
+    const clientsHTML = clients.map(client => `
+        <div class="client-card" data-client-id="${client.id}">
+            <div class="client-name">
+                <span>👤</span>
+                <span>${escapeHtml(client.name)}</span>
+            </div>
+            ${client.phone ? `
+                <div class="client-info">
+                    <span class="client-info-icon">📞</span>
+                    <span>${escapeHtml(client.phone)}</span>
+                </div>
+            ` : ''}
+            <div class="client-info">
+                <span class="client-info-icon">📍</span>
+                <span>${escapeHtml(client.address)}</span>
+            </div>
+        </div>
+    `).join('');
+
+    clientsList.innerHTML = clientsHTML;
+
+    // Adicionar event listeners aos cards
+    document.querySelectorAll('.client-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const clientId = card.getAttribute('data-client-id');
+            const client = clients.find(c => c.id === clientId);
+            if (client) {
+                showClientDetails(client);
+            }
+        });
+    });
+}
+
+// Atualizar contador de clientes
+function updateClientCount(count) {
+    clientCount.textContent = count;
+}
+
+// Mostrar detalhes do cliente (placeholder)
+function showClientDetails(client) {
+    showToast(
+        client.name,
+        'Clique no cliente para ver mais detalhes (em desenvolvimento)',
+        'info',
+        3000
+    );
+    // TODO: Centralizar mapa no endereço do cliente
+    // TODO: Abrir modal com detalhes
+}
+
+// Função helper para escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Carregar clientes ao inicializar
+setTimeout(() => {
+    loadClients();
+}, 2000);
 
 // ===========================
 // CLEANUP
