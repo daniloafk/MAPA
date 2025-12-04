@@ -1797,6 +1797,7 @@ const MAP_ID = "ebb7ca4503045feabc75b373";
 // IMPORTANTE: Substitua pelo seu Project ID do Google Cloud Platform
 // Encontre em: https://console.cloud.google.com/ → Configurações do projeto
 const GOOGLE_CLOUD_PROJECT_ID = "mapas-clientes-479801"; // ✅ Configurado!
+const GOOGLE_MAPS_API_KEY = "AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU"; // API Key para Fleet Routing
 
 // ===========================
 // SISTEMA DE NOTIFICAÇÕES
@@ -2050,7 +2051,7 @@ function handleGeoError(error, isInitial = false) {
     switch(error.code) {
         case error.PERMISSION_DENIED:
             errorTitle = 'Permissão negada';
-            errorMessage = 'Por favor, permita o acesso à localização';
+            errorMessage = 'Por favor, permita o acesso à localizaç��o';
             break;
         case error.POSITION_UNAVAILABLE:
             errorTitle = 'Localização indisponível';
@@ -3045,6 +3046,7 @@ async function calculateFleetRoute(origin, deliveryPoints) {
     const payload = {
         origin: origin,
         deliveryPoints: deliveryPoints,
+        apiKey: GOOGLE_MAPS_API_KEY,
         projectId: GOOGLE_CLOUD_PROJECT_ID
     };
 
