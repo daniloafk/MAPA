@@ -2118,7 +2118,7 @@ function addDeliveryMarkers() {
         });
 
         try {
-            // Criar marcador usando AdvancedMarkerElement
+            // Criar marcador usando AdvancedMarkerElement (se disponível) ou Marker clássico
             if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
                 const marker = new google.maps.marker.AdvancedMarkerElement({
                     map,
@@ -2128,6 +2128,41 @@ function addDeliveryMarkers() {
                 });
 
                 // Adicionar listener de clique no marcador
+                marker.addListener('click', () => {
+                    map.setCenter(position);
+                    map.setZoom(18);
+
+                    showToast(
+                        '📦 Pacote',
+                        data.address,
+                        'info',
+                        5000
+                    );
+                });
+
+                deliveryMarkers[qrCode] = marker;
+            } else {
+                // Fallback: usar Marker clássico com ícone personalizado
+                const marker = new google.maps.Marker({
+                    map,
+                    position,
+                    title: data.address.split('\n')[0],
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        fillColor: '#ea4335',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2,
+                        scale: 10
+                    },
+                    label: {
+                        text: '📦',
+                        color: '#ffffff',
+                        fontSize: '14px'
+                    }
+                });
+
+                // Adicionar listener de clique
                 marker.addListener('click', () => {
                     map.setCenter(position);
                     map.setZoom(18);
