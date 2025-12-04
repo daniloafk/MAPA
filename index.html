@@ -1883,56 +1883,9 @@ window.initMap = function () {
             fullscreenControl: false,
             clickableIcons: false,
             backgroundColor: '#e5e3df',
-            // Configuração EXPLÍCITA do mapTypeControl
-            mapTypeControl: true,
-            mapTypeControlOptions: {
-                mapTypeIds: ['roadmap', 'satellite', 'terrain'],
-                style: google.maps.MapTypeControlStyle.DEFAULT,
-                position: google.maps.ControlPosition.TOP_LEFT
-            }
+            // Controle de tipo de mapa padrão do Google
+            mapTypeControl: true
         });
-
-        // LOG para debug
-        console.log('🗺️ Mapa inicializado com tipos:', map.mapTypes);
-        console.log('🔍 Tipo atual:', map.getMapTypeId());
-
-        // ADICIONAR BOTÃO TERRAIN MANUALMENTE (fallback)
-        setTimeout(() => {
-            // Verificar se terrain está disponível
-            if (map.mapTypes.get('terrain')) {
-                console.log('✅ TERRAIN disponível no mapa');
-
-                // Criar botão customizado para TERRAIN
-                const terrainButton = document.createElement('button');
-                terrainButton.textContent = '🏔️ Relevo';
-                terrainButton.style.cssText = `
-                    background: white;
-                    border: 2px solid #fff;
-                    border-radius: 4px;
-                    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-                    color: #333;
-                    cursor: pointer;
-                    font-family: Arial, sans-serif;
-                    font-size: 14px;
-                    font-weight: 500;
-                    height: 40px;
-                    line-height: 38px;
-                    margin: 10px;
-                    padding: 0 17px;
-                    text-align: center;
-                `;
-
-                terrainButton.addEventListener('click', () => {
-                    map.setMapTypeId('terrain');
-                    console.log('🏔️ Mudado para TERRAIN');
-                });
-
-                map.controls[google.maps.ControlPosition.TOP_CENTER].push(terrainButton);
-                console.log('✅ Botão TERRAIN adicionado no topo');
-            } else {
-                console.error('❌ TERRAIN NÃO ESTÁ DISPONÍVEL');
-            }
-        }, 1000);
 
         // Inicializar serviços de rota
         directionsService = new google.maps.DirectionsService();
