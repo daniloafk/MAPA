@@ -34,6 +34,10 @@
         left: 0;
         opacity: 0;
         transition: opacity 0.5s ease-in-out;
+        /* Aceleração por hardware */
+        transform: translateZ(0);
+        will-change: transform;
+        backface-visibility: hidden;
     }
 
     #map.loaded {
@@ -2098,6 +2102,9 @@ function handleGeoError(error, isInitial = false) {
 let allDeliveryPoints = []; // Cache de todos os pontos
 let visibleMarkers = []; // Marcadores atualmente renderizados
 let updateMarkersTimeout = null;
+let lastBounds = null; // Cache do último bounds calculado
+let lastZoom = null; // Cache do último zoom
+let qrScannerLoaded = false; // Flag para lazy loading do QR scanner
 
 function addDeliveryMarkers() {
     console.log('🎯 Inicializando sistema de marcadores otimizado (viewport-based)');
@@ -2132,6 +2139,17 @@ function updateVisibleMarkers() {
 
         if (!bounds) return;
 
+        // Cache: verificar se bounds ou zoom mudaram significativamente
+        const zoomChanged = lastZoom === null || Math.abs(zoom - lastZoom) > 0.5;
+        const boundsChanged = lastBounds === null || !lastBounds.equals(bounds);
+
+        if (!zoomChanged && !boundsChanged) {
+            return; // Sem mudanças significativas, não atualizar
+        }
+
+        lastZoom = zoom;
+        lastBounds = bounds;
+
         // REGRA: Só mostrar marcadores quando zoom >= 15 (bem próximo)
         // De longe (zoom < 15): apenas rota
         // De perto (zoom >= 15): rota + marcadores na viewport
@@ -2142,19 +2160,32 @@ function updateVisibleMarkers() {
             return;
         }
 
-        // Zoom perto: mostrar marcadores na viewport
-        const pointsInView = allDeliveryPoints.filter(point =>
-            bounds.contains(point.position)
-        );
-
-        // Limitar quantidade para performance (máximo 20 marcadores simultâneos)
-        const pointsToShow = pointsInView.slice(0, 20);
-
-        // Verificar quais já existem e quais precisam ser criados/removidos
-        updateMarkerSet(pointsToShow);
-
-        console.log(`📍 Marcadores visíveis: ${visibleMarkers.length}/${allDeliveryPoints.length} (zoom: ${zoom.toFixed(1)})`);
+        // Usar requestIdleCallback para processar quando navegador estiver ocioso
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(() => {
+                renderMarkersInViewport(bounds);
+            }, { timeout: 500 });
+        } else {
+            // Fallback para navegadores sem suporte
+            renderMarkersInViewport(bounds);
+        }
     }, 300); // Aguardar 300ms após parar de mover (reduz atualizações)
+}
+
+// Função separada para renderizar marcadores (pode ser chamada via requestIdleCallback)
+function renderMarkersInViewport(bounds) {
+    // Zoom perto: mostrar marcadores na viewport
+    const pointsInView = allDeliveryPoints.filter(point =>
+        bounds.contains(point.position)
+    );
+
+    // Limitar quantidade para performance (máximo 20 marcadores simultâneos)
+    const pointsToShow = pointsInView.slice(0, 20);
+
+    // Verificar quais já existem e quais precisam ser criados/removidos
+    updateMarkerSet(pointsToShow);
+
+    console.log(`📍 Marcadores visíveis: ${visibleMarkers.length}/${allDeliveryPoints.length} (zoom: ${lastZoom.toFixed(1)})`);
 }
 
 // Atualizar conjunto de marcadores (adicionar novos, remover antigos)
@@ -2182,44 +2213,50 @@ function updateMarkerSet(newPoints) {
 
 // Criar marcador ultra-leve (círculo SVG simples)
 function createLightweightMarker(point) {
-    // Criar círculo SVG leve (muito mais rápido que AdvancedMarkerElement com HTML)
-    const circle = new google.maps.Circle({
-        map: map,
-        center: point.position,
-        radius: 12, // 12 metros de raio (menor = mais leve)
-        fillColor: '#ea4335',
-        fillOpacity: 0.85,
-        strokeColor: '#ffffff',
-        strokeWeight: 2,
-        strokeOpacity: 1,
-        clickable: true,
-        zIndex: 100,
-        // Otimizações adicionais
-        optimized: true, // Renderização otimizada do Google Maps
-        visible: true
-    });
+    // Usar requestAnimationFrame para renderização suave
+    requestAnimationFrame(() => {
+        // Criar círculo SVG leve (muito mais rápido que AdvancedMarkerElement com HTML)
+        const circle = new google.maps.Circle({
+            map: map,
+            center: point.position,
+            radius: 12, // 12 metros de raio (menor = mais leve)
+            fillColor: '#ea4335',
+            fillOpacity: 0.85,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+            strokeOpacity: 1,
+            clickable: true,
+            zIndex: 100,
+            // Otimizações adicionais
+            optimized: true, // Renderização otimizada do Google Maps
+            visible: true
+        });
 
-    // InfoWindow para mostrar endereço ao clicar
-    const infoWindow = new google.maps.InfoWindow({
-        content: `
-            <div style="padding: 8px; max-width: 250px;">
-                <div style="font-weight: 600; margin-bottom: 4px;">📦 Ponto de Entrega</div>
-                <div style="font-size: 13px; color: #666;">${point.address}</div>
-            </div>
-        `
-    });
+        // InfoWindow para mostrar endereço ao clicar (lazy loading)
+        let infoWindow = null;
 
-    // Mostrar info ao clicar
-    circle.addListener('click', () => {
-        infoWindow.setPosition(point.position);
-        infoWindow.open(map);
-    });
+        // Mostrar info ao clicar (criar InfoWindow apenas quando necessário)
+        circle.addListener('click', () => {
+            if (!infoWindow) {
+                infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div style="padding: 8px; max-width: 250px;">
+                            <div style="font-weight: 600; margin-bottom: 4px;">📦 Ponto de Entrega</div>
+                            <div style="font-size: 13px; color: #666;">${point.address}</div>
+                        </div>
+                    `
+                });
+            }
+            infoWindow.setPosition(point.position);
+            infoWindow.open(map);
+        });
 
-    // Armazenar referência
-    visibleMarkers.push({
-        qrCode: point.qrCode,
-        marker: circle,
-        infoWindow: infoWindow
+        // Armazenar referência
+        visibleMarkers.push({
+            qrCode: point.qrCode,
+            marker: circle,
+            infoWindow: infoWindow
+        });
     });
 }
 
@@ -2373,18 +2410,26 @@ async function openModal() {
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
 
-    // Abrir câmera automaticamente
-    try {
-        await startCamera();
-    } catch (error) {
-        console.error('Erro ao abrir câmera:', error);
-        showToast(
-            'Erro ao abrir câmera',
-            'Verifique as permissões do navegador',
-            'error',
-            5000
-        );
+    // Lazy loading: só iniciar câmera quando modal abrir pela primeira vez
+    if (!qrScannerLoaded) {
+        console.log('📷 Lazy loading: inicializando QR scanner...');
+        qrScannerLoaded = true;
     }
+
+    // Abrir câmera automaticamente (com pequeno delay para renderizar modal primeiro)
+    setTimeout(async () => {
+        try {
+            await startCamera();
+        } catch (error) {
+            console.error('Erro ao abrir câmera:', error);
+            showToast(
+                'Erro ao abrir câmera',
+                'Verifique as permissões do navegador',
+                'error',
+                5000
+            );
+        }
+    }, 100); // 100ms delay para modal renderizar primeiro
 }
 
 // Fechar modal
@@ -3273,7 +3318,20 @@ async function drawRouteInSegments(allPoints, totalDeliveries) {
             });
 
             // Criar polyline para este segmento (otimizada)
-            const path = result.routes[0].overview_path;
+            let path = result.routes[0].overview_path;
+
+            // Simplificar path para reduzir pontos (melhor performance)
+            // Usar algoritmo de simplificação: manter 1 de cada 3 pontos em rotas longas
+            if (path.length > 100) {
+                const simplifiedPath = [path[0]]; // Sempre manter primeiro ponto
+                for (let k = 2; k < path.length - 1; k += 2) {
+                    simplifiedPath.push(path[k]);
+                }
+                simplifiedPath.push(path[path.length - 1]); // Sempre manter último ponto
+                path = simplifiedPath;
+                console.log(`Path simplificado: ${result.routes[0].overview_path.length} → ${path.length} pontos`);
+            }
+
             const polyline = new google.maps.Polyline({
                 path: path,
                 strokeColor: '#4285f4',
