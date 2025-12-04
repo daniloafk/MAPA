@@ -1255,9 +1255,6 @@
 <!-- jsQR - Biblioteca de leitura de QR Code -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
-<!-- Marker Clusterer - Agrupamento de marcadores para performance -->
-<script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
-
 <script>
     const SUPABASE_URL = "https://dctlgztkqtktxnmiuqgr.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjdGxnenRrcXRrdHhubWl1cWdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2MzMwNDIsImV4cCI6MjA4MDIwOTA0Mn0.Ctlx8A4QBFxa7Iu6fObw_OthHfA2XrzY47UiMMIhbIU";
@@ -1791,7 +1788,6 @@ let watchId = null;
 let _animating3D = false;
 let locationAccuracy = null;
 let deliveryMarkers = {}; // Armazena marcadores de endereços de entrega
-let markerCluster = null; // Cluster de marcadores para performance
 let directionsService = null; // Serviço de rotas do Google Maps
 let directionsRenderer = null; // Renderizador de rotas
 let routeMode = false; // Modo de planejamento de rota ativo/inativo
@@ -2082,130 +2078,11 @@ function handleGeoError(error, isInitial = false) {
 // ===========================
 
 function addDeliveryMarkers() {
-    console.log('⚡ Adicionando marcadores de entrega com CLUSTERING...');
-
-    // Limpar cluster anterior
-    if (markerCluster) {
-        markerCluster.clearMarkers();
-        markerCluster = null;
-    }
-
-    // Limpar marcadores existentes
-    Object.values(deliveryMarkers).forEach(marker => {
-        if (marker.setMap) {
-            marker.setMap(null);
-        } else if (marker.map) {
-            marker.map = null;
-        }
-    });
-    deliveryMarkers = {};
-
-    // OTIMIZAÇÃO: Agrupar endereços por coordenadas únicas (remover duplicatas)
-    const uniqueLocations = new Map();
-
-    Object.entries(addressDatabase).forEach(([qrCode, data]) => {
-        const locationKey = `${data.latitude.toFixed(6)},${data.longitude.toFixed(6)}`;
-
-        if (!uniqueLocations.has(locationKey)) {
-            uniqueLocations.set(locationKey, {
-                qrCode,
-                data,
-                count: 1,
-                qrCodes: [qrCode]
-            });
-        } else {
-            // Já existe marcador nessa localização
-            const existing = uniqueLocations.get(locationKey);
-            existing.count++;
-            existing.qrCodes.push(qrCode);
-        }
-    });
-
-    console.log(`Criando ${uniqueLocations.size} marcadores únicos (de ${Object.keys(addressDatabase).length} endereços)`);
-
-    // Array para armazenar todos os marcadores para o cluster
-    const markers = [];
-
-    // Criar marcadores apenas para localizações únicas
-    uniqueLocations.forEach(({qrCode, data, count, qrCodes}) => {
-        const position = {
-            lat: data.latitude,
-            lng: data.longitude
-        };
-
-        try {
-            // Criar marcador SEM adicionar ao mapa ainda (será gerenciado pelo cluster)
-            const marker = new google.maps.Marker({
-                position,
-                title: data.address.split('\n')[0],
-                icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    fillColor: '#ea4335',
-                    fillOpacity: 0.9,
-                    strokeColor: '#ffffff',
-                    strokeWeight: 2,
-                    scale: 8
-                },
-                label: count > 1 ? {
-                    text: count.toString(),
-                    color: '#ffffff',
-                    fontSize: '12px',
-                    fontWeight: 'bold'
-                } : {
-                    text: '📦',
-                    color: '#ffffff',
-                    fontSize: '12px'
-                },
-                optimized: true
-            });
-
-            // Adicionar listener de clique
-            marker.addListener('click', () => {
-                map.setCenter(position);
-                map.setZoom(16);
-
-                const message = count > 1
-                    ? `${count} entregas neste local:\n${data.address}`
-                    : data.address;
-
-                showToast(
-                    '📦 Pacote',
-                    message,
-                    'info',
-                    5000
-                );
-            });
-
-            // Armazenar marcador para todos os QR codes nessa localização
-            qrCodes.forEach(code => {
-                deliveryMarkers[code] = marker;
-            });
-
-            // Adicionar ao array de marcadores
-            markers.push(marker);
-
-        } catch (error) {
-            console.error('Erro ao criar marcador de entrega:', error);
-        }
-    });
-
-    // Criar MarkerClusterer para agrupar marcadores automaticamente
-    if (window.markerClusterer && window.markerClusterer.MarkerClusterer) {
-        markerCluster = new markerClusterer.MarkerClusterer({
-            map,
-            markers,
-            algorithm: new markerClusterer.SuperClusterAlgorithm({
-                radius: 100, // Raio de agrupamento em pixels
-                maxZoom: 15  // Zoom máximo onde ainda agrupa (acima disso mostra individual)
-            })
-        });
-        console.log(`✅ ${uniqueLocations.size} marcadores adicionados COM CLUSTERING (super performance)!`);
-    } else {
-        // Fallback: adicionar marcadores diretamente se clustering não carregar
-        console.warn('⚠️ MarkerClusterer não disponível, adicionando marcadores diretamente');
-        markers.forEach(marker => marker.setMap(map));
-        console.log(`${uniqueLocations.size} marcadores adicionados sem clustering`);
-    }
+    // NOVA ABORDAGEM: NÃO CRIAR MARCADORES!
+    // A rota já mostra visualmente onde estão os pontos de entrega
+    // Isso mantém o mapa super leve e rápido
+    console.log('✅ Modo otimizado: marcadores não serão exibidos (apenas a rota)');
+    console.log('💡 Os 52 pontos de entrega serão visíveis através da linha da rota');
 }
 
 // ===========================
@@ -2981,24 +2858,8 @@ function deactivateRouteMode() {
         window.routePolylines = [];
     }
 
-    // Remover cluster e marcadores de entrega para deixar o mapa leve
-    console.log('🗑️ Removendo cluster e marcadores de entrega...');
-
-    // Limpar cluster
-    if (markerCluster) {
-        markerCluster.clearMarkers();
-        markerCluster = null;
-    }
-
-    // Limpar marcadores individuais
-    Object.values(deliveryMarkers).forEach(marker => {
-        if (marker.setMap) {
-            marker.setMap(null);
-        } else if (marker.map) {
-            marker.map = null;
-        }
-    });
-    deliveryMarkers = {};
+    // Nada para limpar - marcadores não são mais criados
+    console.log('🗑️ Limpando apenas a rota (marcadores não existem)');
 
     showToast(
         'Modo de rota desativado',
