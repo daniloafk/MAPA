@@ -495,8 +495,14 @@
         width: 100%;
         height: auto;
         max-height: 300px;
+        min-height: 200px;
         object-fit: cover;
         display: block;
+        background: #000;
+    }
+
+    #qr-video:not([src]) {
+        opacity: 0.3;
     }
 
     #qr-canvas {
@@ -2992,6 +2998,9 @@ btnSwitchCamera.addEventListener('click', async () => {
 
 // Iniciar câmera
 async function startCamera() {
+    // Parar câmera existente antes de iniciar nova
+    stopCamera();
+
     const constraints = {
         video: {
             facingMode: currentFacingMode,
@@ -3002,35 +3011,81 @@ async function startCamera() {
 
     try {
         videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        // Garantir que o vídeo recebe o stream
         qrVideo.srcObject = videoStream;
 
+        // Mostrar container da câmera
         qrCameraContainer.classList.add('active');
 
-        // Aguardar vídeo carregar
-        qrVideo.onloadedmetadata = () => {
-            qrVideo.play();
-            startScanning();
-        };
+        // Aguardar vídeo carregar e iniciar reprodução
+        return new Promise((resolve, reject) => {
+            qrVideo.onloadedmetadata = async () => {
+                try {
+                    // Forçar play do vídeo
+                    await qrVideo.play();
+
+                    // Iniciar scanning após vídeo começar
+                    startScanning();
+
+                    resolve();
+                } catch (playError) {
+                    console.error('Erro ao iniciar reprodução do vídeo:', playError);
+                    reject(playError);
+                }
+            };
+
+            qrVideo.onerror = (error) => {
+                console.error('Erro no elemento de vídeo:', error);
+                reject(error);
+            };
+
+            // Timeout de segurança
+            setTimeout(() => {
+                if (qrVideo.readyState < 2) {
+                    reject(new Error('Timeout ao carregar vídeo'));
+                }
+            }, 10000);
+        });
 
     } catch (error) {
+        // Limpar em caso de erro
+        stopCamera();
+        qrCameraContainer.classList.remove('active');
         throw error;
     }
 }
 
 // Parar câmera
 function stopCamera() {
+    // Parar todas as tracks do stream
     if (videoStream) {
-        videoStream.getTracks().forEach(track => track.stop());
+        videoStream.getTracks().forEach(track => {
+            track.stop();
+            track.enabled = false;
+        });
         videoStream = null;
     }
 
+    // Parar intervalo de scanning
     if (scanningInterval) {
         clearInterval(scanningInterval);
         scanningInterval = null;
     }
 
+    // Limpar vídeo completamente
+    qrVideo.pause();
     qrVideo.srcObject = null;
+    qrVideo.load(); // Força reload do elemento de vídeo
+
+    // Remover event listeners antigos
+    qrVideo.onloadedmetadata = null;
+    qrVideo.onerror = null;
+
+    // Esconder container
     qrCameraContainer.classList.remove('active');
+
+    // Resetar status
     qrStatus.textContent = 'Procurando QR Code...';
     qrStatus.classList.remove('success');
     lastScannedCode = null;
@@ -3779,7 +3834,7 @@ function showClientDetails(client) {
 let isEditMode = false;
 let editingClientId = null;
 
-function editClient(client) {
+async function editClient(client) {
     isEditMode = true;
     editingClientId = client.id;
 
@@ -3813,6 +3868,31 @@ function editClient(client) {
     const scannerTitle = document.querySelector('.scanner-title span');
     if (scannerTitle) {
         scannerTitle.textContent = '✏️ Editando Cliente';
+    }
+
+    // Iniciar câmera para o scanner QR Code
+    try {
+        await startCamera();
+    } catch (error) {
+        console.error('Erro ao abrir câmera no modo de edição:', error);
+
+        // Mensagem de erro para o usuário
+        let errorMessage = 'Verifique as permissões do navegador';
+
+        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+            errorMessage = 'Permissão negada. Permita o acesso à câmera nas configurações do navegador.';
+        } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+            errorMessage = 'Nenhuma câmera encontrada no dispositivo.';
+        } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+            errorMessage = 'Câmera já está em uso por outro aplicativo.';
+        }
+
+        showToast(
+            'Erro ao abrir câmera',
+            errorMessage,
+            'error',
+            5000
+        );
     }
 
     // Focar no nome
