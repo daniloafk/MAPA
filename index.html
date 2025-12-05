@@ -3122,7 +3122,8 @@ function activateRouteMode() {
     routeMode = true;
     btnToggleRoute.classList.add('active');
 
-    // Mostrar botão de limpar
+    // Esconder botão de planejar rota e mostrar botão de limpar
+    btnToggleRoute.style.display = 'none';
     document.getElementById('btnClearRoute').style.display = 'flex';
 
     // Reativar DirectionsRenderer se necessário
@@ -3162,6 +3163,10 @@ function activateRouteMode() {
 function deactivateRouteMode() {
     routeMode = false;
     btnToggleRoute.classList.remove('active');
+
+    // Mostrar botão de planejar rota e esconder botão de limpar
+    btnToggleRoute.style.display = 'flex';
+    document.getElementById('btnClearRoute').style.display = 'none';
 
     // Limpar rota do mapa COMPLETAMENTE
     if (directionsRenderer) {
@@ -3207,8 +3212,9 @@ function clearAllRoutesAndMarkers() {
         btnToggleRoute.classList.remove('active');
     }
 
-    // Esconder botão de limpar
+    // Esconder botão de limpar e mostrar botão de planejar rota novamente
     document.getElementById('btnClearRoute').style.display = 'none';
+    btnToggleRoute.style.display = 'flex';
 
     // 1. Limpar DirectionsRenderer COMPLETAMENTE
     if (directionsRenderer) {
