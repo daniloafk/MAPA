@@ -1543,6 +1543,7 @@
     <button id="btnOpenSidebar" class="control-btn" title="Ver lista de clientes">👥</button>
     <button id="btnUploadSpreadsheet" class="control-btn" title="Atualizar planilha do dia">📊</button>
     <button id="btnToggleClients" class="control-btn" title="Mostrar/Ocultar clientes no mapa">👤</button>
+    <button id="btnShowMatchedClients" class="control-btn" title="Mostrar clientes identificados na planilha">📍</button>
 </div>
 
 <!-- Container de Notificações -->
@@ -5919,6 +5920,281 @@ function hideClientMarkers() {
 }
 
 // ===========================
+// MOSTRAR CLIENTES IDENTIFICADOS NA PLANILHA
+// ===========================
+
+const btnShowMatchedClients = document.getElementById('btnShowMatchedClients');
+let matchedClientMarkers = {};
+let matchedClientsVisible = false;
+
+// Toggle clientes identificados na planilha
+btnShowMatchedClients.addEventListener('click', async () => {
+    if (matchedClientsVisible) {
+        hideMatchedClientMarkers();
+    } else {
+        await showMatchedClientMarkers();
+    }
+});
+
+// Função para normalizar endereço (mesma usada na comparação)
+function normalizeAddressForComparison(address) {
+    return address
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, ' ')
+        .replace(/[.,;:\-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+// Mostrar marcadores dos clientes identificados na planilha
+async function showMatchedClientMarkers() {
+    try {
+        // Verificar se há endereços matched da planilha
+        if (!window.matchedAddressesFromSpreadsheet || window.matchedAddressesFromSpreadsheet.length === 0) {
+            showToast(
+                'Nenhum endereço identificado',
+                'Faça upload de uma planilha primeiro',
+                'warning',
+                4000
+            );
+            return;
+        }
+
+        // Buscar todos os clientes do banco
+        const { data: clients, error } = await supabase
+            .from('clients')
+            .select('*')
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        if (!clients || clients.length === 0) {
+            showToast(
+                'Nenhum cliente cadastrado',
+                'Não há clientes para exibir',
+                'warning',
+                3000
+            );
+            return;
+        }
+
+        // Filtrar apenas clientes cujos endereços batem com a planilha
+        const matchedClients = clients.filter(client => {
+            const clientAddress = client.address || '';
+            const clientAddressFirstLine = clientAddress.split('\n')[0];
+            const normalizedClient = normalizeAddressForComparison(clientAddressFirstLine);
+
+            return window.matchedAddressesFromSpreadsheet.includes(normalizedClient);
+        });
+
+        if (matchedClients.length === 0) {
+            showToast(
+                'Nenhum cliente identificado',
+                'Os endereços da planilha não correspondem aos clientes cadastrados',
+                'warning',
+                4000
+            );
+            return;
+        }
+
+        console.log(`📍 Mostrando ${matchedClients.length} clientes identificados na planilha`);
+
+        // Criar marcador para cada cliente identificado
+        matchedClients.forEach((client) => {
+            if (!client.latitude || !client.longitude) {
+                console.warn(`Cliente ${client.name} não tem coordenadas válidas`);
+                return;
+            }
+
+            const position = { lat: client.latitude, lng: client.longitude };
+
+            // Criar elemento do marcador com pin VERDE (para diferenciar)
+            const markerDiv = document.createElement('div');
+            markerDiv.style.cursor = 'pointer';
+            markerDiv.style.transition = 'transform 0.2s';
+
+            // Criar pin verde para clientes identificados na planilha
+            const pinImg = document.createElement('div');
+            pinImg.style.width = '32px';
+            pinImg.style.height = '32px';
+            pinImg.style.background = '#4CAF50'; // Verde
+            pinImg.style.border = '3px solid white';
+            pinImg.style.borderRadius = '50% 50% 50% 0';
+            pinImg.style.transform = 'rotate(-45deg)';
+            pinImg.style.boxShadow = '0 3px 6px rgba(0,0,0,0.4)';
+            pinImg.style.display = 'flex';
+            pinImg.style.alignItems = 'center';
+            pinImg.style.justifyContent = 'center';
+
+            const innerCircle = document.createElement('div');
+            innerCircle.style.width = '18px';
+            innerCircle.style.height = '18px';
+            innerCircle.style.background = 'white';
+            innerCircle.style.borderRadius = '50%';
+            innerCircle.style.transform = 'rotate(45deg)';
+            innerCircle.style.fontSize = '11px';
+            innerCircle.style.display = 'flex';
+            innerCircle.style.alignItems = 'center';
+            innerCircle.style.justifyContent = 'center';
+            innerCircle.textContent = '✓';
+
+            pinImg.appendChild(innerCircle);
+            markerDiv.appendChild(pinImg);
+
+            // Efeito hover
+            markerDiv.addEventListener('mouseenter', () => {
+                markerDiv.style.transform = 'scale(1.2)';
+            });
+            markerDiv.addEventListener('mouseleave', () => {
+                markerDiv.style.transform = 'scale(1)';
+            });
+
+            // Criar InfoWindow
+            const infoWindowContent = document.createElement('div');
+            infoWindowContent.style.padding = '12px';
+            infoWindowContent.style.maxWidth = '280px';
+
+            const badgeDiv = document.createElement('div');
+            badgeDiv.style.background = '#4CAF50';
+            badgeDiv.style.color = 'white';
+            badgeDiv.style.padding = '4px 8px';
+            badgeDiv.style.borderRadius = '4px';
+            badgeDiv.style.fontSize = '11px';
+            badgeDiv.style.fontWeight = 'bold';
+            badgeDiv.style.marginBottom = '8px';
+            badgeDiv.style.display = 'inline-block';
+            badgeDiv.textContent = '✓ IDENTIFICADO NA PLANILHA';
+
+            const nameDiv = document.createElement('div');
+            nameDiv.style.fontWeight = 'bold';
+            nameDiv.style.fontSize = '14px';
+            nameDiv.style.color = '#4CAF50';
+            nameDiv.style.marginBottom = '6px';
+            nameDiv.textContent = `👤 ${client.name}`;
+
+            const phoneDiv = document.createElement('div');
+            phoneDiv.style.fontSize = '12px';
+            phoneDiv.style.color = '#666';
+            phoneDiv.style.marginBottom = '4px';
+            phoneDiv.innerHTML = `📞 ${client.phone || 'Sem telefone'}`;
+
+            const addressDiv = document.createElement('div');
+            addressDiv.style.fontSize = '12px';
+            addressDiv.style.color = '#333';
+            addressDiv.style.lineHeight = '1.4';
+            addressDiv.innerHTML = `📍 ${client.address.replace(/\n/g, '<br>')}`;
+
+            infoWindowContent.appendChild(badgeDiv);
+            infoWindowContent.appendChild(nameDiv);
+            infoWindowContent.appendChild(phoneDiv);
+            infoWindowContent.appendChild(addressDiv);
+
+            const infoWindow = new google.maps.InfoWindow({
+                content: infoWindowContent,
+                maxWidth: 300
+            });
+
+            try {
+                // Criar marcador usando AdvancedMarkerElement
+                if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+                    const marker = new google.maps.marker.AdvancedMarkerElement({
+                        map,
+                        position,
+                        content: markerDiv,
+                        title: client.name
+                    });
+
+                    marker.addListener('click', () => {
+                        if (currentInfoWindow) {
+                            currentInfoWindow.close();
+                        }
+                        infoWindow.open(map, marker);
+                        currentInfoWindow = infoWindow;
+                        map.panTo(position);
+                    });
+
+                    matchedClientMarkers[client.id] = marker;
+                } else {
+                    // Fallback: Marcador clássico
+                    const marker = new google.maps.Marker({
+                        map,
+                        position,
+                        title: client.name,
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            fillColor: '#4CAF50',
+                            fillOpacity: 1,
+                            strokeColor: 'white',
+                            strokeWeight: 2,
+                            scale: 10
+                        }
+                    });
+
+                    marker.addListener('click', () => {
+                        if (currentInfoWindow) {
+                            currentInfoWindow.close();
+                        }
+                        infoWindow.open(map, marker);
+                        currentInfoWindow = infoWindow;
+                        map.panTo(position);
+                    });
+
+                    matchedClientMarkers[client.id] = marker;
+                }
+            } catch (error) {
+                console.error('Erro ao criar marcador:', error);
+            }
+        });
+
+        matchedClientsVisible = true;
+        btnShowMatchedClients.classList.add('active');
+
+        showToast(
+            `${matchedClients.length} cliente${matchedClients.length > 1 ? 's' : ''} identificado${matchedClients.length > 1 ? 's' : ''}`,
+            'Clientes da planilha mostrados no mapa',
+            'success',
+            4000
+        );
+
+    } catch (error) {
+        console.error('Erro ao carregar clientes identificados:', error);
+        showToast(
+            'Erro ao carregar',
+            'Não foi possível mostrar os clientes',
+            'error',
+            4000
+        );
+    }
+}
+
+// Ocultar marcadores dos clientes identificados
+function hideMatchedClientMarkers() {
+    Object.values(matchedClientMarkers).forEach(marker => {
+        try {
+            if (marker.map !== undefined) {
+                marker.map = null; // AdvancedMarkerElement
+            } else if (marker.setMap) {
+                marker.setMap(null); // Marker clássico
+            }
+        } catch (e) {
+            console.warn('Erro ao remover marcador:', e);
+        }
+    });
+
+    matchedClientMarkers = {};
+    matchedClientsVisible = false;
+    btnShowMatchedClients.classList.remove('active');
+
+    showToast(
+        'Clientes identificados ocultados',
+        'Marcadores removidos do mapa',
+        'info',
+        2000
+    );
+}
+
+// ===========================
 // UPLOAD DE PLANILHA
 // ===========================
 
@@ -6259,11 +6535,15 @@ async function processSpreadsheetData(jsonData) {
         console.log(`   ✅ Cadastrados: ${matchedCount}`);
         console.log(`   ⚠️ Não cadastrados: ${notRegisteredCount}`);
 
+        // Armazenar endereços matched globalmente para uso posterior
+        window.matchedAddressesFromSpreadsheet = Array.from(matchedAddresses);
+
         return {
             success: true,
             count: deliveryDataRecords.length,
             matchedCount: matchedCount,
             notRegisteredCount: notRegisteredCount,
+            matchedAddresses: Array.from(matchedAddresses),
             message: `${deliveryDataRecords.length} registros salvos com sucesso`
         };
 
