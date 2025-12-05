@@ -5950,10 +5950,19 @@ function normalizeAddressForComparison(address) {
 // Mostrar marcadores dos clientes identificados na planilha
 async function showMatchedClientMarkers() {
     try {
-        // Verificar se há endereços matched da planilha
-        if (!window.matchedAddressesFromSpreadsheet || window.matchedAddressesFromSpreadsheet.length === 0) {
+        // 1. Buscar dados da planilha (delivery_data) do Supabase
+        const { data: deliveryData, error: deliveryError } = await supabase
+            .from('delivery_data')
+            .select('*');
+
+        if (deliveryError) {
+            console.error('Erro ao buscar delivery_data:', deliveryError);
+            throw deliveryError;
+        }
+
+        if (!deliveryData || deliveryData.length === 0) {
             showToast(
-                'Nenhum endereço identificado',
+                'Nenhuma planilha carregada',
                 'Faça upload de uma planilha primeiro',
                 'warning',
                 4000
@@ -5961,13 +5970,13 @@ async function showMatchedClientMarkers() {
             return;
         }
 
-        // Buscar todos os clientes do banco
-        const { data: clients, error } = await supabase
+        // 2. Buscar todos os clientes do banco
+        const { data: clients, error: clientsError } = await supabase
             .from('clients')
             .select('*')
             .order('created_at', { ascending: true });
 
-        if (error) throw error;
+        if (clientsError) throw clientsError;
 
         if (!clients || clients.length === 0) {
             showToast(
@@ -5979,13 +5988,22 @@ async function showMatchedClientMarkers() {
             return;
         }
 
-        // Filtrar apenas clientes cujos endereços batem com a planilha
+        // 3. Criar Set de endereços da planilha (normalizados)
+        const deliveryAddresses = new Set();
+        deliveryData.forEach(delivery => {
+            const addr = delivery.destination_address || '';
+            if (addr) {
+                deliveryAddresses.add(normalizeAddressForComparison(addr));
+            }
+        });
+
+        // 4. Filtrar apenas clientes cujos endereços batem com a planilha
         const matchedClients = clients.filter(client => {
             const clientAddress = client.address || '';
             const clientAddressFirstLine = clientAddress.split('\n')[0];
             const normalizedClient = normalizeAddressForComparison(clientAddressFirstLine);
 
-            return window.matchedAddressesFromSpreadsheet.includes(normalizedClient);
+            return deliveryAddresses.has(normalizedClient);
         });
 
         if (matchedClients.length === 0) {
