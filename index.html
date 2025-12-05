@@ -5573,26 +5573,32 @@ async function processSpreadsheetData(jsonData) {
         if (deleteError) throw deleteError;
 
         // 2. Limpar rotas existentes (resetar roteirização)
-        if (currentRoute) {
+        if (typeof currentRoute !== 'undefined' && currentRoute) {
             currentRoute.setMap(null);
             currentRoute = null;
         }
 
-        if (directionsRenderer) {
+        if (typeof directionsRenderer !== 'undefined' && directionsRenderer) {
             directionsRenderer.setMap(null);
         }
 
         // Limpar marcadores
-        Object.values(deliveryMarkers).forEach(marker => {
-            if (marker.setMap) {
-                marker.setMap(null);
-            }
-        });
-        deliveryMarkers = {};
+        if (typeof deliveryMarkers !== 'undefined') {
+            Object.values(deliveryMarkers).forEach(marker => {
+                if (marker.setMap) {
+                    marker.setMap(null);
+                }
+            });
+            deliveryMarkers = {};
+        }
 
         // Resetar botões
-        btnToggleRoute.classList.remove('active');
-        btnClearRoute.style.display = 'none';
+        if (typeof btnToggleRoute !== 'undefined') {
+            btnToggleRoute.classList.remove('active');
+        }
+        if (typeof btnClearRoute !== 'undefined') {
+            btnClearRoute.style.display = 'none';
+        }
 
         // 3. Processar novos dados da planilha
         const newClients = [];
