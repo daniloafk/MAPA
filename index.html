@@ -6198,17 +6198,6 @@ async function processSpreadsheetData(jsonData) {
                         isMatched = true;
                         break;
                     }
-
-                    // Comparação por coordenadas (diferença < 0.0001 graus ≈ 11 metros)
-                    if (client.latitude && client.longitude && delivery.latitude && delivery.longitude) {
-                        const latDiff = Math.abs(client.latitude - delivery.latitude);
-                        const lngDiff = Math.abs(client.longitude - delivery.longitude);
-
-                        if (latDiff < 0.0001 && lngDiff < 0.0001) {
-                            isMatched = true;
-                            break;
-                        }
-                    }
                 }
 
                 if (isMatched) {
