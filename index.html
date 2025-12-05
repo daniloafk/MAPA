@@ -3481,11 +3481,11 @@ function playBeep() {
 }
 
 // Processar resultado do QR Code
-function handleQRCodeResult(qrData) {
+async function handleQRCodeResult(qrData) {
     console.log('Processando QR Code:', qrData);
 
     // Buscar endereço no banco de dados
-    const addressData = lookupAddressData(qrData);
+    const addressData = await lookupAddressData(qrData);
 
     if (addressData) {
         // Endereço encontrado - armazenar dados completos
@@ -3528,18 +3528,62 @@ function handleQRCodeResult(qrData) {
     }, 500);
 }
 
-// Buscar dados completos do endereço no banco de dados
-function lookupAddressData(qrCode) {
-    // Buscar dados completos pelo código QR
-    if (addressDatabase[qrCode]) {
-        return addressDatabase[qrCode];
+// Buscar dados completos do endereço no banco de dados (delivery_data)
+async function lookupAddressData(qrCode) {
+    try {
+        // Buscar na tabela delivery_data pelo SPX TN (código QR)
+        const { data, error } = await supabase
+            .from('delivery_data')
+            .select('*')
+            .eq('spx_tn', qrCode)
+            .single();
+
+        if (error) {
+            console.warn('Erro ao buscar QR code:', error);
+            // Fallback: buscar no addressDatabase hardcoded (compatibilidade)
+            if (addressDatabase[qrCode]) {
+                return addressDatabase[qrCode];
+            }
+            return null;
+        }
+
+        if (data) {
+            // Formatar endereço no mesmo padrão
+            let formattedAddress = data.destination_address || '';
+            if (data.bairro) {
+                formattedAddress += `\nBairro: ${data.bairro}`;
+            }
+            if (data.city && data.zipcode) {
+                formattedAddress += `\n${data.city} - ${data.zipcode}`;
+            }
+
+            return {
+                address: formattedAddress,
+                latitude: data.latitude,
+                longitude: data.longitude
+            };
+        }
+
+        // Se não encontrou no Supabase, tentar no addressDatabase
+        if (addressDatabase[qrCode]) {
+            return addressDatabase[qrCode];
+        }
+
+        return null;
+
+    } catch (error) {
+        console.error('Erro ao buscar endereço:', error);
+        // Fallback: buscar no addressDatabase
+        if (addressDatabase[qrCode]) {
+            return addressDatabase[qrCode];
+        }
+        return null;
     }
-    return null;
 }
 
 // Buscar endereço no banco de dados (função legada - mantida para compatibilidade)
-function lookupAddress(qrCode) {
-    const data = lookupAddressData(qrCode);
+async function lookupAddress(qrCode) {
+    const data = await lookupAddressData(qrCode);
     return data ? data.address : null;
 }
 
