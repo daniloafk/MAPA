@@ -1008,6 +1008,10 @@
         display: flex;
         gap: 12px;
         margin-left: auto;
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
     }
 
     .phone-action-btn {
@@ -1025,6 +1029,11 @@
         box-shadow: 0 2px 4px rgba(0,0,0,0.15);
         outline: none;
         -webkit-tap-highlight-color: transparent;
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        touch-action: manipulation;
     }
 
     .phone-action-btn:focus,
@@ -3485,7 +3494,14 @@ function renderClients(clients) {
     // Event listeners para botões de telefone (ligação e WhatsApp)
     // Solução para mobile: forçar remoção de foco criando elemento temporário
     document.querySelectorAll('.phone-action-btn').forEach(btn => {
+        // Prevenir propagação em todos os eventos de toque
+        btn.addEventListener('touchstart', function(e) {
+            e.stopPropagation();
+        }, { passive: true });
+
         btn.addEventListener('touchend', function(e) {
+            e.stopPropagation();
+            e.preventDefault();
             const element = this;
 
             // Criar elemento invisível temporário para roubar o foco
@@ -3507,6 +3523,7 @@ function renderClients(clients) {
         });
 
         btn.addEventListener('click', function(e) {
+            e.stopPropagation();
             const element = this;
 
             // Mesmo processo para o evento click
@@ -3528,6 +3545,12 @@ function renderClients(clients) {
                 }, 10);
                 element.blur();
             }, 10);
+        });
+
+        // Prevenir seleção de texto
+        btn.addEventListener('selectstart', function(e) {
+            e.preventDefault();
+            return false;
         });
     });
 }
