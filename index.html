@@ -6181,38 +6181,23 @@ async function processSpreadsheetData(jsonData) {
         }
 
         // 6. Comparar endereços da planilha com clientes cadastrados (APENAS endereço)
+        // Comparação EXATA - sem normalização, texto deve ser idêntico
         let matchedCount = 0;
         let notRegisteredCount = 0;
 
-        // Função para normalizar endereço (remove espaços extras, pontuação, lowercase)
-        const normalizeAddress = (address) => {
-            return address
-                .toLowerCase()
-                .trim()
-                // Remove múltiplos espaços
-                .replace(/\s+/g, ' ')
-                // Remove pontuação (vírgulas, pontos, etc.)
-                .replace(/[.,;:\-]/g, ' ')
-                // Remove espaços novamente após remover pontuação
-                .replace(/\s+/g, ' ')
-                .trim();
-        };
-
         if (clients && clients.length > 0) {
-            console.log(`🔍 Iniciando comparação de ${deliveryDataRecords.length} endereços da planilha com ${clients.length} clientes cadastrados...`);
+            console.log(`🔍 Iniciando comparação EXATA de ${deliveryDataRecords.length} endereços da planilha com ${clients.length} clientes cadastrados...`);
 
             for (const delivery of deliveryDataRecords) {
                 const deliveryAddress = delivery.destination_address || '';
-                const normalizedDelivery = normalizeAddress(deliveryAddress);
                 let isMatched = false;
 
-                // Verificar se o endereço da planilha bate com algum cliente cadastrado
+                // Verificar se o endereço da planilha bate EXATAMENTE com algum cliente cadastrado
                 for (const client of clients) {
                     const clientAddress = client.address || '';
-                    const normalizedClient = normalizeAddress(clientAddress);
 
-                    // Comparação APENAS por endereço normalizado (ignora nome e telefone)
-                    if (normalizedClient && normalizedDelivery && normalizedClient === normalizedDelivery) {
+                    // Comparação EXATA - texto deve ser idêntico (ignora apenas nome e telefone)
+                    if (clientAddress && deliveryAddress && clientAddress === deliveryAddress) {
                         isMatched = true;
                         console.log(`✅ MATCH: "${deliveryAddress}" === "${clientAddress}"`);
                         break;
