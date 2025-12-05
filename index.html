@@ -3593,10 +3593,7 @@ function editClient(client) {
     isEditMode = true;
     editingClientId = client.id;
 
-    // Fechar sidebar antes de abrir modal
-    closeSidebar();
-
-    // Abrir modal
+    // Abrir modal (sem fechar sidebar)
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
 
