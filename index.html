@@ -6202,28 +6202,35 @@ async function processSpreadsheetData(jsonData) {
             console.log(`🔍 Iniciando comparação de ${deliveryDataRecords.length} endereços da planilha com ${clients.length} clientes cadastrados...`);
 
             for (const delivery of deliveryDataRecords) {
-                const deliveryAddress = delivery.destination_address || '';
-                const normalizedDelivery = normalizeAddress(deliveryAddress);
+                // Montar endereço completo da planilha (mesmo formato salvo no banco - 3 linhas)
+                let deliveryFullAddress = delivery.destination_address || '';
+                if (delivery.bairro) {
+                    deliveryFullAddress += `\nBairro: ${delivery.bairro}`;
+                }
+                if (delivery.city && delivery.zipcode) {
+                    deliveryFullAddress += `\n${delivery.city} - ${delivery.zipcode}`;
+                }
+
+                const normalizedDelivery = normalizeAddress(deliveryFullAddress);
                 let isMatched = false;
 
                 // Verificar se o endereço da planilha bate com algum cliente cadastrado
                 for (const client of clients) {
                     const clientAddress = client.address || '';
+                    const normalizedClient = normalizeAddress(clientAddress);
 
-                    // Extrair APENAS a primeira linha do endereço (antes do \n que separa bairro/cidade)
-                    const clientAddressFirstLine = clientAddress.split('\n')[0];
-                    const normalizedClient = normalizeAddress(clientAddressFirstLine);
-
-                    // Comparação APENAS por endereço normalizado (ignora nome, telefone, bairro, cidade, CEP)
+                    // Comparação com endereço completo (3 linhas: endereço + bairro + cidade/CEP)
                     if (normalizedClient && normalizedDelivery && normalizedClient === normalizedDelivery) {
                         isMatched = true;
-                        console.log(`✅ MATCH: "${deliveryAddress}" === "${clientAddressFirstLine}" (cliente completo: "${clientAddress}")`);
+                        console.log(`✅ MATCH encontrado!`);
+                        console.log(`   Planilha: "${deliveryFullAddress.replace(/\n/g, ' | ')}"`);
+                        console.log(`   Cliente:  "${clientAddress.replace(/\n/g, ' | ')}"`);
                         break;
                     }
                 }
 
-                if (!isMatched && deliveryAddress) {
-                    console.log(`⚠️ NO MATCH: "${deliveryAddress}"`);
+                if (!isMatched && delivery.destination_address) {
+                    console.log(`⚠️ NO MATCH: "${deliveryFullAddress.replace(/\n/g, ' | ')}"`);
                 }
 
                 if (isMatched) {
