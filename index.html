@@ -5699,6 +5699,98 @@ async function handleFile(file) {
     }
 }
 
+// Processar dados da planilha e salvar no Supabase
+async function processSpreadsheetData(jsonData) {
+    try {
+        if (!jsonData || jsonData.length === 0) {
+            throw new Error('Planilha vazia ou sem dados válidos');
+        }
+
+        console.log('Processando', jsonData.length, 'linhas da planilha...');
+
+        // 1. Limpar tabela delivery_data
+        const { error: deleteDeliveryError } = await supabase
+            .from('delivery_data')
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000');
+
+        if (deleteDeliveryError) {
+            console.warn('Erro ao limpar delivery_data (talvez a tabela não exista ainda):', deleteDeliveryError);
+        }
+
+        // 2. Limpar rotas existentes
+        if (typeof currentRoute !== 'undefined' && currentRoute) {
+            currentRoute.setMap(null);
+            currentRoute = null;
+        }
+        if (typeof directionsRenderer !== 'undefined' && directionsRenderer) {
+            directionsRenderer.setMap(null);
+        }
+        if (typeof window.routePolylines !== 'undefined' && window.routePolylines) {
+            window.routePolylines.forEach(polyline => polyline.setMap(null));
+            window.routePolylines = [];
+        }
+
+        // 3. Processar dados da planilha
+        const deliveryDataRecords = [];
+
+        for (const row of jsonData) {
+            // Mapear colunas da planilha para o banco
+            const spxTn = row['SPX TN'] || row['spx_tn'] || row['QR Code'] || '';
+            const destinationAddress = row['Destination Address'] || row['destination_address'] || row['Endereço'] || '';
+            const bairro = row['Bairro'] || row['bairro'] || '';
+            const city = row['City'] || row['city'] || row['Cidade'] || '';
+            const zipcode = row['Zipcode/Postal code'] || row['zipcode'] || row['CEP'] || '';
+            const latitude = parseFloat(row['Latitude'] || row['latitude'] || 0);
+            const longitude = parseFloat(row['Longitude'] || row['longitude'] || 0);
+            const sequence = parseInt(row['Sequence'] || row['sequence'] || 0);
+
+            if (!spxTn) {
+                console.warn('Linha sem SPX TN, pulando:', row);
+                continue;
+            }
+
+            deliveryDataRecords.push({
+                spx_tn: spxTn,
+                destination_address: destinationAddress,
+                bairro: bairro,
+                city: city,
+                zipcode: zipcode,
+                latitude: latitude || null,
+                longitude: longitude || null,
+                sequence: sequence || null
+            });
+        }
+
+        if (deliveryDataRecords.length === 0) {
+            throw new Error('Nenhum registro válido encontrado na planilha. Verifique se as colunas estão corretas: SPX TN, Destination Address, Bairro, City, Zipcode/Postal code, Latitude, Longitude');
+        }
+
+        // 4. Inserir na tabela delivery_data
+        const { data: insertedData, error: insertDeliveryError } = await supabase
+            .from('delivery_data')
+            .insert(deliveryDataRecords)
+            .select();
+
+        if (insertDeliveryError) {
+            console.error('Erro ao inserir em delivery_data:', insertDeliveryError);
+            throw new Error(`Erro ao salvar na tabela delivery_data: ${insertDeliveryError.message}`);
+        }
+
+        console.log(`✓ ${deliveryDataRecords.length} registros salvos na tabela delivery_data`);
+
+        return {
+            success: true,
+            count: deliveryDataRecords.length,
+            message: `${deliveryDataRecords.length} registros salvos com sucesso`
+        };
+
+    } catch (error) {
+        console.error('Erro ao processar dados da planilha:', error);
+        throw error;
+    }
+}
+
 // ===========================
 // CLEANUP
 // ===========================
