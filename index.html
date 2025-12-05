@@ -866,9 +866,6 @@
 
     .search-container {
         position: relative;
-        display: flex;
-        gap: 8px;
-        align-items: center;
     }
 
     .search-icon {
@@ -879,11 +876,10 @@
         font-size: 18px;
         color: #999;
         pointer-events: none;
-        z-index: 1;
     }
 
     .search-input {
-        flex: 1;
+        width: 100%;
         padding: 12px 12px 12px 42px;
         border: 2px solid #e0e0e0;
         border-radius: 24px;
@@ -897,33 +893,6 @@
         outline: none;
         border-color: var(--primary-color);
         box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
-    }
-
-    .search-qr-btn {
-        width: 44px;
-        height: 44px;
-        border: none;
-        background: var(--primary-color);
-        color: white;
-        border-radius: 50%;
-        font-size: 20px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        box-shadow: 0 2px 6px rgba(66, 133, 244, 0.3);
-    }
-
-    .search-qr-btn:hover {
-        background: #1976D2;
-        transform: scale(1.05);
-        box-shadow: 0 4px 8px rgba(66, 133, 244, 0.4);
-    }
-
-    .search-qr-btn:active {
-        transform: scale(0.95);
     }
 
     .search-input::placeholder {
@@ -949,21 +918,12 @@
         padding: 16px;
         cursor: pointer;
         transition: all 0.2s ease;
-        outline: none;
     }
 
     .client-card:hover {
         border-color: var(--primary-color);
         box-shadow: 0 2px 8px rgba(66, 133, 244, 0.15);
         transform: translateY(-2px);
-    }
-
-    .client-card:focus,
-    .client-card:active,
-    .client-card:focus-visible {
-        outline: none !important;
-        border-color: #e0e0e0 !important;
-        box-shadow: none !important;
     }
 
     .client-card-header {
@@ -1048,10 +1008,6 @@
         display: flex;
         gap: 12px;
         margin-left: auto;
-        user-select: none;
-        -webkit-user-select: none;
-        -moz-user-select: none;
-        -ms-user-select: none;
     }
 
     .phone-action-btn {
@@ -1067,56 +1023,39 @@
         width: 38px;
         height: 38px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-        outline: none;
-        -webkit-tap-highlight-color: transparent;
-        user-select: none;
-        -webkit-user-select: none;
-        -moz-user-select: none;
-        -ms-user-select: none;
-        touch-action: manipulation;
-    }
-
-    .phone-action-btn:focus {
-        outline: none;
     }
 
     .phone-action-btn svg {
         width: 20px;
         height: 20px;
-        transition: all 0.2s ease;
-        pointer-events: none;
     }
 
-    .phone-action-btn.call-btn,
-    .phone-action-btn.call-btn:link,
-    .phone-action-btn.call-btn:visited,
-    .phone-action-btn.call-btn:focus,
-    .phone-action-btn.call-btn:active {
-        background: #2196F3 !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
-        transform: scale(1) !important;
+    .phone-action-btn svg {
+        transition: all 0.2s ease;
+    }
+
+    .phone-action-btn.call-btn {
+        background: #2196F3;
     }
 
     .phone-action-btn.call-btn:hover {
-        background: #1976D2 !important;
-        transform: scale(1.1) !important;
-        box-shadow: 0 3px 6px rgba(33,150,243,0.4) !important;
+        background: #1976D2;
+        transform: scale(1.1);
+        box-shadow: 0 3px 6px rgba(33,150,243,0.4);
     }
 
-    .phone-action-btn.whatsapp-btn,
-    .phone-action-btn.whatsapp-btn:link,
-    .phone-action-btn.whatsapp-btn:visited,
-    .phone-action-btn.whatsapp-btn:focus,
-    .phone-action-btn.whatsapp-btn:active {
-        background: #25D366 !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
-        transform: scale(1) !important;
+    .phone-action-btn.whatsapp-btn {
+        background: #25D366;
     }
 
     .phone-action-btn.whatsapp-btn:hover {
-        background: #128C7E !important;
-        transform: scale(1.1) !important;
-        box-shadow: 0 3px 6px rgba(37,211,102,0.4) !important;
+        background: #128C7E;
+        transform: scale(1.1);
+        box-shadow: 0 3px 6px rgba(37,211,102,0.4);
+    }
+
+    .phone-action-btn:active {
+        transform: scale(0.95);
     }
 
     .empty-state {
@@ -1235,29 +1174,6 @@
 
         .client-actions {
             gap: 10px;
-        }
-
-        /* Forçar cores originais dos botões no mobile */
-        .phone-action-btn.call-btn,
-        .phone-action-btn.call-btn:link,
-        .phone-action-btn.call-btn:visited,
-        .phone-action-btn.call-btn:focus,
-        .phone-action-btn.call-btn:active,
-        .phone-action-btn.call-btn:focus-visible {
-            background: #2196F3 !important;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
-            transform: scale(1) !important;
-        }
-
-        .phone-action-btn.whatsapp-btn,
-        .phone-action-btn.whatsapp-btn:link,
-        .phone-action-btn.whatsapp-btn:visited,
-        .phone-action-btn.whatsapp-btn:focus,
-        .phone-action-btn.whatsapp-btn:active,
-        .phone-action-btn.whatsapp-btn:focus-visible {
-            background: #25D366 !important;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
-            transform: scale(1) !important;
         }
 
         .modal-container {
@@ -1401,9 +1317,6 @@
                 id="search-input"
                 placeholder="Buscar por nome, endereço ou telefone..."
             >
-            <button class="search-qr-btn" id="search-qr-btn" title="Buscar por QR Code">
-                📷
-            </button>
         </div>
     </div>
 
@@ -1415,34 +1328,6 @@
                 <div class="empty-state-text">Nenhum cliente cadastrado</div>
                 <div class="empty-state-subtext">Adicione clientes para vê-los aqui</div>
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Scanner QR para Busca -->
-<div class="modal-overlay" id="modal-search-qr" style="z-index: 10005;">
-    <div class="modal-container" style="max-width: 500px;">
-        <div class="modal-body" style="padding: 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h3 style="margin: 0; font-size: 18px; color: #333;">📷 Buscar Cliente por QR Code</h3>
-                <button class="modal-close" id="search-qr-close" style="width: 32px; height: 32px; border: none; background: #f5f5f5; border-radius: 50%; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center;">✕</button>
-            </div>
-
-            <div class="qr-camera-container" id="search-qr-camera-container" style="position: relative; width: 100%; aspect-ratio: 1; background: #000; border-radius: 12px; overflow: hidden; margin-bottom: 12px;">
-                <video id="search-qr-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
-                <canvas id="search-qr-canvas" style="display: none;"></canvas>
-
-                <div class="qr-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 2px solid rgba(255,255,255,0.5); border-radius: 12px; pointer-events: none;">
-                    <div style="position: absolute; top: 20px; left: 20px; width: 40px; height: 40px; border-top: 3px solid #4285f4; border-left: 3px solid #4285f4; border-radius: 8px 0 0 0;"></div>
-                    <div style="position: absolute; top: 20px; right: 20px; width: 40px; height: 40px; border-top: 3px solid #4285f4; border-right: 3px solid #4285f4; border-radius: 0 8px 0 0;"></div>
-                    <div style="position: absolute; bottom: 20px; left: 20px; width: 40px; height: 40px; border-bottom: 3px solid #4285f4; border-left: 3px solid #4285f4; border-radius: 0 0 0 8px;"></div>
-                    <div style="position: absolute; bottom: 20px; right: 20px; width: 40px; height: 40px; border-bottom: 3px solid #4285f4; border-right: 3px solid #4285f4; border-radius: 0 0 8px 0;"></div>
-                </div>
-
-                <div class="qr-status" id="search-qr-status" style="position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 8px 16px; border-radius: 20px; font-size: 14px; white-space: nowrap;">Procurando QR Code...</div>
-            </div>
-
-            <button class="btn btn-secondary" id="search-qr-cancel" style="width: 100%; padding: 12px; border: none; background: #f5f5f5; color: #666; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: 600;">Cancelar</button>
         </div>
     </div>
 </div>
@@ -3473,12 +3358,12 @@ function renderClients(clients) {
                     <span class="client-info-icon">📞</span>
                     <span>${escapeHtml(client.phone)}</span>
                     <div class="phone-actions">
-                        <a href="tel:${client.phone.replace(/\D/g, '')}" class="phone-action-btn call-btn" title="Ligar" onclick="event.stopPropagation()" ontouchstart="event.stopPropagation()" ontouchend="event.stopPropagation()">
+                        <a href="tel:${client.phone.replace(/\D/g, '')}" class="phone-action-btn call-btn" title="Ligar" onclick="event.stopPropagation()">
                             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" fill="white"/>
                             </svg>
                         </a>
-                        <a href="https://wa.me/55${client.phone.replace(/\D/g, '')}" target="_blank" class="phone-action-btn whatsapp-btn" title="WhatsApp" onclick="event.stopPropagation()" ontouchstart="event.stopPropagation()" ontouchend="event.stopPropagation()">
+                        <a href="https://wa.me/55${client.phone.replace(/\D/g, '')}" target="_blank" class="phone-action-btn whatsapp-btn" title="WhatsApp" onclick="event.stopPropagation()">
                             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0012.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 012.41 5.83c0 4.54-3.7 8.23-8.24 8.23-1.48 0-2.93-.39-4.19-1.15l-.3-.17-3.12.82.83-3.04-.2-.32a8.188 8.188 0 01-1.26-4.38c.01-4.54 3.7-8.24 8.25-8.24M8.53 7.33c-.16 0-.43.06-.66.31-.22.25-.87.85-.87 2.07 0 1.22.89 2.39 1 2.56.14.17 1.76 2.67 4.25 3.73.59.27 1.05.42 1.41.53.59.19 1.13.16 1.56.1.48-.07 1.46-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.07-.1-.23-.16-.48-.27-.25-.14-1.47-.74-1.69-.82-.23-.08-.37-.12-.56.12-.16.25-.64.81-.78.97-.15.17-.29.19-.53.07-.26-.13-1.06-.39-2-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.39.11-.5.11-.11.25-.29.37-.44.13-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.11-.56-1.35-.76-1.84-.2-.48-.4-.42-.56-.43-.14 0-.3-.01-.47-.01z" fill="white"/>
                             </svg>
@@ -3547,118 +3432,6 @@ function renderClients(clients) {
                 deleteClient(client);
             }
         });
-    });
-
-    // Event listeners para botões de telefone (ligação e WhatsApp)
-    // Forçar remoção de foco quando volta do app externo
-    document.querySelectorAll('.phone-action-btn').forEach(btn => {
-        // Prevenir propagação em todos os eventos de toque
-        btn.addEventListener('touchstart', function(e) {
-            e.stopPropagation();
-        }, { passive: true });
-
-        btn.addEventListener('touchend', function(e) {
-            e.stopPropagation();
-
-            // Forçar remoção de foco imediatamente
-            const element = this;
-            setTimeout(() => {
-                // Criar input invisível para "roubar" o foco
-                const tempInput = document.createElement('input');
-                tempInput.style.position = 'absolute';
-                tempInput.style.opacity = '0';
-                tempInput.style.height = '0';
-                tempInput.style.width = '0';
-                tempInput.style.left = '-9999px';
-                tempInput.setAttribute('tabindex', '-1');
-                document.body.appendChild(tempInput);
-
-                // Transferir foco para o elemento temporário
-                tempInput.focus();
-
-                // Remover foco do botão
-                element.blur();
-
-                // Remover elemento temporário
-                setTimeout(() => {
-                    tempInput.blur();
-                    if (document.body.contains(tempInput)) {
-                        document.body.removeChild(tempInput);
-                    }
-                }, 10);
-            }, 50);
-        });
-
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation();
-
-            // Mesmo processo para click
-            const element = this;
-            setTimeout(() => {
-                const tempInput = document.createElement('input');
-                tempInput.style.position = 'absolute';
-                tempInput.style.opacity = '0';
-                tempInput.style.height = '0';
-                tempInput.style.width = '0';
-                tempInput.style.left = '-9999px';
-                tempInput.setAttribute('tabindex', '-1');
-                document.body.appendChild(tempInput);
-
-                tempInput.focus();
-                element.blur();
-
-                setTimeout(() => {
-                    tempInput.blur();
-                    if (document.body.contains(tempInput)) {
-                        document.body.removeChild(tempInput);
-                    }
-                }, 10);
-            }, 50);
-        });
-
-        // Prevenir seleção de texto
-        btn.addEventListener('selectstart', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-        });
-
-        // Prevenir context menu
-        btn.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-        });
-    });
-
-    // Remover foco dos cards quando a página recebe foco novamente
-    // (quando usuário volta do app de telefone/WhatsApp)
-    window.addEventListener('focus', function() {
-        // Remover foco de todos os botões de telefone
-        document.querySelectorAll('.phone-action-btn').forEach(btn => {
-            btn.blur();
-        });
-
-        // Remover foco dos cards de cliente
-        document.querySelectorAll('.client-card').forEach(card => {
-            card.blur();
-        });
-
-        // Criar input temporário para limpar qualquer foco residual
-        const tempInput = document.createElement('input');
-        tempInput.style.position = 'absolute';
-        tempInput.style.opacity = '0';
-        tempInput.style.height = '0';
-        tempInput.style.width = '0';
-        tempInput.style.left = '-9999px';
-        document.body.appendChild(tempInput);
-        tempInput.focus();
-        tempInput.blur();
-        setTimeout(() => {
-            if (document.body.contains(tempInput)) {
-                document.body.removeChild(tempInput);
-            }
-        }, 100);
     });
 }
 
@@ -4160,157 +3933,6 @@ function escapeHtml(text) {
 setTimeout(() => {
     loadClients();
 }, 2000);
-
-// ===========================
-// SCANNER QR PARA BUSCA DE CLIENTE
-// ===========================
-
-const searchQRModal = document.getElementById('modal-search-qr');
-const searchQRBtn = document.getElementById('search-qr-btn');
-const searchQRClose = document.getElementById('search-qr-close');
-const searchQRCancel = document.getElementById('search-qr-cancel');
-const searchQRVideo = document.getElementById('search-qr-video');
-const searchQRCanvas = document.getElementById('search-qr-canvas');
-const searchQRStatus = document.getElementById('search-qr-status');
-
-let searchQRStream = null;
-let searchQRScanning = false;
-
-// Abrir scanner de busca
-searchQRBtn.addEventListener('click', async () => {
-    searchQRModal.classList.add('active');
-    searchQRScanning = true;
-
-    try {
-        await startSearchQRCamera();
-    } catch (error) {
-        console.error('Erro ao abrir câmera:', error);
-        showToast(
-            'Erro ao abrir câmera',
-            'Verifique as permissões do navegador',
-            'error',
-            4000
-        );
-        closeSearchQRModal();
-    }
-});
-
-// Fechar modal
-function closeSearchQRModal() {
-    searchQRModal.classList.remove('active');
-    searchQRScanning = false;
-    stopSearchQRCamera();
-}
-
-searchQRClose.addEventListener('click', closeSearchQRModal);
-searchQRCancel.addEventListener('click', closeSearchQRModal);
-
-searchQRModal.addEventListener('click', (e) => {
-    if (e.target === searchQRModal) {
-        closeSearchQRModal();
-    }
-});
-
-// Iniciar câmera
-async function startSearchQRCamera() {
-    try {
-        searchQRStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment' }
-        });
-
-        searchQRVideo.srcObject = searchQRStream;
-        searchQRVideo.play();
-
-        // Começar a escanear
-        scanSearchQRCode();
-    } catch (error) {
-        throw error;
-    }
-}
-
-// Parar câmera
-function stopSearchQRCamera() {
-    if (searchQRStream) {
-        searchQRStream.getTracks().forEach(track => track.stop());
-        searchQRStream = null;
-    }
-
-    if (searchQRVideo.srcObject) {
-        searchQRVideo.srcObject = null;
-    }
-}
-
-// Escanear QR code
-function scanSearchQRCode() {
-    if (!searchQRScanning) return;
-
-    const canvas = searchQRCanvas;
-    const video = searchQRVideo;
-
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-        if (code) {
-            // QR Code detectado!
-            searchQRScanning = false;
-            const qrData = code.data;
-
-            searchQRStatus.textContent = '✓ QR Code detectado!';
-            searchQRStatus.style.background = 'rgba(52, 168, 83, 0.9)';
-
-            // Buscar cliente pelo QR code
-            setTimeout(() => {
-                searchClientByQRCode(qrData);
-                closeSearchQRModal();
-            }, 500);
-
-            return;
-        }
-    }
-
-    // Continuar escaneando
-    requestAnimationFrame(scanSearchQRCode);
-}
-
-// Buscar cliente pelo QR code
-async function searchClientByQRCode(qrCode) {
-    console.log('Buscando cliente com QR code:', qrCode);
-
-    // Procurar cliente que tenha esse QR code no endereço
-    const client = allClients.find(c =>
-        c.address && c.address.includes(qrCode)
-    );
-
-    if (client) {
-        // Cliente encontrado! Filtrar lista para mostrar apenas ele
-        searchInput.value = qrCode;
-        filteredClients = [client];
-        renderClients(filteredClients);
-        updateClientCount(allClients.length);
-
-        showToast(
-            '✓ Cliente encontrado!',
-            `${client.name}`,
-            'success',
-            3000
-        );
-    } else {
-        // Cliente não encontrado
-        showToast(
-            '⚠️ Cliente não encontrado',
-            `Nenhum cliente cadastrado com o QR code: ${qrCode}`,
-            'warning',
-            4000
-        );
-    }
-}
 
 // ===========================
 // SISTEMA DE ROTAS DE ENTREGA
