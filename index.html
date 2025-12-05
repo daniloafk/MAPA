@@ -1167,12 +1167,6 @@
         transform: scale(1.1);
     }
 
-    .client-action-btn.navigate-btn svg {
-        display: block;
-        width: 24px;
-        height: 24px;
-    }
-
     .client-action-btn.navigate-btn:hover {
         background: #e8f5e9;
     }
@@ -1546,7 +1540,7 @@
     <button id="btnClearRoute" class="control-btn" title="Limpar rotas e marcadores" style="display: none;">🗑️</button>
     <button id="btnOpenSidebar" class="control-btn" title="Ver lista de clientes">👥</button>
     <button id="btnUploadSpreadsheet" class="control-btn" title="Atualizar planilha do dia">📊</button>
-    <button id="btnToggleClients" class="control-btn" title="Mostrar/Ocultar clientes no mapa">👤</button>
+    <button id="btnToggleClients" class="control-btn" title="Mostrar/Ocultar clientes no mapa">📍</button>
 </div>
 
 <!-- Container de Notificações -->
@@ -3862,18 +3856,7 @@ function renderClients(clients) {
                 </div>
                 <div class="client-actions">
                     <button class="client-action-btn navigate-btn" data-client-id="${client.id}" title="Navegar até o cliente">
-                        <svg width="24" height="24" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                            <!-- Fundo verde -->
-                            <path d="M0 12 L0 36 L12 48 L48 48 L48 0 L12 0 Z" fill="#34A853"/>
-                            <!-- Amarelo -->
-                            <path d="M12 0 L0 12 L12 24 Z" fill="#FBBC04"/>
-                            <!-- Azul -->
-                            <path d="M12 24 L0 36 L12 48 Z" fill="#4285F4"/>
-                            <!-- Pin vermelho -->
-                            <path d="M24 14 C19.6 14 16 17.6 16 22 C16 27.5 24 38 24 38 C24 38 32 27.5 32 22 C32 17.6 28.4 14 24 14 Z" fill="#EA4335"/>
-                            <!-- Centro do pin -->
-                            <circle cx="24" cy="22" r="3" fill="#8B1A10"/>
-                        </svg>
+                        🧭
                     </button>
                     <button class="client-action-btn edit-btn" data-client-id="${client.id}" title="Editar">
                         ✏️
