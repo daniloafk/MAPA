@@ -2734,7 +2734,7 @@ function createPinSVG(number) {
     return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
 }
 
-function addDeliveryMarkers() {
+async function addDeliveryMarkers() {
     console.log('🔵 Adicionando marcadores de entrega...');
 
     // PASSO 1: Remover TODOS os marcadores anteriores
@@ -2757,26 +2757,66 @@ function addDeliveryMarkers() {
     // PASSO 2: Resetar objeto completamente
     deliveryMarkers = {};
 
-    // PASSO 3: Agrupar entregas por coordenadas
+    // PASSO 3: Buscar clientes do Supabase
+    let clientsData = [];
+    try {
+        const { data, error } = await supabase
+            .from('clients')
+            .select('*')
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        clientsData = data || [];
+    } catch (error) {
+        console.error('Erro ao buscar clientes:', error);
+        showToast(
+            'Erro ao carregar clientes',
+            'Não foi possível buscar os dados do banco',
+            'error',
+            4000
+        );
+        return;
+    }
+
+    if (clientsData.length === 0) {
+        console.log('⚠️ Nenhum cliente encontrado no banco de dados');
+        showToast(
+            'Nenhum cliente cadastrado',
+            'Faça upload de uma planilha ou adicione clientes manualmente',
+            'warning',
+            4000
+        );
+        return;
+    }
+
+    // PASSO 4: Agrupar entregas por coordenadas
     const groupedByLocation = {};
-    let sequenceCounter = 1; // Contador de sequência global
-    Object.entries(addressDatabase).forEach(([qrCode, data]) => {
-        const coordKey = `${data.latitude.toFixed(6)},${data.longitude.toFixed(6)}`;
+    let sequenceCounter = 1;
+
+    clientsData.forEach((client) => {
+        if (!client.latitude || !client.longitude) {
+            console.warn(`Cliente ${client.name} não tem coordenadas válidas`);
+            return;
+        }
+
+        const coordKey = `${client.latitude.toFixed(6)},${client.longitude.toFixed(6)}`;
         if (!groupedByLocation[coordKey]) {
             groupedByLocation[coordKey] = {
-                position: { lat: data.latitude, lng: data.longitude },
+                position: { lat: client.latitude, lng: client.longitude },
                 deliveries: []
             };
         }
         groupedByLocation[coordKey].deliveries.push({
-            qrCode,
-            address: data.address,
-            sequence: data.sequence || sequenceCounter // Usar sequence da planilha ou contador
+            id: client.id,
+            name: client.name,
+            phone: client.phone,
+            address: client.address,
+            sequence: sequenceCounter
         });
         sequenceCounter++;
     });
 
-    console.log(`📦 Total de entregas: ${Object.keys(addressDatabase).length}`);
+    console.log(`📦 Total de entregas: ${clientsData.length}`);
     console.log(`📍 Locais únicos: ${Object.keys(groupedByLocation).length}`);
 
     let markerNumber = 1; // Contador para numeração sequencial
@@ -4512,7 +4552,7 @@ btnClearRoute.addEventListener('click', () => {
     clearAllRoutesAndMarkers();
 });
 
-function activateRouteMode() {
+async function activateRouteMode() {
     routeMode = true;
     btnToggleRoute.classList.add('active');
 
@@ -4547,11 +4587,11 @@ function activateRouteMode() {
         return;
     }
 
-    // NOVO: Adicionar marcadores da planilha SOMENTE quando clicar
-    addDeliveryMarkers();
+    // NOVO: Adicionar marcadores do Supabase SOMENTE quando clicar
+    await addDeliveryMarkers();
 
     // Calcular rota otimizada para todos os pontos de entrega
-    calculateOptimizedRoute(currentPosition);
+    await calculateOptimizedRouteFromDB(currentPosition);
 }
 
 function deactivateRouteMode() {
@@ -4760,6 +4800,104 @@ async function calculateOptimizedRoute(origin) {
         );
 
         await calculateDirectionsRoute(origin, uniquePoints);
+    }
+}
+
+// Nova função: Calcular rota usando dados do Supabase
+async function calculateOptimizedRouteFromDB(origin) {
+    showToast(
+        'Calculando rota otimizada...',
+        'Buscando dados dos clientes cadastrados',
+        'info',
+        4000
+    );
+
+    try {
+        // Buscar todos os clientes do Supabase
+        const { data: clientsData, error } = await supabase
+            .from('clients')
+            .select('*')
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        if (!clientsData || clientsData.length === 0) {
+            showToast(
+                'Nenhum cliente encontrado',
+                'Faça upload de uma planilha ou adicione clientes manualmente',
+                'warning',
+                4000
+            );
+            deactivateRouteMode();
+            return;
+        }
+
+        // Criar array de pontos de entrega
+        let deliveryPoints = clientsData
+            .filter(client => client.latitude && client.longitude)
+            .map(client => ({
+                location: { lat: client.latitude, lng: client.longitude },
+                address: client.address,
+                name: client.name
+            }));
+
+        console.log(`Total de clientes no banco: ${deliveryPoints.length}`);
+
+        // Remover pontos duplicados (mesmas coordenadas)
+        const uniquePoints = [];
+        const seenCoords = new Set();
+
+        deliveryPoints.forEach(point => {
+            const coordKey = `${point.location.lat.toFixed(6)},${point.location.lng.toFixed(6)}`;
+            if (!seenCoords.has(coordKey)) {
+                seenCoords.add(coordKey);
+                uniquePoints.push(point);
+            }
+        });
+
+        console.log(`Endereços únicos (sem duplicatas): ${uniquePoints.length}`);
+
+        if (uniquePoints.length === 0) {
+            showToast(
+                'Nenhuma entrega encontrada',
+                'Não há clientes com coordenadas válidas',
+                'warning',
+                4000
+            );
+            deactivateRouteMode();
+            return;
+        }
+
+        // Verificar configuração do Project ID
+        if (typeof GOOGLE_CLOUD_PROJECT_ID !== 'undefined' && GOOGLE_CLOUD_PROJECT_ID !== "SEU_PROJECT_ID_AQUI") {
+            // Usar Fleet Routing API se configurado
+            await calculateFleetRoute(origin, uniquePoints);
+        } else {
+            // Fallback: usar Directions API (limitado a 23 pontos)
+            if (uniquePoints.length > 23) {
+                showToast(
+                    '⚠️ Limite de endereços',
+                    `Você tem ${uniquePoints.length} entregas. Configure o Fleet Routing API para otimizar todas.`,
+                    'warning',
+                    6000
+                );
+                // Usar apenas os 23 primeiros
+                const limitedPoints = uniquePoints.slice(0, 23);
+                await calculateDirectionsRoute(origin, limitedPoints);
+            } else {
+                await calculateDirectionsRoute(origin, uniquePoints);
+            }
+        }
+
+    } catch (error) {
+        console.error('Erro ao calcular rota:', error);
+        showToast(
+            'Erro ao calcular rota',
+            error.message || 'Não foi possível processar os dados',
+            'error',
+            5000
+        );
+        deactivateRouteMode();
     }
 }
 
