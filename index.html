@@ -34,10 +34,16 @@
         left: 0;
         opacity: 0;
         transition: opacity 0.5s ease-in-out;
+        /* GPU acceleration para melhor performance */
+        transform: translateZ(0);
+        will-change: transform, opacity;
+        backface-visibility: hidden;
+        -webkit-font-smoothing: antialiased;
     }
 
     #map.loaded {
         opacity: 1;
+        will-change: auto; /* Remove will-change após carregamento */
     }
 
     /* ===========================
@@ -1777,8 +1783,9 @@
 };
 </script>
 
-<!-- Google Maps -->
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&loading=async&callback=initMap&v=beta&libraries=places,geometry"></script>
+<!-- Google Maps com Marker Clustering -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&loading=async&callback=initMap&v=beta&libraries=places,geometry,marker"></script>
+<script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 
 <script>
 let map;
@@ -1791,6 +1798,9 @@ let deliveryMarkers = {}; // Armazena marcadores de endereços de entrega
 let directionsService = null; // Serviço de rotas do Google Maps
 let directionsRenderer = null; // Renderizador de rotas
 let routeMode = false; // Modo de planejamento de rota ativo/inativo
+let markerCluster = null; // Cluster de marcadores para melhor performance
+let lastPositionUpdate = 0; // Timestamp da última atualização de posição
+let updateThrottle = 1000; // Atualizar posição no máximo a cada 1 segundo (performance)
 
 const MAP_ID = "ebb7ca4503045feabc75b373";
 
@@ -1880,7 +1890,21 @@ window.initMap = function () {
             rotateControl: true,
             zoomControl: true,
             streetViewControl: false,
-            fullscreenControl: true
+            fullscreenControl: true,
+            // Otimizações de performance
+            disableDefaultUI: false,
+            clickableIcons: false, // Desabilita cliques em POIs para melhor performance
+            restriction: {
+                latLngBounds: {
+                    north: -1.0,
+                    south: -1.3,
+                    west: -48.6,
+                    east: -48.3
+                },
+                strictBounds: false
+            },
+            minZoom: 12, // Evita zoom muito distante (performance)
+            maxZoom: 20
         });
 
         // Inicializar serviços de rota
@@ -1939,7 +1963,7 @@ function startLocationTracking() {
     const geoOptions = {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 0
+        maximumAge: 2000 // Cachear posição por até 2s (performance)
     };
 
     console.log('Solicitando posição do GPS...');
@@ -2018,6 +2042,13 @@ function startLocationTracking() {
 }
 
 function updateUserLocation(position) {
+    // Throttle: atualizar apenas a cada X milissegundos (performance)
+    const now = Date.now();
+    if (now - lastPositionUpdate < updateThrottle) {
+        return; // Ignora updates muito frequentes
+    }
+    lastPositionUpdate = now;
+
     const newPos = {
         lat: position.coords.latitude,
         lng: position.coords.longitude
@@ -2080,13 +2111,23 @@ function handleGeoError(error, isInitial = false) {
 function addDeliveryMarkers() {
     console.log('Adicionando marcadores de entrega...');
 
+    // Limpar cluster anterior
+    if (markerCluster) {
+        markerCluster.clearMarkers();
+        markerCluster = null;
+    }
+
     // Limpar marcadores existentes
     Object.values(deliveryMarkers).forEach(marker => {
         if (marker.map) {
             marker.map = null; // Remove do mapa
+        } else if (marker.setMap) {
+            marker.setMap(null);
         }
     });
     deliveryMarkers = {};
+
+    const markers = []; // Array para clustering
 
     // Adicionar marcador para cada endereço no banco de dados
     Object.entries(addressDatabase).forEach(([qrCode, data]) => {
@@ -2177,11 +2218,23 @@ function addDeliveryMarkers() {
                 });
 
                 deliveryMarkers[qrCode] = marker;
+                markers.push(marker); // Adiciona ao array para clustering
             }
         } catch (error) {
             console.error('Erro ao criar marcador de entrega:', error);
         }
     });
+
+    // Criar cluster apenas para Markers clássicos (performance)
+    const classicMarkers = markers.filter(m => m.setMap);
+    if (classicMarkers.length > 0 && window.markerClusterer) {
+        markerCluster = new markerClusterer.MarkerClusterer({
+            map,
+            markers: classicMarkers,
+            algorithm: new markerClusterer.SuperClusterAlgorithm({ radius: 100 })
+        });
+        console.log(`${classicMarkers.length} marcadores agrupados com clustering`);
+    }
 
     console.log(`${Object.keys(deliveryMarkers).length} marcadores de entrega adicionados`);
 }
@@ -2192,16 +2245,28 @@ function addDeliveryMarkers() {
 
 function animateValue(start, end, duration, onUpdate, onFinish) {
     const startTime = performance.now();
+    let frameCount = 0;
 
     function frame(time) {
         const progress = Math.min((time - startTime) / duration, 1);
-        const value = start + (end - start) * progress;
 
-        onUpdate(value);
+        // Easing function para animação mais suave (easeInOutCubic)
+        const eased = progress < 0.5
+            ? 4 * progress * progress * progress
+            : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+        const value = start + (end - start) * eased;
+
+        // Limitar updates para 60fps máximo
+        frameCount++;
+        if (frameCount % 1 === 0) { // Atualiza a cada frame
+            onUpdate(value);
+        }
 
         if (progress < 1) {
             requestAnimationFrame(frame);
         } else {
+            onUpdate(end); // Garantir valor final exato
             if (onFinish) onFinish();
         }
     }
