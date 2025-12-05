@@ -1753,10 +1753,6 @@
                 <div class="result-details" id="result-details"></div>
             </div>
         </div>
-
-        <div class="form-footer">
-            <button type="button" class="btn btn-secondary" id="btn-upload-cancel">Cancelar</button>
-        </div>
     </div>
 </div>
 
@@ -6219,7 +6215,6 @@ function hideMatchedClientMarkers() {
 const modalUploadSpreadsheet = document.getElementById('modal-upload-spreadsheet');
 const btnUploadSpreadsheet = document.getElementById('btnUploadSpreadsheet');
 const btnModalUploadClose = document.getElementById('modal-upload-close');
-const btnUploadCancel = document.getElementById('btn-upload-cancel');
 const uploadArea = document.getElementById('upload-area');
 const fileInput = document.getElementById('file-input');
 const uploadProgress = document.getElementById('upload-progress');
@@ -6229,9 +6224,6 @@ const uploadResult = document.getElementById('upload-result');
 const resultIcon = document.getElementById('result-icon');
 const resultText = document.getElementById('result-text');
 const resultDetails = document.getElementById('result-details');
-
-// Variável para armazenar o timeout de fechamento automático
-let uploadModalAutoCloseTimeout = null;
 
 // Abrir modal de upload
 function openUploadModal() {
@@ -6248,12 +6240,6 @@ function openUploadModal() {
 
 // Fechar modal de upload
 function closeUploadModal() {
-    // Cancelar timeout de fechamento automático se existir
-    if (uploadModalAutoCloseTimeout) {
-        clearTimeout(uploadModalAutoCloseTimeout);
-        uploadModalAutoCloseTimeout = null;
-    }
-
     modalUploadSpreadsheet.classList.remove('active');
     document.body.style.overflow = '';
 }
@@ -6261,7 +6247,6 @@ function closeUploadModal() {
 // Event listeners do modal
 btnUploadSpreadsheet.addEventListener('click', openUploadModal);
 btnModalUploadClose.addEventListener('click', closeUploadModal);
-btnUploadCancel.addEventListener('click', closeUploadModal);
 
 modalUploadSpreadsheet.addEventListener('click', (e) => {
     if (e.target === modalUploadSpreadsheet) {
@@ -6360,7 +6345,7 @@ async function handleFile(file) {
             resultDetails.innerHTML = detailsHTML;
 
             // Fechar modal após 5 segundos (tempo maior para ler as estatísticas)
-            uploadModalAutoCloseTimeout = setTimeout(() => {
+            setTimeout(() => {
                 closeUploadModal();
 
                 // Recarregar dados
