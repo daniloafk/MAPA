@@ -6225,6 +6225,43 @@ const resultIcon = document.getElementById('result-icon');
 const resultText = document.getElementById('result-text');
 const resultDetails = document.getElementById('result-details');
 
+// Estado da planilha
+let spreadsheetLoaded = false;
+
+// Verificar se há planilha carregada ao iniciar
+async function checkSpreadsheetStatus() {
+    try {
+        const { data, error } = await supabase
+            .from('delivery_data')
+            .select('id')
+            .limit(1);
+
+        if (!error && data && data.length > 0) {
+            updateButtonToCleanMode();
+        } else {
+            updateButtonToUploadMode();
+        }
+    } catch (error) {
+        console.error('Erro ao verificar status da planilha:', error);
+    }
+}
+
+// Atualizar botão para modo "Upload"
+function updateButtonToUploadMode() {
+    spreadsheetLoaded = false;
+    btnUploadSpreadsheet.textContent = '📊';
+    btnUploadSpreadsheet.title = 'Atualizar planilha do dia';
+    btnUploadSpreadsheet.classList.remove('active');
+}
+
+// Atualizar botão para modo "Limpar"
+function updateButtonToCleanMode() {
+    spreadsheetLoaded = true;
+    btnUploadSpreadsheet.textContent = '🗑️';
+    btnUploadSpreadsheet.title = 'Limpar planilha carregada';
+    btnUploadSpreadsheet.classList.add('active');
+}
+
 // Abrir modal de upload
 function openUploadModal() {
     modalUploadSpreadsheet.classList.add('active');
@@ -6244,9 +6281,156 @@ function closeUploadModal() {
     document.body.style.overflow = '';
 }
 
-// Event listeners do modal
-btnUploadSpreadsheet.addEventListener('click', openUploadModal);
+// Limpar planilha carregada
+async function clearSpreadsheet() {
+    // Mostrar confirmação customizada
+    const confirmed = await showCustomConfirm(
+        'Limpar planilha?',
+        'Isso removerá todos os dados da planilha atual. Deseja continuar?'
+    );
+
+    if (!confirmed) return;
+
+    try {
+        // 1. Limpar tabela delivery_data
+        const { error: deleteError } = await supabase
+            .from('delivery_data')
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000');
+
+        if (deleteError) {
+            throw deleteError;
+        }
+
+        // 2. Remover marcadores de entrega do mapa
+        if (typeof deliveryMarkers !== 'undefined' && deliveryMarkers) {
+            Object.values(deliveryMarkers).forEach(marker => {
+                try {
+                    if (marker.map !== undefined) {
+                        marker.map = null;
+                    } else if (marker.setMap) {
+                        marker.setMap(null);
+                    }
+                } catch (e) {
+                    console.warn('Erro ao remover marcador:', e);
+                }
+            });
+            deliveryMarkers = {};
+        }
+
+        // 3. Limpar rotas existentes
+        if (typeof currentRoute !== 'undefined' && currentRoute) {
+            currentRoute.setMap(null);
+            currentRoute = null;
+        }
+        if (typeof directionsRenderer !== 'undefined' && directionsRenderer) {
+            directionsRenderer.setMap(null);
+        }
+        if (typeof window.routePolylines !== 'undefined' && window.routePolylines) {
+            window.routePolylines.forEach(polyline => polyline.setMap(null));
+            window.routePolylines = [];
+        }
+
+        // 4. Ocultar clientes identificados se estiverem visíveis
+        if (matchedClientsVisible) {
+            hideMatchedClientMarkers();
+        }
+
+        // 5. Limpar variável global (se ainda existir)
+        if (typeof window.matchedAddressesFromSpreadsheet !== 'undefined') {
+            window.matchedAddressesFromSpreadsheet = [];
+        }
+
+        // 6. Atualizar botão para modo upload
+        updateButtonToUploadMode();
+
+        showToast(
+            'Planilha limpa!',
+            'Sistema pronto para novo upload',
+            'success',
+            3000
+        );
+
+        console.log('✓ Planilha e dados limpos com sucesso');
+
+    } catch (error) {
+        console.error('Erro ao limpar planilha:', error);
+        showToast(
+            'Erro ao limpar',
+            'Não foi possível limpar a planilha',
+            'error',
+            4000
+        );
+    }
+}
+
+// Função para mostrar confirmação customizada
+function showCustomConfirm(title, message) {
+    return new Promise((resolve) => {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.style.zIndex = '10000';
+        modal.innerHTML = `
+            <div class="modal-container" style="max-width: 400px;">
+                <div class="modal-body">
+                    <div class="scanner-title" style="margin-bottom: 20px;">
+                        <span>${title}</span>
+                    </div>
+                    <p style="color: #666; margin-bottom: 24px; line-height: 1.5;">${message}</p>
+                    <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                        <button class="btn btn-secondary" id="confirm-cancel">Cancelar</button>
+                        <button class="btn btn-danger" id="confirm-ok" style="background: #ea4335;">Limpar</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        document.body.style.overflow = 'hidden';
+
+        const btnCancel = modal.querySelector('#confirm-cancel');
+        const btnOk = modal.querySelector('#confirm-ok');
+
+        const cleanup = () => {
+            document.body.removeChild(modal);
+            document.body.style.overflow = '';
+        };
+
+        btnCancel.addEventListener('click', () => {
+            cleanup();
+            resolve(false);
+        });
+
+        btnOk.addEventListener('click', () => {
+            cleanup();
+            resolve(true);
+        });
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                cleanup();
+                resolve(false);
+            }
+        });
+    });
+}
+
+// Event listener do botão (alternar entre upload e limpar)
+btnUploadSpreadsheet.addEventListener('click', () => {
+    if (spreadsheetLoaded) {
+        // Modo limpar
+        clearSpreadsheet();
+    } else {
+        // Modo upload
+        openUploadModal();
+    }
+});
+
 btnModalUploadClose.addEventListener('click', closeUploadModal);
+
+// Verificar status ao carregar a página
+setTimeout(() => {
+    checkSpreadsheetStatus();
+}, 2500);
 
 modalUploadSpreadsheet.addEventListener('click', (e) => {
     if (e.target === modalUploadSpreadsheet) {
@@ -6350,6 +6534,9 @@ async function handleFile(file) {
 
                 // Recarregar dados
                 loadClients();
+
+                // Atualizar botão para modo "Limpar"
+                updateButtonToCleanMode();
 
                 showToast(
                     'Planilha atualizada!',
