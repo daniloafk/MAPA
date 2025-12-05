@@ -1203,6 +1203,27 @@
             gap: 10px;
         }
 
+        /* Forçar reset de estado dos botões de telefone no mobile */
+        .phone-action-btn:active,
+        .phone-action-btn:focus,
+        .phone-action-btn:visited {
+            background: var(--original-bg) !important;
+            transform: scale(1) !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
+        }
+
+        .phone-action-btn.call-btn:active,
+        .phone-action-btn.call-btn:focus,
+        .phone-action-btn.call-btn:visited {
+            background: #2196F3 !important;
+        }
+
+        .phone-action-btn.whatsapp-btn:active,
+        .phone-action-btn.whatsapp-btn:focus,
+        .phone-action-btn.whatsapp-btn:visited {
+            background: #25D366 !important;
+        }
+
         .modal-container {
             width: 95%;
             max-height: 95vh;
@@ -3458,6 +3479,34 @@ function renderClients(clients) {
             if (client) {
                 deleteClient(client);
             }
+        });
+    });
+
+    // Event listeners para botões de telefone (ligação e WhatsApp)
+    // Solução para mobile: remover foco e estado após clique
+    document.querySelectorAll('.phone-action-btn').forEach(btn => {
+        // Touchstart - remover foco imediatamente
+        btn.addEventListener('touchstart', function() {
+            this.style.transition = 'none';
+        });
+
+        // Touchend - restaurar e remover foco
+        btn.addEventListener('touchend', function() {
+            const element = this;
+            setTimeout(() => {
+                element.blur();
+                element.style.transition = '';
+            }, 100);
+        });
+
+        // Click - backup para garantir remoção de foco
+        btn.addEventListener('click', function(e) {
+            const element = this;
+            setTimeout(() => {
+                element.blur();
+                // Forçar remoção de classes de estado ativo
+                element.classList.remove('active');
+            }, 150);
         });
     });
 }
