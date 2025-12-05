@@ -4598,43 +4598,7 @@ function escapeHtml(text) {
 // Carregar clientes ao inicializar
 setTimeout(() => {
     loadClients();
-    loadDeliveryDataOnStartup(); // Carregar dados da planilha salvos
 }, 2000);
-
-// Carregar dados da planilha salvos no Supabase (ao abrir a página)
-async function loadDeliveryDataOnStartup() {
-    try {
-        const { data, error } = await supabase
-            .from('delivery_data')
-            .select('*')
-            .order('sequence', { ascending: true });
-
-        if (error) {
-            console.warn('Erro ao carregar delivery_data:', error);
-            return;
-        }
-
-        if (data && data.length > 0) {
-            console.log(`📦 ${data.length} registros de entrega encontrados no banco de dados`);
-
-            // Mostrar toast informando que há dados salvos
-            showToast(
-                'Dados carregados',
-                `${data.length} entregas encontradas na planilha salva`,
-                'info',
-                4000
-            );
-
-            // Nota: Os marcadores serão adicionados quando o usuário clicar em "Planejar Rota"
-            // ou "Mostrar Clientes" - não adiciona automaticamente para não poluir o mapa
-        } else {
-            console.log('📋 Nenhum dado de entrega salvo no banco');
-        }
-
-    } catch (error) {
-        console.error('Erro ao verificar dados de entrega:', error);
-    }
-}
 
 // ===========================
 // SISTEMA DE ROTAS DE ENTREGA
