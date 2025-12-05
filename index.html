@@ -6180,69 +6180,58 @@ async function processSpreadsheetData(jsonData) {
             console.warn('Erro ao buscar clientes:', clientsError);
         }
 
-        // Função para normalizar endereços antes da comparação
-        function normalizeAddress(address) {
-            if (!address) return '';
-            return address
-                .toLowerCase()
-                .trim()
-                .replace(/\s+/g, ' ')  // Substituir múltiplos espaços por um único
-                .replace(/\n/g, ' ')    // Remover quebras de linha
-                .replace(/\r/g, '')     // Remover retorno de carro
-                .normalize('NFD')       // Normalizar caracteres Unicode
-                .replace(/[\u0300-\u036f]/g, ''); // Remover acentos
-        }
-
         // 6. Comparar APENAS endereços: Destination Address (planilha) vs address (clientes)
         let matchedCount = 0;
         let notRegisteredCount = 0;
-        const matchedAddresses = [];
-        const notMatchedAddresses = [];
+
+        // Função para normalizar endereço (remove espaços extras, pontuação, lowercase)
+        const normalizeAddress = (address) => {
+            return address
+                .toLowerCase()
+                .trim()
+                // Remove múltiplos espaços
+                .replace(/\s+/g, ' ')
+                // Remove pontuação (vírgulas, pontos, etc.)
+                .replace(/[.,;:\-]/g, ' ')
+                // Remove espaços novamente após remover pontuação
+                .replace(/\s+/g, ' ')
+                .trim();
+        };
 
         if (clients && clients.length > 0) {
             console.log(`🔍 Iniciando comparação de ${deliveryDataRecords.length} endereços da planilha com ${clients.length} clientes cadastrados...`);
 
             for (const delivery of deliveryDataRecords) {
-                const deliveryAddressOriginal = delivery.destination_address || '';
-                const deliveryAddressNormalized = normalizeAddress(deliveryAddressOriginal);
+                const deliveryAddress = delivery.destination_address || '';
+                const normalizedDelivery = normalizeAddress(deliveryAddress);
                 let isMatched = false;
-                let matchedClientName = '';
 
                 // Verificar se o endereço da planilha bate com algum cliente cadastrado
                 for (const client of clients) {
-                    const clientAddressOriginal = client.address || '';
-                    const clientAddressNormalized = normalizeAddress(clientAddressOriginal);
+                    const clientAddress = client.address || '';
+                    const normalizedClient = normalizeAddress(clientAddress);
 
-                    // Comparação APENAS por endereço (texto normalizado)
-                    if (clientAddressNormalized && deliveryAddressNormalized &&
-                        clientAddressNormalized === deliveryAddressNormalized) {
+                    // Comparação por endereço normalizado (texto)
+                    if (normalizedClient && normalizedDelivery && normalizedClient === normalizedDelivery) {
                         isMatched = true;
-                        matchedClientName = client.name;
+                        console.log(`✅ MATCH: "${deliveryAddress}" === "${clientAddress}"`);
                         break;
                     }
                 }
 
+                if (!isMatched && deliveryAddress) {
+                    console.log(`⚠️ NO MATCH: "${deliveryAddress}"`);
+                }
+
                 if (isMatched) {
                     matchedCount++;
-                    matchedAddresses.push({
-                        address: deliveryAddressOriginal,
-                        client: matchedClientName,
-                        spx_tn: delivery.spx_tn
-                    });
-                    console.log(`✅ MATCH: "${deliveryAddressOriginal}" → Cliente: ${matchedClientName}`);
                 } else {
                     notRegisteredCount++;
-                    notMatchedAddresses.push({
-                        address: deliveryAddressOriginal,
-                        spx_tn: delivery.spx_tn
-                    });
-                    console.log(`⚠️ NO MATCH: "${deliveryAddressOriginal}"`);
                 }
             }
         } else {
             // Se não há clientes cadastrados, todos os endereços não estão registrados
             notRegisteredCount = deliveryDataRecords.length;
-            console.log(`⚠️ Nenhum cliente cadastrado para comparação`);
         }
 
         console.log(`📊 Análise de endereços:`);
