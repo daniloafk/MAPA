@@ -997,6 +997,104 @@
         color: #666;
     }
 
+    /* Upload de Planilha */
+    .upload-area {
+        border: 2px dashed #ccc;
+        border-radius: 12px;
+        padding: 40px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: #fafafa;
+    }
+
+    .upload-area:hover {
+        border-color: var(--primary-color);
+        background: #f0f7ff;
+    }
+
+    .upload-area.dragover {
+        border-color: var(--primary-color);
+        background: #e3f2fd;
+        transform: scale(1.02);
+    }
+
+    .upload-icon {
+        font-size: 48px;
+        margin-bottom: 12px;
+    }
+
+    .upload-text {
+        font-size: 16px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 4px;
+    }
+
+    .upload-subtext {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 8px;
+    }
+
+    .upload-formats {
+        font-size: 12px;
+        color: #999;
+    }
+
+    .upload-progress {
+        text-align: center;
+        padding: 20px;
+    }
+
+    .progress-bar-container {
+        width: 100%;
+        height: 8px;
+        background: #e0e0e0;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 12px;
+    }
+
+    .progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary-color), #1976D2);
+        width: 0%;
+        transition: width 0.3s ease;
+        animation: progress-pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes progress-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+
+    .progress-text {
+        font-size: 14px;
+        color: #666;
+    }
+
+    .upload-result {
+        text-align: center;
+        padding: 20px;
+    }
+
+    .result-icon {
+        font-size: 48px;
+        margin-bottom: 12px;
+    }
+
+    .result-text {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .result-details {
+        font-size: 14px;
+        color: #666;
+    }
+
     .sidebar-content {
         flex: 1;
         overflow-y: auto;
@@ -1441,6 +1539,7 @@
     <button id="btnToggleRoute" class="control-btn" title="Planejar rota de entrega">🚗</button>
     <button id="btnClearRoute" class="control-btn" title="Limpar rotas e marcadores" style="display: none;">🗑️</button>
     <button id="btnOpenSidebar" class="control-btn" title="Ver lista de clientes">👥</button>
+    <button id="btnUploadSpreadsheet" class="control-btn" title="Atualizar planilha do dia">📊</button>
 </div>
 
 <!-- Container de Notificações -->
@@ -1612,6 +1711,53 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Upload de Planilha -->
+<div class="modal-overlay" id="modal-upload-spreadsheet">
+    <div class="modal-container">
+        <div class="modal-body">
+            <div class="scanner-title">
+                <span>📊 Atualizar Planilha do Dia</span>
+                <button class="modal-close" id="modal-upload-close">✕</button>
+            </div>
+
+            <div class="upload-info" style="background: #fff3cd; padding: 12px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+                <div style="font-weight: 600; color: #856404; margin-bottom: 4px;">⚠️ Atenção</div>
+                <div style="font-size: 13px; color: #856404;">
+                    Ao fazer upload de uma nova planilha, todos os dados anteriores serão substituídos e a roteirização será resetada.
+                </div>
+            </div>
+
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">📊</div>
+                <div class="upload-text">Arraste a planilha aqui</div>
+                <div class="upload-subtext">ou clique para selecionar</div>
+                <div class="upload-formats">Formatos: Excel (.xlsx, .xls) ou CSV (.csv)</div>
+                <input type="file" id="file-input" accept=".xlsx,.xls,.csv" style="display: none;">
+            </div>
+
+            <div class="upload-progress" id="upload-progress" style="display: none;">
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
+                <div class="progress-text" id="progress-text">Processando planilha...</div>
+            </div>
+
+            <div class="upload-result" id="upload-result" style="display: none;">
+                <div class="result-icon" id="result-icon"></div>
+                <div class="result-text" id="result-text"></div>
+                <div class="result-details" id="result-details"></div>
+            </div>
+        </div>
+
+        <div class="form-footer">
+            <button type="button" class="btn btn-secondary" id="btn-upload-cancel">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<!-- SheetJS - Biblioteca para processamento de Excel -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -5248,6 +5394,249 @@ modalScanPackage.addEventListener('click', (e) => {
         closePackageScanner();
     }
 });
+
+// ===========================
+// UPLOAD DE PLANILHA
+// ===========================
+
+const modalUploadSpreadsheet = document.getElementById('modal-upload-spreadsheet');
+const btnUploadSpreadsheet = document.getElementById('btnUploadSpreadsheet');
+const btnModalUploadClose = document.getElementById('modal-upload-close');
+const btnUploadCancel = document.getElementById('btn-upload-cancel');
+const uploadArea = document.getElementById('upload-area');
+const fileInput = document.getElementById('file-input');
+const uploadProgress = document.getElementById('upload-progress');
+const progressBar = document.getElementById('progress-bar');
+const progressText = document.getElementById('progress-text');
+const uploadResult = document.getElementById('upload-result');
+const resultIcon = document.getElementById('result-icon');
+const resultText = document.getElementById('result-text');
+const resultDetails = document.getElementById('result-details');
+
+// Abrir modal de upload
+function openUploadModal() {
+    modalUploadSpreadsheet.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    // Resetar estados
+    uploadArea.style.display = 'block';
+    uploadProgress.style.display = 'none';
+    uploadResult.style.display = 'none';
+    progressBar.style.width = '0%';
+    fileInput.value = '';
+}
+
+// Fechar modal de upload
+function closeUploadModal() {
+    modalUploadSpreadsheet.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+// Event listeners do modal
+btnUploadSpreadsheet.addEventListener('click', openUploadModal);
+btnModalUploadClose.addEventListener('click', closeUploadModal);
+btnUploadCancel.addEventListener('click', closeUploadModal);
+
+modalUploadSpreadsheet.addEventListener('click', (e) => {
+    if (e.target === modalUploadSpreadsheet) {
+        closeUploadModal();
+    }
+});
+
+// Click na área de upload
+uploadArea.addEventListener('click', () => {
+    fileInput.click();
+});
+
+// Drag and drop
+uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+});
+
+uploadArea.addEventListener('dragleave', () => {
+    uploadArea.classList.remove('dragover');
+});
+
+uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        handleFile(files[0]);
+    }
+});
+
+// Seleção de arquivo
+fileInput.addEventListener('change', (e) => {
+    const files = e.target.files;
+    if (files.length > 0) {
+        handleFile(files[0]);
+    }
+});
+
+// Processar arquivo
+async function handleFile(file) {
+    const fileName = file.name.toLowerCase();
+
+    // Validar tipo de arquivo
+    if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls') && !fileName.endsWith('.csv')) {
+        showToast(
+            'Formato inválido',
+            'Por favor, selecione um arquivo Excel (.xlsx, .xls) ou CSV (.csv)',
+            'error',
+            5000
+        );
+        return;
+    }
+
+    // Mostrar progresso
+    uploadArea.style.display = 'none';
+    uploadProgress.style.display = 'block';
+    progressBar.style.width = '30%';
+    progressText.textContent = 'Lendo arquivo...';
+
+    try {
+        const data = await file.arrayBuffer();
+        progressBar.style.width = '50%';
+        progressText.textContent = 'Processando dados...';
+
+        // Processar planilha
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+        progressBar.style.width = '70%';
+        progressText.textContent = 'Atualizando banco de dados...';
+
+        // Processar e salvar dados
+        await processSpreadsheetData(jsonData);
+
+        progressBar.style.width = '100%';
+        progressText.textContent = 'Concluído!';
+
+        // Mostrar resultado de sucesso
+        setTimeout(() => {
+            uploadProgress.style.display = 'none';
+            uploadResult.style.display = 'block';
+            resultIcon.textContent = '✅';
+            resultText.textContent = 'Planilha atualizada com sucesso!';
+            resultText.style.color = '#4caf50';
+            resultDetails.textContent = `${jsonData.length} registros processados`;
+
+            // Fechar modal após 3 segundos
+            setTimeout(() => {
+                closeUploadModal();
+
+                // Recarregar dados
+                loadClients();
+
+                showToast(
+                    'Planilha atualizada!',
+                    `${jsonData.length} registros importados com sucesso`,
+                    'success',
+                    5000
+                );
+            }, 3000);
+        }, 500);
+
+    } catch (error) {
+        console.error('Erro ao processar planilha:', error);
+
+        uploadProgress.style.display = 'none';
+        uploadResult.style.display = 'block';
+        resultIcon.textContent = '❌';
+        resultText.textContent = 'Erro ao processar planilha';
+        resultText.style.color = '#ea4335';
+        resultDetails.textContent = error.message || 'Verifique o formato do arquivo';
+
+        showToast(
+            'Erro no upload',
+            'Não foi possível processar a planilha',
+            'error',
+            5000
+        );
+    }
+}
+
+// Processar dados da planilha e atualizar banco
+async function processSpreadsheetData(jsonData) {
+    try {
+        // 1. Limpar todos os clientes existentes
+        const { error: deleteError } = await supabase
+            .from('clients')
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000'); // Deleta tudo
+
+        if (deleteError) throw deleteError;
+
+        // 2. Limpar rotas existentes (resetar roteirização)
+        if (currentRoute) {
+            currentRoute.setMap(null);
+            currentRoute = null;
+        }
+
+        if (directionsRenderer) {
+            directionsRenderer.setMap(null);
+        }
+
+        // Limpar marcadores
+        Object.values(deliveryMarkers).forEach(marker => {
+            if (marker.setMap) {
+                marker.setMap(null);
+            }
+        });
+        deliveryMarkers = {};
+
+        // Resetar botões
+        btnToggleRoute.classList.remove('active');
+        btnClearRoute.style.display = 'none';
+
+        // 3. Processar novos dados da planilha
+        const newClients = [];
+
+        for (const row of jsonData) {
+            // Adaptar conforme estrutura da sua planilha
+            // Assumindo colunas: QR Code, Nome, Telefone, Endereço, Latitude, Longitude
+
+            const qrCode = row['QR Code'] || row['Código'] || row['codigo'] || '';
+            const address = row['Endereço'] || row['Endereco'] || row['address'] || '';
+
+            // Buscar coordenadas no addressDatabase usando o QR code
+            const addressData = addressDatabase[qrCode];
+
+            if (addressData) {
+                const client = {
+                    name: row['Nome'] || row['Name'] || row['Cliente'] || 'Cliente sem nome',
+                    phone: row['Telefone'] || row['Phone'] || row['Fone'] || '',
+                    address: addressData.address || address,
+                    latitude: addressData.latitude,
+                    longitude: addressData.longitude,
+                    created_at: new Date().toISOString()
+                };
+
+                newClients.push(client);
+            }
+        }
+
+        // 4. Inserir novos clientes no banco
+        if (newClients.length > 0) {
+            const { error: insertError } = await supabase
+                .from('clients')
+                .insert(newClients);
+
+            if (insertError) throw insertError;
+        }
+
+        return newClients.length;
+
+    } catch (error) {
+        console.error('Erro ao processar dados da planilha:', error);
+        throw error;
+    }
+}
 
 // ===========================
 // CLEANUP
