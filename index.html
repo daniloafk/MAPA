@@ -2101,25 +2101,41 @@ function handleGeoError(error, isInitial = false) {
 // ===========================
 
 function addDeliveryMarkers() {
-    console.log('Adicionando marcadores de entrega...');
+    console.log('🔵 Adicionando marcadores de entrega...');
 
-    // Limpar cluster anterior
+    // PASSO 1: Limpar cluster anterior COMPLETAMENTE
     if (markerCluster) {
-        markerCluster.clearMarkers();
+        console.log('🗑️ Destruindo cluster anterior...');
+        try {
+            markerCluster.clearMarkers();
+            markerCluster.setMap(null);
+        } catch (e) {
+            console.warn('Erro ao limpar cluster:', e);
+        }
         markerCluster = null;
     }
 
-    // Limpar marcadores existentes
-    Object.values(deliveryMarkers).forEach(marker => {
-        if (marker.map) {
-            marker.map = null; // Remove do mapa
-        } else if (marker.setMap) {
-            marker.setMap(null);
-        }
-    });
+    // PASSO 2: Remover TODOS os marcadores anteriores
+    const markerCount = Object.keys(deliveryMarkers).length;
+    if (markerCount > 0) {
+        console.log(`🗑️ Removendo ${markerCount} marcadores anteriores...`);
+        Object.values(deliveryMarkers).forEach(marker => {
+            try {
+                if (marker.map !== undefined) {
+                    marker.map = null; // AdvancedMarkerElement
+                } else if (marker.setMap) {
+                    marker.setMap(null); // Marker clássico
+                }
+            } catch (e) {
+                console.warn('Erro ao remover marcador:', e);
+            }
+        });
+    }
+
+    // PASSO 3: Resetar objeto completamente
     deliveryMarkers = {};
 
-    const markers = []; // Array para clustering
+    const markers = []; // Array para clustering (ambos os tipos)
 
     // Adicionar marcador para cada endereço no banco de dados
     Object.entries(addressDatabase).forEach(([qrCode, data]) => {
@@ -2175,6 +2191,7 @@ function addDeliveryMarkers() {
                 });
 
                 deliveryMarkers[qrCode] = marker;
+                markers.push(marker); // IMPORTANTE: Adiciona ao array
             } else {
                 // Fallback: usar Marker clássico com ícone personalizado
                 const marker = new google.maps.Marker({
@@ -2217,18 +2234,26 @@ function addDeliveryMarkers() {
         }
     });
 
-    // Criar cluster apenas para Markers clássicos (performance)
+    // Criar cluster para Markers clássicos (AdvancedMarkers não suportam clustering nativo)
     const classicMarkers = markers.filter(m => m.setMap);
+    const advancedMarkers = markers.filter(m => !m.setMap);
+
     if (classicMarkers.length > 0 && window.markerClusterer) {
-        markerCluster = new markerClusterer.MarkerClusterer({
-            map,
-            markers: classicMarkers,
-            algorithm: new markerClusterer.SuperClusterAlgorithm({ radius: 100 })
-        });
-        console.log(`${classicMarkers.length} marcadores agrupados com clustering`);
+        try {
+            markerCluster = new markerClusterer.MarkerClusterer({
+                map,
+                markers: classicMarkers,
+                algorithm: new markerClusterer.SuperClusterAlgorithm({ radius: 100 })
+            });
+            console.log(`✅ ${classicMarkers.length} marcadores clássicos com clustering`);
+        } catch (e) {
+            console.error('❌ Erro ao criar cluster:', e);
+        }
     }
 
-    console.log(`${Object.keys(deliveryMarkers).length} marcadores de entrega adicionados`);
+    console.log(`✅ Total: ${Object.keys(deliveryMarkers).length} marcadores adicionados`);
+    console.log(`   - AdvancedMarkers: ${advancedMarkers.length}`);
+    console.log(`   - Classic Markers: ${classicMarkers.length}`);
 }
 
 // ===========================
@@ -3124,10 +3149,13 @@ function deactivateRouteMode() {
 
 // Nova função: Limpar TUDO (marcadores + rotas + cluster)
 function clearAllRoutesAndMarkers() {
-    console.log('🗑️ Limpando todas as rotas e marcadores...');
+    console.log('🗑️ ========================================');
+    console.log('🗑️ INICIANDO LIMPEZA COMPLETA...');
+    console.log('🗑️ ========================================');
 
     // Desativar modo de rota se estiver ativo
     if (routeMode) {
+        console.log('🔴 Desativando modo de rota...');
         routeMode = false;
         btnToggleRoute.classList.remove('active');
     }
@@ -3137,34 +3165,63 @@ function clearAllRoutesAndMarkers() {
 
     // 1. Limpar DirectionsRenderer
     if (directionsRenderer) {
-        directionsRenderer.setDirections({routes: []});
+        console.log('🗑️ Limpando DirectionsRenderer...');
+        try {
+            directionsRenderer.setDirections({routes: []});
+            directionsRenderer.setMap(null);
+        } catch (e) {
+            console.warn('Erro ao limpar DirectionsRenderer:', e);
+        }
     }
 
     // 2. Limpar todas as polylines
-    if (window.routePolylines) {
+    if (window.routePolylines && window.routePolylines.length > 0) {
+        console.log(`🗑️ Removendo ${window.routePolylines.length} polylines...`);
         window.routePolylines.forEach(polyline => {
-            polyline.setMap(null);
+            try {
+                polyline.setMap(null);
+            } catch (e) {
+                console.warn('Erro ao remover polyline:', e);
+            }
         });
         window.routePolylines = [];
     }
 
-    // 3. Limpar cluster de marcadores
+    // 3. Limpar cluster de marcadores COMPLETAMENTE
     if (markerCluster) {
-        markerCluster.clearMarkers();
+        console.log('🗑️ Destruindo cluster de marcadores...');
+        try {
+            markerCluster.clearMarkers();
+            markerCluster.setMap(null);
+        } catch (e) {
+            console.warn('Erro ao destruir cluster:', e);
+        }
         markerCluster = null;
     }
 
     // 4. Remover TODOS os marcadores de entrega
-    Object.values(deliveryMarkers).forEach(marker => {
-        if (marker.map) {
-            marker.map = null; // AdvancedMarkerElement
-        } else if (marker.setMap) {
-            marker.setMap(null); // Marker clássico
-        }
-    });
-    deliveryMarkers = {}; // Resetar objeto
+    const markerCount = Object.keys(deliveryMarkers).length;
+    if (markerCount > 0) {
+        console.log(`🗑️ Removendo ${markerCount} marcadores de entrega...`);
+        Object.values(deliveryMarkers).forEach(marker => {
+            try {
+                if (marker.map !== undefined) {
+                    marker.map = null; // AdvancedMarkerElement
+                } else if (marker.setMap) {
+                    marker.setMap(null); // Marker clássico
+                }
+            } catch (e) {
+                console.warn('Erro ao remover marcador:', e);
+            }
+        });
+    }
 
-    console.log('✅ Limpeza completa realizada');
+    // 5. RESETAR completamente o objeto de marcadores
+    deliveryMarkers = {};
+
+    console.log('✅ ========================================');
+    console.log('✅ LIMPEZA COMPLETA REALIZADA!');
+    console.log('✅ ========================================');
 
     showToast(
         '🗑️ Tudo limpo!',
