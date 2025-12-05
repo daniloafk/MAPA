@@ -1034,38 +1034,60 @@
         transition: all 0.2s ease;
     }
 
-    .phone-action-btn.call-btn,
+    /* Classes para estado resetado - força re-render */
+    .phone-action-btn.btn-reset {
+        pointer-events: auto !important;
+        outline: none !important;
+    }
+
+    .phone-action-btn.call-btn {
+        background: #2196F3;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        transform: scale(1);
+    }
+
     .phone-action-btn.call-btn:link,
     .phone-action-btn.call-btn:visited,
     .phone-action-btn.call-btn:focus,
     .phone-action-btn.call-btn:active,
     .phone-action-btn.call-btn:focus-visible {
-        background: #2196F3 !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
-        transform: scale(1) !important;
+        background: #2196F3;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        transform: scale(1);
     }
 
-    .phone-action-btn.call-btn:hover:not(:active) {
-        background: #1976D2 !important;
-        transform: scale(1.1) !important;
-        box-shadow: 0 3px 6px rgba(33,150,243,0.4) !important;
+    /* Hover apenas em desktop - não em touch */
+    @media (hover: hover) and (pointer: fine) {
+        .phone-action-btn.call-btn:hover:not(:active) {
+            background: #1976D2;
+            transform: scale(1.1);
+            box-shadow: 0 3px 6px rgba(33,150,243,0.4);
+        }
     }
 
-    .phone-action-btn.whatsapp-btn,
+    .phone-action-btn.whatsapp-btn {
+        background: #25D366;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        transform: scale(1);
+    }
+
     .phone-action-btn.whatsapp-btn:link,
     .phone-action-btn.whatsapp-btn:visited,
     .phone-action-btn.whatsapp-btn:focus,
     .phone-action-btn.whatsapp-btn:active,
     .phone-action-btn.whatsapp-btn:focus-visible {
-        background: #25D366 !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
-        transform: scale(1) !important;
+        background: #25D366;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        transform: scale(1);
     }
 
-    .phone-action-btn.whatsapp-btn:hover:not(:active) {
-        background: #128C7E !important;
-        transform: scale(1.1) !important;
-        box-shadow: 0 3px 6px rgba(37,211,102,0.4) !important;
+    /* Hover apenas em desktop - não em touch */
+    @media (hover: hover) and (pointer: fine) {
+        .phone-action-btn.whatsapp-btn:hover:not(:active) {
+            background: #128C7E;
+            transform: scale(1.1);
+            box-shadow: 0 3px 6px rgba(37,211,102,0.4);
+        }
     }
 
     .empty-state {
@@ -1186,16 +1208,24 @@
             gap: 10px;
         }
 
-        /* Forçar cores originais dos botões no mobile */
+        /* Desabilitar hover em mobile - evitar estados persistentes */
+        .phone-action-btn {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
         .phone-action-btn.call-btn,
         .phone-action-btn.call-btn:link,
         .phone-action-btn.call-btn:visited,
         .phone-action-btn.call-btn:focus,
         .phone-action-btn.call-btn:active,
-        .phone-action-btn.call-btn:focus-visible {
-            background: #2196F3 !important;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
-            transform: scale(1) !important;
+        .phone-action-btn.call-btn:focus-visible,
+        .phone-action-btn.call-btn:hover {
+            background: #2196F3;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+            transform: scale(1);
         }
 
         .phone-action-btn.whatsapp-btn,
@@ -1203,10 +1233,11 @@
         .phone-action-btn.whatsapp-btn:visited,
         .phone-action-btn.whatsapp-btn:focus,
         .phone-action-btn.whatsapp-btn:active,
-        .phone-action-btn.whatsapp-btn:focus-visible {
-            background: #25D366 !important;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
-            transform: scale(1) !important;
+        .phone-action-btn.whatsapp-btn:focus-visible,
+        .phone-action-btn.whatsapp-btn:hover {
+            background: #25D366;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+            transform: scale(1);
         }
 
         .modal-container {
@@ -3467,42 +3498,131 @@ function renderClients(clients) {
         });
     });
 
-    // Listener global para resetar foco quando volta do app externo
-    // Remove apenas uma vez e adiciona novamente
+    // Event listeners para botões de telefone - reset agressivo com class toggle
+    document.querySelectorAll('.phone-action-btn').forEach(btn => {
+        // Touchstart - preparar para reset
+        btn.addEventListener('touchstart', function(e) {
+            e.stopPropagation();
+            this.setAttribute('data-touched', 'true');
+        }, { passive: true });
+
+        // Touch end - resetar com class toggle para forçar re-render
+        btn.addEventListener('touchend', function(e) {
+            e.stopPropagation();
+            const element = this;
+
+            // Reset imediato com requestAnimationFrame para forçar reflow
+            requestAnimationFrame(() => {
+                element.blur();
+
+                // Remove e readiciona classe para forçar re-render
+                element.classList.remove('btn-reset');
+                void element.offsetWidth; // Força reflow
+                element.classList.add('btn-reset');
+
+                // Remove todos os estilos inline
+                element.removeAttribute('style');
+
+                // Remove atributo de touch
+                element.removeAttribute('data-touched');
+            });
+
+            // Segundo reset após um delay
+            setTimeout(() => {
+                element.blur();
+                element.removeAttribute('style');
+                element.classList.remove('btn-reset');
+                void element.offsetWidth;
+                element.classList.add('btn-reset');
+            }, 100);
+        });
+
+        // Click - reset similar
+        btn.addEventListener('click', function(e) {
+            const element = this;
+
+            requestAnimationFrame(() => {
+                element.blur();
+                element.classList.remove('btn-reset');
+                void element.offsetWidth;
+                element.classList.add('btn-reset');
+                element.removeAttribute('style');
+            });
+
+            setTimeout(() => {
+                element.blur();
+                element.removeAttribute('style');
+            }, 150);
+        });
+
+        // Mouseout - limpar estados residuais
+        btn.addEventListener('mouseout', function() {
+            this.blur();
+            this.removeAttribute('style');
+        });
+    });
+
+    // Listener global para resetar quando volta do app externo
     window.removeEventListener('focus', resetPhoneButtonsFocus);
     window.addEventListener('focus', resetPhoneButtonsFocus);
+
+    // Listener para quando a página fica visível novamente
+    document.removeEventListener('visibilitychange', resetPhoneButtonsFocus);
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            resetPhoneButtonsFocus();
+        }
+    });
 }
 
-// Função para resetar foco dos botões de telefone
+// Função para resetar foco dos botões de telefone - versão agressiva
 function resetPhoneButtonsFocus() {
-    // Remover foco de todos os botões de telefone
-    document.querySelectorAll('.phone-action-btn').forEach(btn => {
-        btn.blur();
+    requestAnimationFrame(() => {
+        // Resetar TODOS os botões de telefone
+        document.querySelectorAll('.phone-action-btn').forEach(btn => {
+            // Remove foco
+            btn.blur();
+
+            // Remove todos os estilos inline
+            btn.removeAttribute('style');
+
+            // Remove e readiciona classe para forçar re-render
+            btn.classList.remove('btn-reset');
+            void btn.offsetWidth; // Força reflow
+            btn.classList.add('btn-reset');
+
+            // Remove atributos residuais
+            btn.removeAttribute('data-touched');
+        });
+
+        // Remover foco dos cards
+        document.querySelectorAll('.client-card').forEach(card => {
+            card.blur();
+            card.style.outline = 'none';
+        });
+
+        // Criar input temporário para roubar foco completamente
+        const tempInput = document.createElement('input');
+        tempInput.style.cssText = 'position:absolute;opacity:0;height:0;width:0;left:-9999px;pointer-events:none;';
+        tempInput.setAttribute('tabindex', '-1');
+        tempInput.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(tempInput);
+
+        tempInput.focus();
+
+        setTimeout(() => {
+            tempInput.blur();
+            if (document.body.contains(tempInput)) {
+                document.body.removeChild(tempInput);
+            }
+
+            // Reset final dos botões
+            document.querySelectorAll('.phone-action-btn').forEach(btn => {
+                btn.removeAttribute('style');
+                btn.blur();
+            });
+        }, 50);
     });
-
-    // Remover foco dos cards de cliente
-    document.querySelectorAll('.client-card').forEach(card => {
-        card.blur();
-    });
-
-    // Criar input temporário para limpar qualquer foco residual
-    const tempInput = document.createElement('input');
-    tempInput.style.position = 'absolute';
-    tempInput.style.opacity = '0';
-    tempInput.style.height = '0';
-    tempInput.style.width = '0';
-    tempInput.style.left = '-9999px';
-    tempInput.setAttribute('tabindex', '-1');
-    document.body.appendChild(tempInput);
-
-    tempInput.focus();
-    tempInput.blur();
-
-    setTimeout(() => {
-        if (document.body.contains(tempInput)) {
-            document.body.removeChild(tempInput);
-        }
-    }, 100);
 }
 
 // Atualizar contador de clientes
@@ -4611,6 +4731,18 @@ async function calculateDirectionsRoute(origin, deliveryPoints) {
 
 window.addEventListener('beforeunload', () => {
     if (watchId) navigator.geolocation.clearWatch(watchId);
+});
+
+// Resetar botões quando usuário volta de app externo (tel: ou whatsapp:)
+window.addEventListener('pageshow', function(event) {
+    // Executar reset quando página é mostrada novamente
+    if (event.persisted || performance.getEntriesByType('navigation')[0]?.type === 'back_forward') {
+        resetPhoneButtonsFocus();
+    }
+    // Reset também ao voltar de link externo
+    setTimeout(() => {
+        resetPhoneButtonsFocus();
+    }, 100);
 });
 
 // Tratamento de erro de carregamento do mapa
