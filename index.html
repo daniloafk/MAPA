@@ -2118,29 +2118,29 @@ function handleGeoError(error, isInitial = false) {
 // MARCADORES DE ENTREGAS
 // ===========================
 
-// Função auxiliar para criar SVG de pin do Google Maps com número (tamanho reduzido)
+// Função auxiliar para criar SVG de pin do Google Maps com número (tamanho compacto)
 function createPinSVG(number) {
-    // SVG do pin do Google Maps (formato teardrop/gota invertida) - 30% menor
+    // SVG do pin do Google Maps (formato teardrop/gota invertida) - tamanho compacto
     const svg = `
-        <svg width="28" height="40" viewBox="0 0 28 40" xmlns="http://www.w3.org/2000/svg">
+        <svg width="20" height="28" viewBox="0 0 20 28" xmlns="http://www.w3.org/2000/svg">
             <!-- Sombra -->
-            <ellipse cx="14" cy="38" rx="5.6" ry="1.4" fill="rgba(0,0,0,0.3)"/>
+            <ellipse cx="10" cy="27" rx="4" ry="1" fill="rgba(0,0,0,0.3)"/>
 
             <!-- Pin vermelho -->
-            <path d="M14 0 C6.268 0 0 6.268 0 14 C0 24.5 14 40 14 40 S28 24.5 28 14 C28 6.268 21.732 0 14 0 Z"
+            <path d="M10 0 C4.477 0 0 4.477 0 10 C0 17.5 10 28 10 28 S20 17.5 20 10 C20 4.477 15.523 0 10 0 Z"
                   fill="#EA4335"
                   stroke="#FFFFFF"
-                  stroke-width="1.5"/>
+                  stroke-width="1.2"/>
 
             <!-- Círculo branco interno -->
-            <circle cx="14" cy="14" r="8.4" fill="#FFFFFF"/>
+            <circle cx="10" cy="10" r="6" fill="#FFFFFF"/>
 
             <!-- Número -->
-            <text x="14" y="14"
+            <text x="10" y="10"
                   text-anchor="middle"
                   dominant-baseline="central"
                   font-family="Arial, sans-serif"
-                  font-size="10"
+                  font-size="8"
                   font-weight="bold"
                   fill="#EA4335">${number}</text>
         </svg>
@@ -2186,11 +2186,11 @@ function addDeliveryMarkers() {
         markerDiv.style.cursor = 'pointer';
         markerDiv.style.transition = 'transform 0.2s';
 
-        // Criar imagem do pin com número (tamanho reduzido)
+        // Criar imagem do pin com número (tamanho compacto)
         const pinImg = document.createElement('img');
         pinImg.src = createPinSVG(markerNumber);
-        pinImg.style.width = '28px';
-        pinImg.style.height = '40px';
+        pinImg.style.width = '20px';
+        pinImg.style.height = '28px';
         pinImg.style.display = 'block';
 
         markerDiv.appendChild(pinImg);
@@ -2252,8 +2252,8 @@ function addDeliveryMarkers() {
                     title: `${markerNumber}. ${data.address.split('\n')[0]}`,
                     icon: {
                         url: createPinSVG(markerNumber),
-                        scaledSize: new google.maps.Size(28, 40),
-                        anchor: new google.maps.Point(14, 40) // Ancorar na ponta do pin
+                        scaledSize: new google.maps.Size(20, 28),
+                        anchor: new google.maps.Point(10, 28) // Ancorar na ponta do pin
                     }
                 });
 
