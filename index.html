@@ -3269,6 +3269,12 @@ function renderClients(clients) {
                     <span>${escapeHtml(client.phone)}</span>
                 </div>
             ` : ''}
+            ${client.address ? `
+                <div class="client-info">
+                    <span class="client-info-icon">📍</span>
+                    <span>${escapeHtml(client.address.replace(/Código QR:.*?\(/g, '(').replace(/BR\d+/g, '').trim())}</span>
+                </div>
+            ` : ''}
         </div>
     `).join('');
 
