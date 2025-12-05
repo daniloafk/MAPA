@@ -3483,30 +3483,51 @@ function renderClients(clients) {
     });
 
     // Event listeners para botões de telefone (ligação e WhatsApp)
-    // Solução para mobile: remover foco e estado após clique
+    // Solução para mobile: forçar remoção de foco criando elemento temporário
     document.querySelectorAll('.phone-action-btn').forEach(btn => {
-        // Touchstart - remover foco imediatamente
-        btn.addEventListener('touchstart', function() {
-            this.style.transition = 'none';
-        });
-
-        // Touchend - restaurar e remover foco
-        btn.addEventListener('touchend', function() {
+        btn.addEventListener('touchend', function(e) {
             const element = this;
+
+            // Criar elemento invisível temporário para roubar o foco
+            const tempInput = document.createElement('input');
+            tempInput.style.position = 'absolute';
+            tempInput.style.opacity = '0';
+            tempInput.style.height = '0';
+            tempInput.style.width = '0';
+            tempInput.style.pointerEvents = 'none';
+            document.body.appendChild(tempInput);
+
+            // Dar foco ao elemento temporário (remove foco do botão)
             setTimeout(() => {
+                tempInput.focus();
+                tempInput.blur();
+                document.body.removeChild(tempInput);
                 element.blur();
-                element.style.transition = '';
-            }, 100);
+            }, 1);
         });
 
-        // Click - backup para garantir remoção de foco
         btn.addEventListener('click', function(e) {
             const element = this;
+
+            // Mesmo processo para o evento click
             setTimeout(() => {
+                const tempInput = document.createElement('input');
+                tempInput.style.position = 'absolute';
+                tempInput.style.opacity = '0';
+                tempInput.style.height = '0';
+                tempInput.style.width = '0';
+                tempInput.style.pointerEvents = 'none';
+                document.body.appendChild(tempInput);
+
+                tempInput.focus();
+                tempInput.blur();
+                setTimeout(() => {
+                    if (document.body.contains(tempInput)) {
+                        document.body.removeChild(tempInput);
+                    }
+                }, 10);
                 element.blur();
-                // Forçar remoção de classes de estado ativo
-                element.classList.remove('active');
-            }, 150);
+            }, 10);
         });
     });
 }
