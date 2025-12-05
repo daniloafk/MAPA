@@ -1129,6 +1129,7 @@
     <button id="btnToggle3D" class="control-btn" title="Alternar visualização 3D">3D</button>
     <button id="btnCenterLocation" class="control-btn" title="Centralizar na minha localização">📍</button>
     <button id="btnToggleRoute" class="control-btn" title="Planejar rota de entrega">🚗</button>
+    <button id="btnClearRoute" class="control-btn" title="Limpar rotas e marcadores" style="display: none;">🗑️</button>
     <button id="btnOpenSidebar" class="control-btn" title="Ver lista de clientes">👥</button>
 </div>
 
@@ -3046,9 +3047,18 @@ btnToggleRoute.addEventListener('click', () => {
     }
 });
 
+// Botão de limpar rotas e marcadores
+const btnClearRoute = document.getElementById('btnClearRoute');
+btnClearRoute.addEventListener('click', () => {
+    clearAllRoutesAndMarkers();
+});
+
 function activateRouteMode() {
     routeMode = true;
     btnToggleRoute.classList.add('active');
+
+    // Mostrar botão de limpar
+    document.getElementById('btnClearRoute').style.display = 'flex';
 
     // Obter posição atual do usuário
     let currentPosition;
@@ -3070,6 +3080,9 @@ function activateRouteMode() {
         deactivateRouteMode();
         return;
     }
+
+    // NOVO: Adicionar marcadores da planilha SOMENTE quando clicar
+    addDeliveryMarkers();
 
     // Calcular rota otimizada para todos os pontos de entrega
     calculateOptimizedRoute(currentPosition);
@@ -3109,9 +3122,61 @@ function deactivateRouteMode() {
     );
 }
 
+// Nova função: Limpar TUDO (marcadores + rotas + cluster)
+function clearAllRoutesAndMarkers() {
+    console.log('🗑️ Limpando todas as rotas e marcadores...');
+
+    // Desativar modo de rota se estiver ativo
+    if (routeMode) {
+        routeMode = false;
+        btnToggleRoute.classList.remove('active');
+    }
+
+    // Esconder botão de limpar
+    document.getElementById('btnClearRoute').style.display = 'none';
+
+    // 1. Limpar DirectionsRenderer
+    if (directionsRenderer) {
+        directionsRenderer.setDirections({routes: []});
+    }
+
+    // 2. Limpar todas as polylines
+    if (window.routePolylines) {
+        window.routePolylines.forEach(polyline => {
+            polyline.setMap(null);
+        });
+        window.routePolylines = [];
+    }
+
+    // 3. Limpar cluster de marcadores
+    if (markerCluster) {
+        markerCluster.clearMarkers();
+        markerCluster = null;
+    }
+
+    // 4. Remover TODOS os marcadores de entrega
+    Object.values(deliveryMarkers).forEach(marker => {
+        if (marker.map) {
+            marker.map = null; // AdvancedMarkerElement
+        } else if (marker.setMap) {
+            marker.setMap(null); // Marker clássico
+        }
+    });
+    deliveryMarkers = {}; // Resetar objeto
+
+    console.log('✅ Limpeza completa realizada');
+
+    showToast(
+        '🗑️ Tudo limpo!',
+        'Rotas e marcadores removidos do mapa',
+        'success',
+        3000
+    );
+}
+
 async function calculateOptimizedRoute(origin) {
-    // Mostrar marcadores de entrega ao ativar modo de rota
-    addDeliveryMarkers();
+    // Marcadores já foram adicionados em activateRouteMode()
+    // Removido: addDeliveryMarkers();
 
     showToast(
         'Calculando rota otimizada...',
