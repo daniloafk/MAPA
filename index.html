@@ -6230,104 +6230,77 @@ const resultIcon = document.getElementById('result-icon');
 const resultText = document.getElementById('result-text');
 const resultDetails = document.getElementById('result-details');
 
+// Variável para armazenar o timeout de fechamento automático
+let uploadModalAutoCloseTimeout = null;
+
 // Abrir modal de upload
 function openUploadModal() {
-    console.log('Abrindo modal de upload...');
+    modalUploadSpreadsheet.classList.add('active');
+    document.body.style.overflow = 'hidden';
 
-    // Resetar estados PRIMEIRO
+    // Resetar estados
     uploadArea.style.display = 'block';
     uploadProgress.style.display = 'none';
     uploadResult.style.display = 'none';
     progressBar.style.width = '0%';
     fileInput.value = '';
-
-    // Depois abrir o modal
-    modalUploadSpreadsheet.classList.add('active');
-    document.body.style.overflow = 'hidden';
 }
 
 // Fechar modal de upload
 function closeUploadModal() {
-    console.log('Fechando modal de upload...');
+    // Cancelar timeout de fechamento automático se existir
+    if (uploadModalAutoCloseTimeout) {
+        clearTimeout(uploadModalAutoCloseTimeout);
+        uploadModalAutoCloseTimeout = null;
+    }
+
     modalUploadSpreadsheet.classList.remove('active');
     document.body.style.overflow = '';
-
-    // Resetar estados ao fechar também
-    setTimeout(() => {
-        uploadArea.style.display = 'block';
-        uploadProgress.style.display = 'none';
-        uploadResult.style.display = 'none';
-        progressBar.style.width = '0%';
-        fileInput.value = '';
-    }, 300); // Após animação do modal
 }
 
-// Event listeners do modal (protegido contra duplicação)
-if (!btnUploadSpreadsheet._hasUploadListener) {
-    btnUploadSpreadsheet.addEventListener('click', openUploadModal);
-    btnUploadSpreadsheet._hasUploadListener = true;
-}
+// Event listeners do modal
+btnUploadSpreadsheet.addEventListener('click', openUploadModal);
+btnModalUploadClose.addEventListener('click', closeUploadModal);
+btnUploadCancel.addEventListener('click', closeUploadModal);
 
-if (!btnModalUploadClose._hasCloseListener) {
-    btnModalUploadClose.addEventListener('click', closeUploadModal);
-    btnModalUploadClose._hasCloseListener = true;
-}
+modalUploadSpreadsheet.addEventListener('click', (e) => {
+    if (e.target === modalUploadSpreadsheet) {
+        closeUploadModal();
+    }
+});
 
-if (!btnUploadCancel._hasCancelListener) {
-    btnUploadCancel.addEventListener('click', closeUploadModal);
-    btnUploadCancel._hasCancelListener = true;
-}
+// Click na área de upload
+uploadArea.addEventListener('click', () => {
+    fileInput.click();
+});
 
-if (!modalUploadSpreadsheet._hasClickListener) {
-    modalUploadSpreadsheet.addEventListener('click', (e) => {
-        if (e.target === modalUploadSpreadsheet) {
-            closeUploadModal();
-        }
-    });
-    modalUploadSpreadsheet._hasClickListener = true;
-}
+// Drag and drop
+uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+});
 
-// Click na área de upload (protegido contra duplicação)
-if (!uploadArea._hasClickListener) {
-    uploadArea.addEventListener('click', () => {
-        fileInput.click();
-    });
-    uploadArea._hasClickListener = true;
-}
+uploadArea.addEventListener('dragleave', () => {
+    uploadArea.classList.remove('dragover');
+});
 
-// Drag and drop (protegido contra duplicação)
-if (!uploadArea._hasDragListeners) {
-    uploadArea.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        uploadArea.classList.add('dragover');
-    });
+uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
 
-    uploadArea.addEventListener('dragleave', () => {
-        uploadArea.classList.remove('dragover');
-    });
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        handleFile(files[0]);
+    }
+});
 
-    uploadArea.addEventListener('drop', (e) => {
-        e.preventDefault();
-        uploadArea.classList.remove('dragover');
-
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            handleFile(files[0]);
-        }
-    });
-    uploadArea._hasDragListeners = true;
-}
-
-// Seleção de arquivo (protegido contra duplicação)
-if (!fileInput._hasChangeListener) {
-    fileInput.addEventListener('change', (e) => {
-        const files = e.target.files;
-        if (files.length > 0) {
-            handleFile(files[0]);
-        }
-    });
-    fileInput._hasChangeListener = true;
-}
+// Seleção de arquivo
+fileInput.addEventListener('change', (e) => {
+    const files = e.target.files;
+    if (files.length > 0) {
+        handleFile(files[0]);
+    }
+});
 
 // Processar arquivo
 async function handleFile(file) {
@@ -6387,7 +6360,7 @@ async function handleFile(file) {
             resultDetails.innerHTML = detailsHTML;
 
             // Fechar modal após 5 segundos (tempo maior para ler as estatísticas)
-            setTimeout(() => {
+            uploadModalAutoCloseTimeout = setTimeout(() => {
                 closeUploadModal();
 
                 // Recarregar dados
