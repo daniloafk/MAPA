@@ -5487,36 +5487,119 @@ function startPackageScanning() {
 // Buscar cliente pelo código QR do pacote
 async function findClientByQRCode(qrCode) {
     try {
-        // Buscar no banco de dados de clientes
-        const { data: clients, error } = await supabase
-            .from('clients')
+        // PASSO 1: Buscar o pacote na planilha do dia (delivery_data)
+        const { data: deliveryData, error: deliveryError } = await supabase
+            .from('delivery_data')
             .select('*')
-            .ilike('address', `%${qrCode}%`);
+            .eq('spx_tn', qrCode)
+            .single();
 
-        if (error) throw error;
+        if (deliveryError && deliveryError.code !== 'PGRST116') {
+            console.error('Erro ao buscar na planilha:', deliveryError);
+        }
 
-        if (clients && clients.length > 0) {
-            // Cliente encontrado
-            const client = clients[0];
-
-            // Mostrar resultado
+        if (!deliveryData) {
+            // Pacote não encontrado na planilha do dia
             scanResult.classList.add('active');
             scanResultText.innerHTML = `
-                <strong>${escapeHtml(client.name)}</strong><br>
-                📞 ${escapeHtml(client.phone || 'Sem telefone')}<br>
-                📍 ${escapeHtml(client.address.split('\n')[0])}
+                <strong style="color: #ea4335;">❌ Pacote não encontrado</strong><br>
+                O código <code>${escapeHtml(qrCode)}</code> não está na planilha do dia.
+            `;
+
+            showToast(
+                'Pacote não encontrado',
+                'Este código QR não está na planilha de entregas do dia',
+                'error',
+                4000
+            );
+
+            // Resetar scanner
+            setTimeout(() => {
+                packageLastScannedCode = null;
+                qrPackageStatus.textContent = 'Procurando código QR...';
+                qrPackageStatus.classList.remove('success');
+            }, 3000);
+            return;
+        }
+
+        // PASSO 2: Buscar clientes cadastrados
+        const { data: clients, error: clientsError } = await supabase
+            .from('clients')
+            .select('*');
+
+        if (clientsError) throw clientsError;
+
+        if (!clients || clients.length === 0) {
+            // Nenhum cliente cadastrado
+            scanResult.classList.add('active');
+            scanResultText.innerHTML = `
+                <strong style="color: #ff9800;">⚠️ Nenhum cliente cadastrado</strong><br>
+                Pacote encontrado na planilha, mas não há clientes cadastrados para verificar.
+            `;
+
+            showToast(
+                'Nenhum cliente cadastrado',
+                'Adicione clientes para verificar correspondência',
+                'warning',
+                4000
+            );
+
+            setTimeout(() => {
+                packageLastScannedCode = null;
+                qrPackageStatus.textContent = 'Procurando código QR...';
+                qrPackageStatus.classList.remove('success');
+            }, 3000);
+            return;
+        }
+
+        // PASSO 3: Verificar se algum cliente tem endereço que bate com o da planilha
+        const deliveryAddress = (deliveryData.destination_address || '').toLowerCase().trim();
+
+        let matchedClient = null;
+
+        for (const client of clients) {
+            const clientAddress = (client.address || '').toLowerCase().trim();
+
+            // Verificar se os endereços batem (comparação flexível)
+            if (clientAddress.includes(deliveryAddress) || deliveryAddress.includes(clientAddress)) {
+                matchedClient = client;
+                break;
+            }
+
+            // Verificar também por coordenadas próximas (mesma latitude/longitude)
+            if (client.latitude && client.longitude && deliveryData.latitude && deliveryData.longitude) {
+                const latDiff = Math.abs(client.latitude - deliveryData.latitude);
+                const lngDiff = Math.abs(client.longitude - deliveryData.longitude);
+
+                // Se diferença menor que 0.0001 graus (~11 metros), considera mesmo endereço
+                if (latDiff < 0.0001 && lngDiff < 0.0001) {
+                    matchedClient = client;
+                    break;
+                }
+            }
+        }
+
+        if (matchedClient) {
+            // ✅ CLIENTE ENCONTRADO - Endereço bate!
+            scanResult.classList.add('active');
+            scanResultText.innerHTML = `
+                <strong style="color: #4caf50;">✅ Cliente encontrado!</strong><br>
+                <strong>${escapeHtml(matchedClient.name)}</strong><br>
+                📞 ${escapeHtml(matchedClient.phone || 'Sem telefone')}<br>
+                📦 SPX TN: ${escapeHtml(qrCode)}<br>
+                📍 ${escapeHtml(deliveryData.destination_address || 'Sem endereço')}
             `;
 
             // Filtrar lista para mostrar apenas este cliente
-            highlightClientInList(client);
+            highlightClientInList(matchedClient);
 
             // Parar câmera
             stopPackageCamera();
 
             // Toast de sucesso
             showToast(
-                '✅ Cliente encontrado!',
-                `${client.name}`,
+                '✅ Endereço confirmado!',
+                `Cliente: ${matchedClient.name}`,
                 'success',
                 3000
             );
@@ -5527,21 +5610,24 @@ async function findClientByQRCode(qrCode) {
             }, 2000);
 
         } else {
-            // Cliente não encontrado
+            // ❌ PACOTE NA PLANILHA MAS CLIENTE NÃO CADASTRADO
             scanResult.classList.add('active');
             scanResultText.innerHTML = `
-                <strong style="color: #ea4335;">❌ Cliente não encontrado</strong><br>
-                O código <code>${escapeHtml(qrCode)}</code> não está cadastrado.
+                <strong style="color: #ff9800;">⚠️ Cliente não cadastrado</strong><br>
+                📦 SPX TN: ${escapeHtml(qrCode)}<br>
+                📍 Endereço da planilha:<br>
+                ${escapeHtml(deliveryData.destination_address || 'Sem endereço')}<br>
+                <small style="color: #666;">Nenhum cliente cadastrado corresponde a este endereço.</small>
             `;
 
             showToast(
-                'Cliente não encontrado',
-                'O código QR não corresponde a nenhum cliente cadastrado',
-                'error',
+                'Cliente não cadastrado',
+                'O pacote existe na planilha mas o cliente não foi cadastrado ainda',
+                'warning',
                 4000
             );
 
-            // Resetar scanner para permitir novo scan
+            // Resetar scanner
             setTimeout(() => {
                 packageLastScannedCode = null;
                 qrPackageStatus.textContent = 'Procurando código QR...';
