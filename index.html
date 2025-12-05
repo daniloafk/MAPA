@@ -1540,6 +1540,7 @@
     <button id="btnClearRoute" class="control-btn" title="Limpar rotas e marcadores" style="display: none;">🗑️</button>
     <button id="btnOpenSidebar" class="control-btn" title="Ver lista de clientes">👥</button>
     <button id="btnUploadSpreadsheet" class="control-btn" title="Atualizar planilha do dia">📊</button>
+    <button id="btnToggleClients" class="control-btn" title="Mostrar/Ocultar clientes no mapa">👤</button>
 </div>
 
 <!-- Container de Notificações -->
@@ -5692,6 +5693,228 @@ modalScanPackage.addEventListener('click', (e) => {
         closePackageScanner();
     }
 });
+
+// ===========================
+// MOSTRAR/OCULTAR CLIENTES NO MAPA
+// ===========================
+
+const btnToggleClients = document.getElementById('btnToggleClients');
+let clientMarkers = {};
+let clientsVisible = false;
+
+// Toggle clientes no mapa
+btnToggleClients.addEventListener('click', async () => {
+    if (clientsVisible) {
+        // Ocultar clientes
+        hideClientMarkers();
+    } else {
+        // Mostrar clientes
+        await showClientMarkers();
+    }
+});
+
+// Mostrar marcadores dos clientes cadastrados
+async function showClientMarkers() {
+    try {
+        // Buscar todos os clientes do banco
+        const { data: clients, error } = await supabase
+            .from('clients')
+            .select('*')
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        if (!clients || clients.length === 0) {
+            showToast(
+                'Nenhum cliente cadastrado',
+                'Adicione clientes para visualizá-los no mapa',
+                'warning',
+                3000
+            );
+            return;
+        }
+
+        // Criar marcador para cada cliente
+        clients.forEach((client, index) => {
+            if (!client.latitude || !client.longitude) {
+                console.warn(`Cliente ${client.name} não tem coordenadas válidas`);
+                return;
+            }
+
+            const position = { lat: client.latitude, lng: client.longitude };
+
+            // Criar elemento do marcador com pin azul (diferente dos vermelhos de entrega)
+            const markerDiv = document.createElement('div');
+            markerDiv.style.cursor = 'pointer';
+            markerDiv.style.transition = 'transform 0.2s';
+
+            // Criar pin azul para clientes
+            const pinImg = document.createElement('div');
+            pinImg.style.width = '28px';
+            pinImg.style.height = '28px';
+            pinImg.style.background = '#2196F3';
+            pinImg.style.border = '3px solid white';
+            pinImg.style.borderRadius = '50% 50% 50% 0';
+            pinImg.style.transform = 'rotate(-45deg)';
+            pinImg.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
+            pinImg.style.display = 'flex';
+            pinImg.style.alignItems = 'center';
+            pinImg.style.justifyContent = 'center';
+
+            const innerCircle = document.createElement('div');
+            innerCircle.style.width = '16px';
+            innerCircle.style.height = '16px';
+            innerCircle.style.background = 'white';
+            innerCircle.style.borderRadius = '50%';
+            innerCircle.style.transform = 'rotate(45deg)';
+            innerCircle.style.fontSize = '10px';
+            innerCircle.style.display = 'flex';
+            innerCircle.style.alignItems = 'center';
+            innerCircle.style.justifyContent = 'center';
+            innerCircle.textContent = '👤';
+
+            pinImg.appendChild(innerCircle);
+            markerDiv.appendChild(pinImg);
+
+            // Efeito hover
+            markerDiv.addEventListener('mouseenter', () => {
+                markerDiv.style.transform = 'scale(1.15)';
+            });
+            markerDiv.addEventListener('mouseleave', () => {
+                markerDiv.style.transform = 'scale(1)';
+            });
+
+            // Criar InfoWindow
+            const infoWindowContent = document.createElement('div');
+            infoWindowContent.style.padding = '10px';
+            infoWindowContent.style.maxWidth = '250px';
+
+            const nameDiv = document.createElement('div');
+            nameDiv.style.fontWeight = 'bold';
+            nameDiv.style.fontSize = '14px';
+            nameDiv.style.color = '#2196F3';
+            nameDiv.style.marginBottom = '6px';
+            nameDiv.textContent = `👤 ${client.name}`;
+
+            const phoneDiv = document.createElement('div');
+            phoneDiv.style.fontSize = '12px';
+            phoneDiv.style.color = '#666';
+            phoneDiv.style.marginBottom = '4px';
+            phoneDiv.innerHTML = `📞 ${client.phone || 'Sem telefone'}`;
+
+            const addressDiv = document.createElement('div');
+            addressDiv.style.fontSize = '12px';
+            addressDiv.style.color = '#333';
+            addressDiv.style.lineHeight = '1.4';
+            addressDiv.innerHTML = `📍 ${client.address.replace(/\n/g, '<br>')}`;
+
+            infoWindowContent.appendChild(nameDiv);
+            infoWindowContent.appendChild(phoneDiv);
+            infoWindowContent.appendChild(addressDiv);
+
+            const infoWindow = new google.maps.InfoWindow({
+                content: infoWindowContent,
+                maxWidth: 280
+            });
+
+            try {
+                // Criar marcador usando AdvancedMarkerElement
+                if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+                    const marker = new google.maps.marker.AdvancedMarkerElement({
+                        map,
+                        position,
+                        content: markerDiv,
+                        title: client.name
+                    });
+
+                    marker.addListener('click', () => {
+                        if (currentInfoWindow) {
+                            currentInfoWindow.close();
+                        }
+                        infoWindow.open(map, marker);
+                        currentInfoWindow = infoWindow;
+                        map.panTo(position);
+                    });
+
+                    clientMarkers[client.id] = marker;
+                } else {
+                    // Fallback: Marcador clássico
+                    const marker = new google.maps.Marker({
+                        map,
+                        position,
+                        title: client.name,
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            fillColor: '#2196F3',
+                            fillOpacity: 1,
+                            strokeColor: 'white',
+                            strokeWeight: 2,
+                            scale: 8
+                        }
+                    });
+
+                    marker.addListener('click', () => {
+                        if (currentInfoWindow) {
+                            currentInfoWindow.close();
+                        }
+                        infoWindow.open(map, marker);
+                        currentInfoWindow = infoWindow;
+                        map.panTo(position);
+                    });
+
+                    clientMarkers[client.id] = marker;
+                }
+            } catch (error) {
+                console.error('Erro ao criar marcador:', error);
+            }
+        });
+
+        clientsVisible = true;
+        btnToggleClients.classList.add('active');
+
+        showToast(
+            `${clients.length} cliente${clients.length > 1 ? 's' : ''} exibido${clients.length > 1 ? 's' : ''}`,
+            'Clientes cadastrados mostrados no mapa',
+            'success',
+            3000
+        );
+
+    } catch (error) {
+        console.error('Erro ao carregar clientes:', error);
+        showToast(
+            'Erro ao carregar clientes',
+            'Não foi possível buscar os dados do banco',
+            'error',
+            4000
+        );
+    }
+}
+
+// Ocultar marcadores dos clientes
+function hideClientMarkers() {
+    Object.values(clientMarkers).forEach(marker => {
+        try {
+            if (marker.map !== undefined) {
+                marker.map = null; // AdvancedMarkerElement
+            } else if (marker.setMap) {
+                marker.setMap(null); // Marker clássico
+            }
+        } catch (e) {
+            console.warn('Erro ao remover marcador:', e);
+        }
+    });
+
+    clientMarkers = {};
+    clientsVisible = false;
+    btnToggleClients.classList.remove('active');
+
+    showToast(
+        'Clientes ocultados',
+        'Marcadores removidos do mapa',
+        'info',
+        2000
+    );
+}
 
 // ===========================
 // UPLOAD DE PLANILHA
