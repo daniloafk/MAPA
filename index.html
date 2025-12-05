@@ -6180,7 +6180,7 @@ async function processSpreadsheetData(jsonData) {
             console.warn('Erro ao buscar clientes:', clientsError);
         }
 
-        // 6. Comparar endereços da planilha com clientes cadastrados
+        // 6. Comparar APENAS endereços: Destination Address (planilha) vs address (clientes)
         let matchedCount = 0;
         let notRegisteredCount = 0;
 
@@ -6189,12 +6189,12 @@ async function processSpreadsheetData(jsonData) {
                 const deliveryAddress = (delivery.destination_address || '').toLowerCase().trim();
                 let isMatched = false;
 
+                // Verificar se o endereço da planilha bate com algum cliente cadastrado
                 for (const client of clients) {
                     const clientAddress = (client.address || '').toLowerCase().trim();
 
-                    // Comparação por texto
-                    if (clientAddress && deliveryAddress &&
-                        (clientAddress.includes(deliveryAddress) || deliveryAddress.includes(clientAddress))) {
+                    // Comparação APENAS por endereço (texto)
+                    if (clientAddress && deliveryAddress && clientAddress === deliveryAddress) {
                         isMatched = true;
                         break;
                     }
