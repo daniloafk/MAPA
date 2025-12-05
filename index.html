@@ -1894,17 +1894,8 @@ window.initMap = function () {
             // Otimizações de performance
             disableDefaultUI: false,
             clickableIcons: false, // Desabilita cliques em POIs para melhor performance
-            restriction: {
-                latLngBounds: {
-                    north: -1.0,
-                    south: -1.3,
-                    west: -48.6,
-                    east: -48.3
-                },
-                strictBounds: false
-            },
-            minZoom: 12, // Evita zoom muito distante (performance)
-            maxZoom: 20
+            minZoom: 3, // Permite zoom global
+            maxZoom: 22 // Zoom máximo detalhado
         });
 
         // Inicializar serviços de rota
