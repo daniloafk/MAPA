@@ -6181,8 +6181,9 @@ async function processSpreadsheetData(jsonData) {
         }
 
         // 6. Comparar endereços da planilha com clientes cadastrados (APENAS endereço)
-        let matchedCount = 0;
-        let notRegisteredCount = 0;
+        // Usar Sets para contar ENDEREÇOS ÚNICOS (não pacotes duplicados)
+        const matchedAddresses = new Set();
+        const notRegisteredAddresses = new Set();
 
         // Função para normalizar endereço (remove espaços extras, pontuação, lowercase)
         const normalizeAddress = (address) => {
@@ -6199,50 +6200,60 @@ async function processSpreadsheetData(jsonData) {
         };
 
         if (clients && clients.length > 0) {
-            console.log(`🔍 Iniciando comparação de ${deliveryDataRecords.length} endereços da planilha com ${clients.length} clientes cadastrados...`);
+            console.log(`🔍 Iniciando comparação de ${deliveryDataRecords.length} pacotes da planilha com ${clients.length} clientes cadastrados...`);
 
             for (const delivery of deliveryDataRecords) {
-                // Montar endereço completo da planilha (mesmo formato salvo no banco - 3 linhas)
-                let deliveryFullAddress = delivery.destination_address || '';
-                if (delivery.bairro) {
-                    deliveryFullAddress += `\nBairro: ${delivery.bairro}`;
-                }
-                if (delivery.city && delivery.zipcode) {
-                    deliveryFullAddress += `\n${delivery.city} - ${delivery.zipcode}`;
-                }
+                const deliveryAddress = delivery.destination_address || '';
+                const normalizedDelivery = normalizeAddress(deliveryAddress);
 
-                const normalizedDelivery = normalizeAddress(deliveryFullAddress);
+                // Pular endereços vazios
+                if (!normalizedDelivery) continue;
+
                 let isMatched = false;
 
                 // Verificar se o endereço da planilha bate com algum cliente cadastrado
                 for (const client of clients) {
                     const clientAddress = client.address || '';
-                    const normalizedClient = normalizeAddress(clientAddress);
 
-                    // Comparação com endereço completo (3 linhas: endereço + bairro + cidade/CEP)
+                    // Extrair APENAS a primeira linha do endereço (antes do \n que separa bairro/cidade)
+                    const clientAddressFirstLine = clientAddress.split('\n')[0];
+                    const normalizedClient = normalizeAddress(clientAddressFirstLine);
+
+                    // Comparação APENAS por endereço normalizado (ignora nome, telefone, bairro, cidade, CEP)
                     if (normalizedClient && normalizedDelivery && normalizedClient === normalizedDelivery) {
                         isMatched = true;
-                        console.log(`✅ MATCH encontrado!`);
-                        console.log(`   Planilha: "${deliveryFullAddress.replace(/\n/g, ' | ')}"`);
-                        console.log(`   Cliente:  "${clientAddress.replace(/\n/g, ' | ')}"`);
+
+                        // Adicionar ao Set de endereços cadastrados (não duplica)
+                        if (!matchedAddresses.has(normalizedDelivery)) {
+                            console.log(`✅ MATCH: "${deliveryAddress}" === "${clientAddressFirstLine}"`);
+                            matchedAddresses.add(normalizedDelivery);
+                        }
                         break;
                     }
                 }
 
-                if (!isMatched && delivery.destination_address) {
-                    console.log(`⚠️ NO MATCH: "${deliveryFullAddress.replace(/\n/g, ' | ')}"`);
-                }
-
-                if (isMatched) {
-                    matchedCount++;
-                } else {
-                    notRegisteredCount++;
+                if (!isMatched && deliveryAddress) {
+                    // Adicionar ao Set de endereços não cadastrados (não duplica)
+                    if (!notRegisteredAddresses.has(normalizedDelivery)) {
+                        console.log(`⚠️ NO MATCH: "${deliveryAddress}"`);
+                        notRegisteredAddresses.add(normalizedDelivery);
+                    }
                 }
             }
         } else {
-            // Se não há clientes cadastrados, todos os endereços não estão registrados
-            notRegisteredCount = deliveryDataRecords.length;
+            // Se não há clientes cadastrados, contar endereços únicos da planilha
+            const uniqueAddresses = new Set();
+            deliveryDataRecords.forEach(delivery => {
+                const normalized = normalizeAddress(delivery.destination_address || '');
+                if (normalized) {
+                    uniqueAddresses.add(normalized);
+                }
+            });
+            uniqueAddresses.forEach(addr => notRegisteredAddresses.add(addr));
         }
+
+        const matchedCount = matchedAddresses.size;
+        const notRegisteredCount = notRegisteredAddresses.size;
 
         console.log(`📊 Análise de endereços:`);
         console.log(`   ✅ Cadastrados: ${matchedCount}`);
