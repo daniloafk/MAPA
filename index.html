@@ -971,6 +971,10 @@
         transform: scale(1.1);
     }
 
+    .client-action-btn.navigate-btn:hover {
+        background: #e8f5e9;
+    }
+
     .client-action-btn.edit-btn:hover {
         background: #e3f2fd;
     }
@@ -3253,6 +3257,9 @@ function renderClients(clients) {
                     <span>${escapeHtml(client.name)}</span>
                 </div>
                 <div class="client-actions">
+                    <button class="client-action-btn navigate-btn" data-client-id="${client.id}" title="Navegar até o cliente">
+                        🧭
+                    </button>
                     <button class="client-action-btn edit-btn" data-client-id="${client.id}" title="Editar">
                         ✏️
                     </button>
@@ -3288,6 +3295,18 @@ function renderClients(clients) {
             const client = clients.find(c => c.id === clientId);
             if (client) {
                 showClientDetails(client);
+            }
+        });
+    });
+
+    // Event listeners para botões de navegar
+    document.querySelectorAll('.navigate-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const clientId = btn.getAttribute('data-client-id');
+            const client = clients.find(c => c.id === clientId);
+            if (client) {
+                navigateToClient(client);
             }
         });
     });
@@ -3631,6 +3650,180 @@ function deleteClient(client) {
             }, 300);
         }
     });
+}
+
+// ===========================
+// NAVEGAR ATÉ O CLIENTE
+// ===========================
+
+async function navigateToClient(client) {
+    // Fechar sidebar
+    closeSidebar();
+
+    // Verificar se temos coordenadas do destino
+    let destination = null;
+
+    if (client.latitude && client.longitude) {
+        destination = { lat: client.latitude, lng: client.longitude };
+    } else {
+        // Tentar encontrar no addressDatabase pelo endereço
+        const qrCodeMatch = Object.keys(addressDatabase).find(qr =>
+            client.address && client.address.includes(qr)
+        );
+
+        if (qrCodeMatch && addressDatabase[qrCodeMatch]) {
+            destination = {
+                lat: addressDatabase[qrCodeMatch].latitude,
+                lng: addressDatabase[qrCodeMatch].longitude
+            };
+        }
+    }
+
+    if (!destination) {
+        showToast(
+            '⚠️ Coordenadas não encontradas',
+            'Este cliente não possui coordenadas GPS salvas',
+            'error',
+            4000
+        );
+        return;
+    }
+
+    // Obter localização atual do usuário
+    let userPosition = null;
+    if (userLocationMarker) {
+        if (userLocationMarker.position) {
+            userPosition = userLocationMarker.position;
+        } else if (userLocationMarker.getPosition) {
+            userPosition = userLocationMarker.getPosition();
+        }
+    }
+
+    if (!userPosition) {
+        showToast(
+            '⚠️ Localização não disponível',
+            'Ative a localização GPS para navegar',
+            'error',
+            4000
+        );
+        return;
+    }
+
+    showToast(
+        '🧭 Calculando rota...',
+        `Traçando caminho até ${client.name}`,
+        'info',
+        3000
+    );
+
+    try {
+        // Usar Directions API para rota ponto-a-ponto
+        const directionsService = new google.maps.DirectionsService();
+
+        const request = {
+            origin: userPosition,
+            destination: destination,
+            travelMode: google.maps.TravelMode.DRIVING,
+            optimizeWaypoints: false,
+            language: 'pt-BR',
+            region: 'BR'
+        };
+
+        const result = await directionsService.route(request);
+
+        if (result.status === 'OK') {
+            // Limpar rotas antigas
+            if (window.routePolylines && window.routePolylines.length > 0) {
+                window.routePolylines.forEach(polyline => {
+                    if (polyline.setMap) {
+                        polyline.setMap(null);
+                    }
+                });
+                window.routePolylines = [];
+            }
+
+            // Desenhar nova rota
+            const route = result.routes[0];
+            const leg = route.legs[0];
+
+            // Criar polyline para a rota
+            const polyline = new google.maps.Polyline({
+                path: route.overview_path,
+                geodesic: true,
+                strokeColor: '#4285f4',
+                strokeOpacity: 0.8,
+                strokeWeight: 5,
+                map: map
+            });
+
+            window.routePolylines = [polyline];
+
+            // Ajustar mapa para mostrar toda a rota
+            const bounds = new google.maps.LatLngBounds();
+            bounds.extend(userPosition);
+            bounds.extend(destination);
+            map.fitBounds(bounds);
+
+            // Criar marcador no destino
+            const destinationMarkerDiv = document.createElement('div');
+            destinationMarkerDiv.style.width = '40px';
+            destinationMarkerDiv.style.height = '40px';
+            destinationMarkerDiv.style.background = '#34a853';
+            destinationMarkerDiv.style.border = '3px solid white';
+            destinationMarkerDiv.style.borderRadius = '50%';
+            destinationMarkerDiv.style.display = 'flex';
+            destinationMarkerDiv.style.alignItems = 'center';
+            destinationMarkerDiv.style.justifyContent = 'center';
+            destinationMarkerDiv.style.fontSize = '20px';
+            destinationMarkerDiv.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4)';
+            destinationMarkerDiv.innerHTML = '🎯';
+
+            const destinationMarker = new google.maps.marker.AdvancedMarkerElement({
+                position: destination,
+                map: map,
+                content: destinationMarkerDiv,
+                title: client.name
+            });
+
+            // Remover marcador após 10 segundos
+            setTimeout(() => {
+                if (destinationMarker.map !== undefined) {
+                    destinationMarker.map = null;
+                } else if (destinationMarker.setMap) {
+                    destinationMarker.setMap(null);
+                }
+            }, 10000);
+
+            // Formatar distância e duração
+            const distance = leg.distance.text;
+            const duration = leg.duration.text;
+
+            showToast(
+                `🎯 Rota para ${client.name}`,
+                `📏 Distância: ${distance}\n⏱️ Tempo estimado: ${duration}`,
+                'success',
+                8000
+            );
+
+            console.log('✅ Rota calculada:', {
+                distance: leg.distance,
+                duration: leg.duration,
+                steps: leg.steps.length
+            });
+
+        } else {
+            throw new Error(`Directions API retornou status: ${result.status}`);
+        }
+
+    } catch (error) {
+        console.error('Erro ao calcular rota:', error);
+        showToast(
+            '❌ Erro ao calcular rota',
+            error.message || 'Não foi possível traçar o caminho',
+            'error',
+            5000
+        );
+    }
 }
 
 // Função helper para escape HTML
