@@ -153,6 +153,12 @@
         transition: all 0.2s ease;
         position: relative;
         color: #333;
+        /* Centralizar ícone perfeitamente */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        line-height: 1;
     }
 
     .control-btn:hover {
@@ -3085,6 +3091,12 @@ function activateRouteMode() {
     // Mostrar botão de limpar
     document.getElementById('btnClearRoute').style.display = 'flex';
 
+    // Reativar DirectionsRenderer se necessário
+    if (directionsRenderer && !directionsRenderer.getMap()) {
+        console.log('🔵 Reativando DirectionsRenderer...');
+        directionsRenderer.setMap(map);
+    }
+
     // Obter posição atual do usuário
     let currentPosition;
     if (userLocationMarker) {
@@ -3117,9 +3129,10 @@ function deactivateRouteMode() {
     routeMode = false;
     btnToggleRoute.classList.remove('active');
 
-    // Limpar rota do mapa
+    // Limpar rota do mapa COMPLETAMENTE
     if (directionsRenderer) {
         directionsRenderer.setDirections({routes: []});
+        directionsRenderer.setMap(null);
     }
 
     // Limpar polylines (rotas em segmentos)
@@ -3163,12 +3176,23 @@ function clearAllRoutesAndMarkers() {
     // Esconder botão de limpar
     document.getElementById('btnClearRoute').style.display = 'none';
 
-    // 1. Limpar DirectionsRenderer
+    // 1. Limpar DirectionsRenderer COMPLETAMENTE
     if (directionsRenderer) {
         console.log('🗑️ Limpando DirectionsRenderer...');
         try {
             directionsRenderer.setDirections({routes: []});
             directionsRenderer.setMap(null);
+            directionsRenderer.setPanel(null);
+            // Recriar DirectionsRenderer limpo
+            directionsRenderer = new google.maps.DirectionsRenderer({
+                map: null, // Inicialmente sem mapa
+                suppressMarkers: false,
+                polylineOptions: {
+                    strokeColor: '#4285f4',
+                    strokeWeight: 5,
+                    strokeOpacity: 0.7
+                }
+            });
         } catch (e) {
             console.warn('Erro ao limpar DirectionsRenderer:', e);
         }
