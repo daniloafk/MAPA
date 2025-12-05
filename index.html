@@ -5929,9 +5929,14 @@ let matchedClientsVisible = false;
 
 // Toggle clientes identificados na planilha
 btnShowMatchedClients.addEventListener('click', async () => {
+    console.log('🔘 Botão "Mostrar clientes identificados" clicado');
+    console.log('Estado atual - matchedClientsVisible:', matchedClientsVisible);
+
     if (matchedClientsVisible) {
+        console.log('Ocultando clientes identificados...');
         hideMatchedClientMarkers();
     } else {
+        console.log('Mostrando clientes identificados...');
         await showMatchedClientMarkers();
     }
 });
@@ -5950,17 +5955,23 @@ function normalizeAddressForComparison(address) {
 // Mostrar marcadores dos clientes identificados na planilha
 async function showMatchedClientMarkers() {
     try {
+        console.log('📦 Iniciando busca de clientes identificados...');
+
         // 1. Buscar dados da planilha (delivery_data) do Supabase
+        console.log('1️⃣ Buscando dados da planilha (delivery_data)...');
         const { data: deliveryData, error: deliveryError } = await supabase
             .from('delivery_data')
             .select('*');
 
         if (deliveryError) {
-            console.error('Erro ao buscar delivery_data:', deliveryError);
+            console.error('❌ Erro ao buscar delivery_data:', deliveryError);
             throw deliveryError;
         }
 
+        console.log(`✅ Encontrados ${deliveryData?.length || 0} registros na planilha`);
+
         if (!deliveryData || deliveryData.length === 0) {
+            console.warn('⚠️ Nenhum dado encontrado na tabela delivery_data');
             showToast(
                 'Nenhuma planilha carregada',
                 'Faça upload de uma planilha primeiro',
@@ -5971,14 +5982,21 @@ async function showMatchedClientMarkers() {
         }
 
         // 2. Buscar todos os clientes do banco
+        console.log('2️⃣ Buscando clientes cadastrados...');
         const { data: clients, error: clientsError } = await supabase
             .from('clients')
             .select('*')
             .order('created_at', { ascending: true });
 
-        if (clientsError) throw clientsError;
+        if (clientsError) {
+            console.error('❌ Erro ao buscar clients:', clientsError);
+            throw clientsError;
+        }
+
+        console.log(`✅ Encontrados ${clients?.length || 0} clientes cadastrados`);
 
         if (!clients || clients.length === 0) {
+            console.warn('⚠️ Nenhum cliente cadastrado');
             showToast(
                 'Nenhum cliente cadastrado',
                 'Não há clientes para exibir',
@@ -5989,24 +6007,41 @@ async function showMatchedClientMarkers() {
         }
 
         // 3. Criar Set de endereços da planilha (normalizados)
+        console.log('3️⃣ Normalizando endereços da planilha...');
         const deliveryAddresses = new Set();
         deliveryData.forEach(delivery => {
             const addr = delivery.destination_address || '';
             if (addr) {
-                deliveryAddresses.add(normalizeAddressForComparison(addr));
+                const normalized = normalizeAddressForComparison(addr);
+                deliveryAddresses.add(normalized);
+                console.log(`   📍 Planilha: "${addr}" → normalizado: "${normalized}"`);
             }
         });
 
+        console.log(`✅ Total de ${deliveryAddresses.size} endereços únicos na planilha`);
+
         // 4. Filtrar apenas clientes cujos endereços batem com a planilha
+        console.log('4️⃣ Comparando endereços...');
         const matchedClients = clients.filter(client => {
             const clientAddress = client.address || '';
             const clientAddressFirstLine = clientAddress.split('\n')[0];
             const normalizedClient = normalizeAddressForComparison(clientAddressFirstLine);
 
-            return deliveryAddresses.has(normalizedClient);
+            const hasMatch = deliveryAddresses.has(normalizedClient);
+
+            if (hasMatch) {
+                console.log(`   ✅ MATCH: Cliente "${client.name}" - "${clientAddressFirstLine}"`);
+            } else {
+                console.log(`   ❌ NO MATCH: Cliente "${client.name}" - "${clientAddressFirstLine}" (normalizado: "${normalizedClient}")`);
+            }
+
+            return hasMatch;
         });
 
+        console.log(`✅ Total de ${matchedClients.length} clientes identificados na planilha`);
+
         if (matchedClients.length === 0) {
+            console.warn('⚠️ Nenhum cliente corresponde aos endereços da planilha');
             showToast(
                 'Nenhum cliente identificado',
                 'Os endereços da planilha não correspondem aos clientes cadastrados',
@@ -6249,150 +6284,10 @@ function closeUploadModal() {
     document.body.style.overflow = '';
 }
 
-// Função para resetar/limpar planilha
-async function resetSpreadsheet() {
-    // Criar modal de confirmação customizado
-    const confirmDiv = document.createElement('div');
-    confirmDiv.className = 'modal-overlay';
-    confirmDiv.style.zIndex = '10000';
-    confirmDiv.innerHTML = `
-        <div class="modal-container" style="max-width: 400px;">
-            <div class="modal-body">
-                <div style="text-align: center; padding: 20px;">
-                    <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
-                    <div style="font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #333;">
-                        Limpar planilha do dia?
-                    </div>
-                    <div style="font-size: 14px; color: #666; margin-bottom: 24px;">
-                        Todos os dados da planilha serão removidos. Esta ação não pode ser desfeita.
-                    </div>
-                    <div style="display: flex; gap: 12px; justify-content: center;">
-                        <button class="btn btn-secondary" id="confirm-cancel" style="flex: 1;">Cancelar</button>
-                        <button class="btn btn-primary" id="confirm-reset" style="flex: 1; background: #ea4335;">Limpar</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(confirmDiv);
-    confirmDiv.classList.add('active');
-
-    return new Promise((resolve) => {
-        document.getElementById('confirm-cancel').addEventListener('click', () => {
-            confirmDiv.remove();
-            resolve(false);
-        });
-
-        document.getElementById('confirm-reset').addEventListener('click', async () => {
-            confirmDiv.remove();
-
-            try {
-                // Mostrar loading
-                uploadArea.style.display = 'none';
-                uploadProgress.style.display = 'block';
-                progressBar.style.width = '50%';
-                progressText.textContent = 'Limpando dados da planilha...';
-
-                // 1. Limpar tabela delivery_data no Supabase
-                const { error: deleteError } = await supabase
-                    .from('delivery_data')
-                    .delete()
-                    .neq('id', '00000000-0000-0000-0000-000000000000');
-
-                if (deleteError) {
-                    console.error('Erro ao limpar delivery_data:', deleteError);
-                    throw new Error('Não foi possível limpar os dados da planilha');
-                }
-
-                progressBar.style.width = '75%';
-                progressText.textContent = 'Limpando marcadores do mapa...';
-
-                // 2. Limpar rotas do mapa
-                if (typeof currentRoute !== 'undefined' && currentRoute) {
-                    currentRoute.setMap(null);
-                    currentRoute = null;
-                }
-                if (typeof directionsRenderer !== 'undefined' && directionsRenderer) {
-                    directionsRenderer.setMap(null);
-                }
-                if (typeof window.routePolylines !== 'undefined' && window.routePolylines) {
-                    window.routePolylines.forEach(polyline => polyline.setMap(null));
-                    window.routePolylines = [];
-                }
-
-                // 3. Limpar marcadores de entrega (vermelhos)
-                if (typeof deliveryMarkers !== 'undefined') {
-                    Object.values(deliveryMarkers).forEach(marker => {
-                        try {
-                            if (marker.map !== undefined) {
-                                marker.map = null;
-                            } else if (marker.setMap) {
-                                marker.setMap(null);
-                            }
-                        } catch (e) {
-                            console.warn('Erro ao remover marcador:', e);
-                        }
-                    });
-                    deliveryMarkers = {};
-                }
-
-                // 4. Ocultar marcadores de clientes identificados (verdes) se estiverem visíveis
-                if (matchedClientsVisible) {
-                    hideMatchedClientMarkers();
-                }
-
-                progressBar.style.width = '100%';
-                progressText.textContent = 'Concluído!';
-
-                // Mostrar resultado
-                setTimeout(() => {
-                    uploadProgress.style.display = 'none';
-                    uploadResult.style.display = 'block';
-                    resultIcon.textContent = '✅';
-                    resultText.textContent = 'Planilha limpa com sucesso!';
-                    resultText.style.color = '#4caf50';
-                    resultDetails.innerHTML = 'Sistema pronto para nova planilha';
-
-                    setTimeout(() => {
-                        closeUploadModal();
-                        showToast(
-                            'Planilha limpa',
-                            'Sistema resetado e pronto para nova planilha',
-                            'success',
-                            4000
-                        );
-                    }, 2000);
-                }, 500);
-
-                resolve(true);
-
-            } catch (error) {
-                console.error('Erro ao resetar planilha:', error);
-
-                uploadProgress.style.display = 'none';
-                uploadResult.style.display = 'block';
-                resultIcon.textContent = '❌';
-                resultText.textContent = 'Erro ao limpar planilha';
-                resultText.style.color = '#ea4335';
-                resultDetails.textContent = error.message || 'Tente novamente';
-
-                showToast(
-                    'Erro ao limpar',
-                    'Não foi possível resetar a planilha',
-                    'error',
-                    4000
-                );
-
-                resolve(false);
-            }
-        });
-    });
-}
-
 // Event listeners do modal
 btnUploadSpreadsheet.addEventListener('click', openUploadModal);
 btnModalUploadClose.addEventListener('click', closeUploadModal);
-btnUploadCancel.addEventListener('click', resetSpreadsheet);
+btnUploadCancel.addEventListener('click', closeUploadModal);
 
 modalUploadSpreadsheet.addEventListener('click', (e) => {
     if (e.target === modalUploadSpreadsheet) {
