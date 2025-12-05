@@ -2970,10 +2970,29 @@ form.addEventListener('submit', async (e) => {
         created_at: new Date().toISOString()
     };
 
-    // Adicionar coordenadas se disponíveis (QR code encontrado no banco)
-    if (scannedLatLng) {
-        clientData.latitude = scannedLatLng.latitude;
-        clientData.longitude = scannedLatLng.longitude;
+    // SEMPRE adicionar coordenadas da localização atual do usuário
+    let currentPosition = null;
+    if (userLocationMarker) {
+        if (userLocationMarker.position) {
+            currentPosition = userLocationMarker.position;
+        } else if (userLocationMarker.getPosition) {
+            currentPosition = userLocationMarker.getPosition();
+        }
+    }
+
+    if (currentPosition) {
+        clientData.latitude = currentPosition.lat;
+        clientData.longitude = currentPosition.lng;
+        console.log('📍 Salvando localização atual:', currentPosition);
+    } else {
+        // Fallback: usar coordenadas do QR code se disponíveis
+        if (scannedLatLng) {
+            clientData.latitude = scannedLatLng.latitude;
+            clientData.longitude = scannedLatLng.longitude;
+            console.log('📍 Usando coordenadas do QR code:', scannedLatLng);
+        } else {
+            console.warn('⚠️ Nenhuma coordenada disponível para salvar');
+        }
     }
 
     // Validação
@@ -3224,6 +3243,62 @@ function showClientDetails(client) {
         // Centralizar no endereço encontrado
         map.setCenter(targetPosition);
         map.setZoom(18);
+
+        // Criar marcador temporário para mostrar a localização do cliente
+        const clientMarkerDiv = document.createElement('div');
+        clientMarkerDiv.style.width = '40px';
+        clientMarkerDiv.style.height = '40px';
+        clientMarkerDiv.style.background = '#4285f4';
+        clientMarkerDiv.style.border = '3px solid white';
+        clientMarkerDiv.style.borderRadius = '50%';
+        clientMarkerDiv.style.boxShadow = '0 2px 10px rgba(0,0,0,0.4)';
+        clientMarkerDiv.style.display = 'flex';
+        clientMarkerDiv.style.alignItems = 'center';
+        clientMarkerDiv.style.justifyContent = 'center';
+        clientMarkerDiv.style.fontSize = '20px';
+        clientMarkerDiv.innerHTML = '👤';
+
+        let tempMarker;
+        try {
+            if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+                tempMarker = new google.maps.marker.AdvancedMarkerElement({
+                    map,
+                    position: targetPosition,
+                    content: clientMarkerDiv,
+                    title: client.name
+                });
+            } else {
+                tempMarker = new google.maps.Marker({
+                    map,
+                    position: targetPosition,
+                    title: client.name,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 12,
+                        fillColor: '#4285f4',
+                        fillOpacity: 1,
+                        strokeColor: 'white',
+                        strokeWeight: 3
+                    },
+                    label: {
+                        text: '👤',
+                        color: 'white',
+                        fontSize: '16px'
+                    }
+                });
+            }
+
+            // Remover marcador temporário após 5 segundos
+            setTimeout(() => {
+                if (tempMarker.map !== undefined) {
+                    tempMarker.map = null;
+                } else if (tempMarker.setMap) {
+                    tempMarker.setMap(null);
+                }
+            }, 5000);
+        } catch (error) {
+            console.warn('Erro ao criar marcador temporário:', error);
+        }
 
         // Destacar o marcador correspondente (apenas se estiver no modo de rota)
         if (qrCodeMatch && deliveryMarkers[qrCodeMatch]) {
