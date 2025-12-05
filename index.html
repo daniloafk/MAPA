@@ -918,12 +918,21 @@
         padding: 16px;
         cursor: pointer;
         transition: all 0.2s ease;
+        outline: none;
     }
 
     .client-card:hover {
         border-color: var(--primary-color);
         box-shadow: 0 2px 8px rgba(66, 133, 244, 0.15);
         transform: translateY(-2px);
+    }
+
+    .client-card:focus,
+    .client-card:active,
+    .client-card:focus-visible {
+        outline: none !important;
+        border-color: #e0e0e0 !important;
+        box-shadow: none !important;
     }
 
     .client-card-header {
@@ -3448,7 +3457,7 @@ function renderClients(clients) {
     });
 
     // Event listeners para botões de telefone (ligação e WhatsApp)
-    // Prevenir propagação e seleção de texto
+    // Forçar remoção de foco quando volta do app externo
     document.querySelectorAll('.phone-action-btn').forEach(btn => {
         // Prevenir propagação em todos os eventos de toque
         btn.addEventListener('touchstart', function(e) {
@@ -3457,10 +3466,61 @@ function renderClients(clients) {
 
         btn.addEventListener('touchend', function(e) {
             e.stopPropagation();
+
+            // Forçar remoção de foco imediatamente
+            const element = this;
+            setTimeout(() => {
+                // Criar input invisível para "roubar" o foco
+                const tempInput = document.createElement('input');
+                tempInput.style.position = 'absolute';
+                tempInput.style.opacity = '0';
+                tempInput.style.height = '0';
+                tempInput.style.width = '0';
+                tempInput.style.left = '-9999px';
+                tempInput.setAttribute('tabindex', '-1');
+                document.body.appendChild(tempInput);
+
+                // Transferir foco para o elemento temporário
+                tempInput.focus();
+
+                // Remover foco do botão
+                element.blur();
+
+                // Remover elemento temporário
+                setTimeout(() => {
+                    tempInput.blur();
+                    if (document.body.contains(tempInput)) {
+                        document.body.removeChild(tempInput);
+                    }
+                }, 10);
+            }, 50);
         });
 
         btn.addEventListener('click', function(e) {
             e.stopPropagation();
+
+            // Mesmo processo para click
+            const element = this;
+            setTimeout(() => {
+                const tempInput = document.createElement('input');
+                tempInput.style.position = 'absolute';
+                tempInput.style.opacity = '0';
+                tempInput.style.height = '0';
+                tempInput.style.width = '0';
+                tempInput.style.left = '-9999px';
+                tempInput.setAttribute('tabindex', '-1');
+                document.body.appendChild(tempInput);
+
+                tempInput.focus();
+                element.blur();
+
+                setTimeout(() => {
+                    tempInput.blur();
+                    if (document.body.contains(tempInput)) {
+                        document.body.removeChild(tempInput);
+                    }
+                }, 10);
+            }, 50);
         });
 
         // Prevenir seleção de texto
@@ -3476,6 +3536,36 @@ function renderClients(clients) {
             e.stopPropagation();
             return false;
         });
+    });
+
+    // Remover foco dos cards quando a página recebe foco novamente
+    // (quando usuário volta do app de telefone/WhatsApp)
+    window.addEventListener('focus', function() {
+        // Remover foco de todos os botões de telefone
+        document.querySelectorAll('.phone-action-btn').forEach(btn => {
+            btn.blur();
+        });
+
+        // Remover foco dos cards de cliente
+        document.querySelectorAll('.client-card').forEach(card => {
+            card.blur();
+        });
+
+        // Criar input temporário para limpar qualquer foco residual
+        const tempInput = document.createElement('input');
+        tempInput.style.position = 'absolute';
+        tempInput.style.opacity = '0';
+        tempInput.style.height = '0';
+        tempInput.style.width = '0';
+        tempInput.style.left = '-9999px';
+        document.body.appendChild(tempInput);
+        tempInput.focus();
+        tempInput.blur();
+        setTimeout(() => {
+            if (document.body.contains(tempInput)) {
+                document.body.removeChild(tempInput);
+            }
+        }, 100);
     });
 }
 
