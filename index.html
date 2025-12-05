@@ -926,14 +926,57 @@
         transform: translateY(-2px);
     }
 
+    .client-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 8px;
+        gap: 8px;
+    }
+
     .client-name {
         font-size: 16px;
         font-weight: 600;
         color: #333;
-        margin-bottom: 8px;
         display: flex;
         align-items: center;
         gap: 8px;
+        flex: 1;
+    }
+
+    .client-actions {
+        display: flex;
+        gap: 4px;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+
+    .client-card:hover .client-actions {
+        opacity: 1;
+    }
+
+    .client-action-btn {
+        background: none;
+        border: none;
+        padding: 4px 8px;
+        cursor: pointer;
+        font-size: 16px;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        line-height: 1;
+    }
+
+    .client-action-btn:hover {
+        background: #f0f0f0;
+        transform: scale(1.1);
+    }
+
+    .client-action-btn.edit-btn:hover {
+        background: #e3f2fd;
+    }
+
+    .client-action-btn.delete-btn:hover {
+        background: #ffebee;
     }
 
     .client-info {
@@ -2700,6 +2743,17 @@ function resetForm() {
     scannedQRCode = '';
     scannedLatLng = null;
     stopCamera(); // Parar câmera ao fechar modal
+
+    // Resetar modo de edição
+    isEditMode = false;
+    editingClientId = null;
+    btnSave.textContent = 'Salvar Cliente';
+
+    // Restaurar título do scanner
+    const scannerTitle = document.querySelector('.scanner-title span');
+    if (scannerTitle) {
+        scannerTitle.textContent = '📸 Aponte a câmera para o QR Code';
+    }
 }
 
 // Event listeners do modal
@@ -3021,22 +3075,42 @@ form.addEventListener('submit', async (e) => {
     btnSave.disabled = true;
 
     try {
-        // Salvar no Supabase
-        const { data, error } = await supabase
-            .from('clients')
-            .insert([clientData])
-            .select();
+        if (isEditMode && editingClientId) {
+            // MODO EDIÇÃO - Atualizar cliente existente
+            const { data, error } = await supabase
+                .from('clients')
+                .update(clientData)
+                .eq('id', editingClientId)
+                .select();
 
-        if (error) throw error;
+            if (error) throw error;
 
-        console.log('Cliente salvo:', data);
+            console.log('Cliente atualizado:', data);
 
-        showToast(
-            'Cliente adicionado!',
-            `${clientData.name} foi cadastrado com sucesso`,
-            'success',
-            4000
-        );
+            showToast(
+                'Cliente atualizado!',
+                `${clientData.name} foi atualizado com sucesso`,
+                'success',
+                4000
+            );
+        } else {
+            // MODO CRIAÇÃO - Inserir novo cliente
+            const { data, error } = await supabase
+                .from('clients')
+                .insert([clientData])
+                .select();
+
+            if (error) throw error;
+
+            console.log('Cliente salvo:', data);
+
+            showToast(
+                'Cliente adicionado!',
+                `${clientData.name} foi cadastrado com sucesso`,
+                'success',
+                4000
+            );
+        }
 
         // Atualizar lista de clientes no sidebar
         await loadClients();
@@ -3173,9 +3247,19 @@ function renderClients(clients) {
 
     const clientsHTML = clients.map(client => `
         <div class="client-card" data-client-id="${client.id}">
-            <div class="client-name">
-                <span>👤</span>
-                <span>${escapeHtml(client.name)}</span>
+            <div class="client-card-header">
+                <div class="client-name">
+                    <span>👤</span>
+                    <span>${escapeHtml(client.name)}</span>
+                </div>
+                <div class="client-actions">
+                    <button class="client-action-btn edit-btn" data-client-id="${client.id}" title="Editar">
+                        ✏️
+                    </button>
+                    <button class="client-action-btn delete-btn" data-client-id="${client.id}" title="Excluir">
+                        🗑️
+                    </button>
+                </div>
             </div>
             ${client.phone ? `
                 <div class="client-info">
@@ -3194,11 +3278,40 @@ function renderClients(clients) {
 
     // Adicionar event listeners aos cards
     document.querySelectorAll('.client-card').forEach(card => {
-        card.addEventListener('click', () => {
+        card.addEventListener('click', (e) => {
+            // Não abrir detalhes se clicou em um botão de ação
+            if (e.target.closest('.client-action-btn')) {
+                return;
+            }
+
             const clientId = card.getAttribute('data-client-id');
             const client = clients.find(c => c.id === clientId);
             if (client) {
                 showClientDetails(client);
+            }
+        });
+    });
+
+    // Event listeners para botões de editar
+    document.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const clientId = btn.getAttribute('data-client-id');
+            const client = clients.find(c => c.id === clientId);
+            if (client) {
+                editClient(client);
+            }
+        });
+    });
+
+    // Event listeners para botões de excluir
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const clientId = btn.getAttribute('data-client-id');
+            const client = clients.find(c => c.id === clientId);
+            if (client) {
+                deleteClient(client);
             }
         });
     });
@@ -3349,6 +3462,175 @@ function showClientDetails(client) {
             5000
         );
     }
+}
+
+// ===========================
+// EDITAR CLIENTE
+// ===========================
+
+let isEditMode = false;
+let editingClientId = null;
+
+function editClient(client) {
+    isEditMode = true;
+    editingClientId = client.id;
+
+    // Fechar sidebar antes de abrir modal
+    closeSidebar();
+
+    // Abrir modal
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    // Preencher campos com dados atuais
+    inputName.value = client.name || '';
+    inputPhone.value = client.phone || '';
+
+    // Mostrar endereço
+    scannedAddress = client.address || '';
+    addressText.textContent = scannedAddress;
+    if (scannedAddress) {
+        addressDisplay.classList.add('active');
+    }
+
+    // Salvar coordenadas existentes
+    if (client.latitude && client.longitude) {
+        scannedLatLng = {
+            latitude: client.latitude,
+            longitude: client.longitude
+        };
+    }
+
+    // Trocar texto do botão
+    btnSave.textContent = 'Atualizar Cliente';
+
+    // Modificar o título do scanner
+    const scannerTitle = document.querySelector('.scanner-title span');
+    if (scannerTitle) {
+        scannerTitle.textContent = '✏️ Editando Cliente';
+    }
+
+    // Focar no nome
+    setTimeout(() => {
+        inputName.focus();
+        inputName.select();
+    }, 300);
+}
+
+// ===========================
+// EXCLUIR CLIENTE
+// ===========================
+
+function deleteClient(client) {
+    // Criar modal de confirmação customizado
+    const confirmModal = document.createElement('div');
+    confirmModal.className = 'modal-overlay';
+    confirmModal.style.zIndex = '10002';
+    confirmModal.innerHTML = `
+        <div class="modal-container" style="max-width: 400px;">
+            <div class="modal-body" style="padding: 24px;">
+                <h3 style="margin: 0 0 16px 0; color: #ea4335; font-size: 20px;">
+                    🗑️ Confirmar Exclusão
+                </h3>
+                <p style="margin: 0 0 8px 0; color: #333; font-size: 16px;">
+                    Deseja realmente excluir este cliente?
+                </p>
+                <div style="background: #f5f5f5; padding: 12px; border-radius: 8px; margin-top: 12px;">
+                    <p style="margin: 0 0 4px 0; font-weight: 600; color: #333;">
+                        ${escapeHtml(client.name)}
+                    </p>
+                    <p style="margin: 0; font-size: 14px; color: #666;">
+                        ${client.phone ? '📞 ' + escapeHtml(client.phone) : ''}
+                    </p>
+                </div>
+                <p style="margin: 16px 0 0 0; font-size: 13px; color: #999;">
+                    Esta ação não pode ser desfeita.
+                </p>
+            </div>
+            <div class="form-footer">
+                <button type="button" class="btn btn-secondary" id="btn-confirm-cancel">
+                    Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="btn-confirm-delete" style="background: #ea4335;">
+                    Excluir
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(confirmModal);
+
+    // Animar entrada
+    setTimeout(() => {
+        confirmModal.classList.add('active');
+    }, 10);
+
+    // Botão Cancelar
+    const btnCancel = confirmModal.querySelector('#btn-confirm-cancel');
+    btnCancel.addEventListener('click', () => {
+        confirmModal.classList.remove('active');
+        setTimeout(() => {
+            confirmModal.remove();
+        }, 300);
+    });
+
+    // Botão Excluir
+    const btnDelete = confirmModal.querySelector('#btn-confirm-delete');
+    btnDelete.addEventListener('click', async () => {
+        btnDelete.classList.add('loading');
+        btnDelete.disabled = true;
+        btnDelete.textContent = 'Excluindo...';
+
+        try {
+            // Excluir do Supabase
+            const { error } = await supabase
+                .from('clients')
+                .delete()
+                .eq('id', client.id);
+
+            if (error) throw error;
+
+            console.log('Cliente excluído:', client.id);
+
+            showToast(
+                'Cliente excluído!',
+                `${client.name} foi removido com sucesso`,
+                'success',
+                3000
+            );
+
+            // Fechar modal de confirmação
+            confirmModal.classList.remove('active');
+            setTimeout(() => {
+                confirmModal.remove();
+            }, 300);
+
+            // Atualizar lista de clientes
+            await loadClients();
+
+        } catch (error) {
+            console.error('Erro ao excluir cliente:', error);
+            showToast(
+                'Erro ao excluir',
+                error.message || 'Não foi possível excluir o cliente',
+                'error',
+                5000
+            );
+            btnDelete.classList.remove('loading');
+            btnDelete.disabled = false;
+            btnDelete.textContent = 'Excluir';
+        }
+    });
+
+    // Fechar ao clicar fora
+    confirmModal.addEventListener('click', (e) => {
+        if (e.target === confirmModal) {
+            confirmModal.classList.remove('active');
+            setTimeout(() => {
+                confirmModal.remove();
+            }, 300);
+        }
+    });
 }
 
 // Função helper para escape HTML
