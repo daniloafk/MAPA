@@ -1024,22 +1024,26 @@
         height: 38px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.15);
         outline: none;
+        -webkit-tap-highlight-color: transparent;
     }
 
-    .phone-action-btn:focus {
+    .phone-action-btn:focus,
+    .phone-action-btn:focus-visible,
+    .phone-action-btn:focus-within {
         outline: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.15);
     }
 
     .phone-action-btn svg {
         width: 20px;
         height: 20px;
-    }
-
-    .phone-action-btn svg {
         transition: all 0.2s ease;
+        pointer-events: none;
     }
 
-    .phone-action-btn.call-btn {
+    .phone-action-btn.call-btn,
+    .phone-action-btn.call-btn:link,
+    .phone-action-btn.call-btn:visited {
         background: #2196F3;
     }
 
@@ -1049,7 +1053,19 @@
         box-shadow: 0 3px 6px rgba(33,150,243,0.4);
     }
 
-    .phone-action-btn.whatsapp-btn {
+    .phone-action-btn.call-btn:active {
+        background: #2196F3;
+        transform: scale(0.95);
+    }
+
+    .phone-action-btn.call-btn:focus {
+        background: #2196F3;
+        transform: scale(1);
+    }
+
+    .phone-action-btn.whatsapp-btn,
+    .phone-action-btn.whatsapp-btn:link,
+    .phone-action-btn.whatsapp-btn:visited {
         background: #25D366;
     }
 
@@ -1059,8 +1075,14 @@
         box-shadow: 0 3px 6px rgba(37,211,102,0.4);
     }
 
-    .phone-action-btn:active {
+    .phone-action-btn.whatsapp-btn:active {
+        background: #25D366;
         transform: scale(0.95);
+    }
+
+    .phone-action-btn.whatsapp-btn:focus {
+        background: #25D366;
+        transform: scale(1);
     }
 
     .empty-state {
