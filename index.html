@@ -6230,9 +6230,6 @@ const resultIcon = document.getElementById('result-icon');
 const resultText = document.getElementById('result-text');
 const resultDetails = document.getElementById('result-details');
 
-// Variável para armazenar o timeout de fechamento automático
-let uploadModalAutoCloseTimeout = null;
-
 // Abrir modal de upload
 function openUploadModal() {
     modalUploadSpreadsheet.classList.add('active');
@@ -6248,20 +6245,154 @@ function openUploadModal() {
 
 // Fechar modal de upload
 function closeUploadModal() {
-    // Cancelar timeout de fechamento automático se existir
-    if (uploadModalAutoCloseTimeout) {
-        clearTimeout(uploadModalAutoCloseTimeout);
-        uploadModalAutoCloseTimeout = null;
-    }
-
     modalUploadSpreadsheet.classList.remove('active');
     document.body.style.overflow = '';
+}
+
+// Função para resetar/limpar planilha
+async function resetSpreadsheet() {
+    // Criar modal de confirmação customizado
+    const confirmDiv = document.createElement('div');
+    confirmDiv.className = 'modal-overlay';
+    confirmDiv.style.zIndex = '10000';
+    confirmDiv.innerHTML = `
+        <div class="modal-container" style="max-width: 400px;">
+            <div class="modal-body">
+                <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+                    <div style="font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #333;">
+                        Limpar planilha do dia?
+                    </div>
+                    <div style="font-size: 14px; color: #666; margin-bottom: 24px;">
+                        Todos os dados da planilha serão removidos. Esta ação não pode ser desfeita.
+                    </div>
+                    <div style="display: flex; gap: 12px; justify-content: center;">
+                        <button class="btn btn-secondary" id="confirm-cancel" style="flex: 1;">Cancelar</button>
+                        <button class="btn btn-primary" id="confirm-reset" style="flex: 1; background: #ea4335;">Limpar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(confirmDiv);
+    confirmDiv.classList.add('active');
+
+    return new Promise((resolve) => {
+        document.getElementById('confirm-cancel').addEventListener('click', () => {
+            confirmDiv.remove();
+            resolve(false);
+        });
+
+        document.getElementById('confirm-reset').addEventListener('click', async () => {
+            confirmDiv.remove();
+
+            try {
+                // Mostrar loading
+                uploadArea.style.display = 'none';
+                uploadProgress.style.display = 'block';
+                progressBar.style.width = '50%';
+                progressText.textContent = 'Limpando dados da planilha...';
+
+                // 1. Limpar tabela delivery_data no Supabase
+                const { error: deleteError } = await supabase
+                    .from('delivery_data')
+                    .delete()
+                    .neq('id', '00000000-0000-0000-0000-000000000000');
+
+                if (deleteError) {
+                    console.error('Erro ao limpar delivery_data:', deleteError);
+                    throw new Error('Não foi possível limpar os dados da planilha');
+                }
+
+                progressBar.style.width = '75%';
+                progressText.textContent = 'Limpando marcadores do mapa...';
+
+                // 2. Limpar rotas do mapa
+                if (typeof currentRoute !== 'undefined' && currentRoute) {
+                    currentRoute.setMap(null);
+                    currentRoute = null;
+                }
+                if (typeof directionsRenderer !== 'undefined' && directionsRenderer) {
+                    directionsRenderer.setMap(null);
+                }
+                if (typeof window.routePolylines !== 'undefined' && window.routePolylines) {
+                    window.routePolylines.forEach(polyline => polyline.setMap(null));
+                    window.routePolylines = [];
+                }
+
+                // 3. Limpar marcadores de entrega (vermelhos)
+                if (typeof deliveryMarkers !== 'undefined') {
+                    Object.values(deliveryMarkers).forEach(marker => {
+                        try {
+                            if (marker.map !== undefined) {
+                                marker.map = null;
+                            } else if (marker.setMap) {
+                                marker.setMap(null);
+                            }
+                        } catch (e) {
+                            console.warn('Erro ao remover marcador:', e);
+                        }
+                    });
+                    deliveryMarkers = {};
+                }
+
+                // 4. Ocultar marcadores de clientes identificados (verdes) se estiverem visíveis
+                if (matchedClientsVisible) {
+                    hideMatchedClientMarkers();
+                }
+
+                progressBar.style.width = '100%';
+                progressText.textContent = 'Concluído!';
+
+                // Mostrar resultado
+                setTimeout(() => {
+                    uploadProgress.style.display = 'none';
+                    uploadResult.style.display = 'block';
+                    resultIcon.textContent = '✅';
+                    resultText.textContent = 'Planilha limpa com sucesso!';
+                    resultText.style.color = '#4caf50';
+                    resultDetails.innerHTML = 'Sistema pronto para nova planilha';
+
+                    setTimeout(() => {
+                        closeUploadModal();
+                        showToast(
+                            'Planilha limpa',
+                            'Sistema resetado e pronto para nova planilha',
+                            'success',
+                            4000
+                        );
+                    }, 2000);
+                }, 500);
+
+                resolve(true);
+
+            } catch (error) {
+                console.error('Erro ao resetar planilha:', error);
+
+                uploadProgress.style.display = 'none';
+                uploadResult.style.display = 'block';
+                resultIcon.textContent = '❌';
+                resultText.textContent = 'Erro ao limpar planilha';
+                resultText.style.color = '#ea4335';
+                resultDetails.textContent = error.message || 'Tente novamente';
+
+                showToast(
+                    'Erro ao limpar',
+                    'Não foi possível resetar a planilha',
+                    'error',
+                    4000
+                );
+
+                resolve(false);
+            }
+        });
+    });
 }
 
 // Event listeners do modal
 btnUploadSpreadsheet.addEventListener('click', openUploadModal);
 btnModalUploadClose.addEventListener('click', closeUploadModal);
-btnUploadCancel.addEventListener('click', closeUploadModal);
+btnUploadCancel.addEventListener('click', resetSpreadsheet);
 
 modalUploadSpreadsheet.addEventListener('click', (e) => {
     if (e.target === modalUploadSpreadsheet) {
@@ -6360,7 +6491,7 @@ async function handleFile(file) {
             resultDetails.innerHTML = detailsHTML;
 
             // Fechar modal após 5 segundos (tempo maior para ler as estatísticas)
-            uploadModalAutoCloseTimeout = setTimeout(() => {
+            setTimeout(() => {
                 closeUploadModal();
 
                 // Recarregar dados
