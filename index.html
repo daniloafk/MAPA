@@ -2204,19 +2204,55 @@ function addDeliveryMarkers() {
             markerDiv.style.transform = 'scale(1)';
         });
 
-        // Criar InfoWindow para este marcador
+        // Criar InfoWindow customizada para este marcador
+        const infoWindowContent = document.createElement('div');
+        infoWindowContent.style.padding = '8px';
+        infoWindowContent.style.maxWidth = '200px';
+
+        const headerDiv = document.createElement('div');
+        headerDiv.style.display = 'flex';
+        headerDiv.style.justifyContent = 'space-between';
+        headerDiv.style.alignItems = 'center';
+        headerDiv.style.marginBottom = '4px';
+
+        const titleDiv = document.createElement('div');
+        titleDiv.style.fontWeight = 'bold';
+        titleDiv.style.color = '#EA4335';
+        titleDiv.textContent = `📍 Parada ${markerNumber}`;
+
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '×';
+        closeBtn.style.background = 'none';
+        closeBtn.style.border = 'none';
+        closeBtn.style.fontSize = '20px';
+        closeBtn.style.color = '#666';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.style.padding = '0';
+        closeBtn.style.marginLeft = '12px';
+        closeBtn.style.lineHeight = '1';
+        closeBtn.style.fontWeight = 'normal';
+        closeBtn.title = 'Fechar';
+        closeBtn.addEventListener('click', () => {
+            infoWindow.close();
+            currentInfoWindow = null;
+        });
+
+        headerDiv.appendChild(titleDiv);
+        headerDiv.appendChild(closeBtn);
+
+        const addressDiv = document.createElement('div');
+        addressDiv.style.fontSize = '13px';
+        addressDiv.style.color = '#333';
+        addressDiv.style.lineHeight = '1.4';
+        addressDiv.textContent = data.address;
+
+        infoWindowContent.appendChild(headerDiv);
+        infoWindowContent.appendChild(addressDiv);
+
         const infoWindow = new google.maps.InfoWindow({
-            content: `
-                <div style="padding: 8px; max-width: 200px;">
-                    <div style="font-weight: bold; color: #EA4335; margin-bottom: 4px;">
-                        📍 Parada ${markerNumber}
-                    </div>
-                    <div style="font-size: 13px; color: #333; line-height: 1.4;">
-                        ${data.address}
-                    </div>
-                </div>
-            `,
-            maxWidth: 250
+            content: infoWindowContent,
+            maxWidth: 250,
+            disableAutoPan: false
         });
 
         try {
