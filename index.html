@@ -1809,6 +1809,11 @@ let markerCluster = null; // Cluster de marcadores para melhor performance
 let lastPositionUpdate = 0; // Timestamp da última atualização de posição
 let updateThrottle = 1000; // Atualizar posição no máximo a cada 1 segundo (performance)
 
+// IMPORTANTE: Inicializar array de polylines globalmente
+if (!window.routePolylines) {
+    window.routePolylines = [];
+}
+
 const MAP_ID = "ebb7ca4503045feabc75b373";
 
 // IMPORTANTE: Substitua pelo seu Project ID do Google Cloud Platform
@@ -3198,18 +3203,27 @@ function clearAllRoutesAndMarkers() {
         }
     }
 
-    // 2. Limpar todas as polylines
+    // 2. Limpar TODAS as polylines (array + verificação extra)
+    let polylinesRemoved = 0;
+
     if (window.routePolylines && window.routePolylines.length > 0) {
-        console.log(`🗑️ Removendo ${window.routePolylines.length} polylines...`);
+        console.log(`🗑️ Removendo ${window.routePolylines.length} polylines do array...`);
         window.routePolylines.forEach(polyline => {
             try {
-                polyline.setMap(null);
+                if (polyline && polyline.setMap) {
+                    polyline.setMap(null);
+                    polylinesRemoved++;
+                }
             } catch (e) {
                 console.warn('Erro ao remover polyline:', e);
             }
         });
         window.routePolylines = [];
+    } else {
+        console.log('🗑️ Nenhuma polyline encontrada no array');
     }
+
+    console.log(`✅ ${polylinesRemoved} polylines removidas`);
 
     // 3. Limpar cluster de marcadores COMPLETAMENTE
     if (markerCluster) {
@@ -3465,12 +3479,27 @@ async function renderFleetRoute(fleetResult, origin, deliveryPoints) {
 
 // Desenhar rota em múltiplos segmentos (para mais de 25 pontos)
 async function drawRouteInSegments(allPoints, totalDeliveries) {
-    console.log(`Desenhando rota com ${allPoints.length} pontos totais`);
+    console.log(`🔵 Desenhando rota com ${allPoints.length} pontos totais`);
 
-    // Limpar rotas anteriores
+    // PASSO 1: Limpar TODAS as rotas anteriores COMPLETAMENTE
     if (directionsRenderer) {
         directionsRenderer.setMap(null);
     }
+
+    // PASSO 2: Limpar polylines antigas se existirem
+    if (window.routePolylines && window.routePolylines.length > 0) {
+        console.log(`🗑️ Removendo ${window.routePolylines.length} polylines antigas antes de desenhar...`);
+        window.routePolylines.forEach(polyline => {
+            try {
+                polyline.setMap(null);
+            } catch (e) {
+                console.warn('Erro ao remover polyline antiga:', e);
+            }
+        });
+    }
+
+    // PASSO 3: Resetar array de polylines
+    window.routePolylines = [];
 
     // Dividir pontos em segmentos de até 25 (origem + 23 waypoints + destino)
     const segments = [];
@@ -3557,6 +3586,7 @@ async function drawRouteInSegments(allPoints, totalDeliveries) {
 
     // Armazenar polylines para limpeza posterior
     window.routePolylines = polylines;
+    console.log(`✅ ${polylines.length} polylines armazenadas para limpeza futura`);
 
     // Ajustar zoom para mostrar toda a rota
     map.fitBounds(bounds);
