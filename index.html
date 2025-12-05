@@ -1034,28 +1034,38 @@
         transition: all 0.2s ease;
     }
 
-    .phone-action-btn.call-btn {
-        background: #2196F3;
+    .phone-action-btn.call-btn,
+    .phone-action-btn.call-btn:link,
+    .phone-action-btn.call-btn:visited,
+    .phone-action-btn.call-btn:focus,
+    .phone-action-btn.call-btn:active,
+    .phone-action-btn.call-btn:focus-visible {
+        background: #2196F3 !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
+        transform: scale(1) !important;
     }
 
-    .phone-action-btn.call-btn:hover {
-        background: #1976D2;
-        transform: scale(1.1);
-        box-shadow: 0 3px 6px rgba(33,150,243,0.4);
+    .phone-action-btn.call-btn:hover:not(:active) {
+        background: #1976D2 !important;
+        transform: scale(1.1) !important;
+        box-shadow: 0 3px 6px rgba(33,150,243,0.4) !important;
     }
 
-    .phone-action-btn.whatsapp-btn {
-        background: #25D366;
+    .phone-action-btn.whatsapp-btn,
+    .phone-action-btn.whatsapp-btn:link,
+    .phone-action-btn.whatsapp-btn:visited,
+    .phone-action-btn.whatsapp-btn:focus,
+    .phone-action-btn.whatsapp-btn:active,
+    .phone-action-btn.whatsapp-btn:focus-visible {
+        background: #25D366 !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
+        transform: scale(1) !important;
     }
 
-    .phone-action-btn.whatsapp-btn:hover {
-        background: #128C7E;
-        transform: scale(1.1);
-        box-shadow: 0 3px 6px rgba(37,211,102,0.4);
-    }
-
-    .phone-action-btn:active {
-        transform: scale(0.95);
+    .phone-action-btn.whatsapp-btn:hover:not(:active) {
+        background: #128C7E !important;
+        transform: scale(1.1) !important;
+        box-shadow: 0 3px 6px rgba(37,211,102,0.4) !important;
     }
 
     .empty-state {
@@ -1174,6 +1184,29 @@
 
         .client-actions {
             gap: 10px;
+        }
+
+        /* Forçar cores originais dos botões no mobile */
+        .phone-action-btn.call-btn,
+        .phone-action-btn.call-btn:link,
+        .phone-action-btn.call-btn:visited,
+        .phone-action-btn.call-btn:focus,
+        .phone-action-btn.call-btn:active,
+        .phone-action-btn.call-btn:focus-visible {
+            background: #2196F3 !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
+            transform: scale(1) !important;
+        }
+
+        .phone-action-btn.whatsapp-btn,
+        .phone-action-btn.whatsapp-btn:link,
+        .phone-action-btn.whatsapp-btn:visited,
+        .phone-action-btn.whatsapp-btn:focus,
+        .phone-action-btn.whatsapp-btn:active,
+        .phone-action-btn.whatsapp-btn:focus-visible {
+            background: #25D366 !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
+            transform: scale(1) !important;
         }
 
         .modal-container {
@@ -3433,6 +3466,43 @@ function renderClients(clients) {
             }
         });
     });
+
+    // Listener global para resetar foco quando volta do app externo
+    // Remove apenas uma vez e adiciona novamente
+    window.removeEventListener('focus', resetPhoneButtonsFocus);
+    window.addEventListener('focus', resetPhoneButtonsFocus);
+}
+
+// Função para resetar foco dos botões de telefone
+function resetPhoneButtonsFocus() {
+    // Remover foco de todos os botões de telefone
+    document.querySelectorAll('.phone-action-btn').forEach(btn => {
+        btn.blur();
+    });
+
+    // Remover foco dos cards de cliente
+    document.querySelectorAll('.client-card').forEach(card => {
+        card.blur();
+    });
+
+    // Criar input temporário para limpar qualquer foco residual
+    const tempInput = document.createElement('input');
+    tempInput.style.position = 'absolute';
+    tempInput.style.opacity = '0';
+    tempInput.style.height = '0';
+    tempInput.style.width = '0';
+    tempInput.style.left = '-9999px';
+    tempInput.setAttribute('tabindex', '-1');
+    document.body.appendChild(tempInput);
+
+    tempInput.focus();
+    tempInput.blur();
+
+    setTimeout(() => {
+        if (document.body.contains(tempInput)) {
+            document.body.removeChild(tempInput);
+        }
+    }, 100);
 }
 
 // Atualizar contador de clientes
