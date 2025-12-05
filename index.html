@@ -2757,67 +2757,68 @@ async function addDeliveryMarkers() {
     // PASSO 2: Resetar objeto completamente
     deliveryMarkers = {};
 
-    // PASSO 3: Buscar clientes do Supabase
-    let clientsData = [];
+    // PASSO 3: Buscar dados da planilha (delivery_data) do Supabase
+    let deliveryData = [];
     try {
         const { data, error } = await supabase
-            .from('clients')
+            .from('delivery_data')
             .select('*')
-            .order('created_at', { ascending: true });
+            .order('sequence', { ascending: true });
 
         if (error) throw error;
-        clientsData = data || [];
+        deliveryData = data || [];
     } catch (error) {
-        console.error('Erro ao buscar clientes:', error);
+        console.error('Erro ao buscar delivery_data:', error);
         showToast(
-            'Erro ao carregar clientes',
-            'Não foi possível buscar os dados do banco',
+            'Erro ao carregar dados',
+            'Não foi possível buscar os dados da planilha',
             'error',
             4000
         );
         return;
     }
 
-    if (clientsData.length === 0) {
-        console.log('⚠️ Nenhum cliente encontrado no banco de dados');
+    if (deliveryData.length === 0) {
+        console.log('⚠️ Nenhum dado encontrado na planilha');
         showToast(
-            'Nenhum cliente cadastrado',
-            'Faça upload de uma planilha ou adicione clientes manualmente',
+            'Nenhuma entrega encontrada',
+            'Faça upload de uma planilha para planejar rotas',
             'warning',
             4000
         );
         return;
     }
 
-    // PASSO 4: Agrupar entregas por coordenadas
+    // PASSO 4: Agrupar entregas por coordenadas (endereço)
     const groupedByLocation = {};
-    let sequenceCounter = 1;
 
-    clientsData.forEach((client) => {
-        if (!client.latitude || !client.longitude) {
-            console.warn(`Cliente ${client.name} não tem coordenadas válidas`);
+    deliveryData.forEach((delivery) => {
+        if (!delivery.latitude || !delivery.longitude) {
+            console.warn(`Entrega ${delivery.spx_tn} não tem coordenadas válidas`);
             return;
         }
 
-        const coordKey = `${client.latitude.toFixed(6)},${client.longitude.toFixed(6)}`;
+        const coordKey = `${delivery.latitude.toFixed(6)},${delivery.longitude.toFixed(6)}`;
         if (!groupedByLocation[coordKey]) {
             groupedByLocation[coordKey] = {
-                position: { lat: client.latitude, lng: client.longitude },
+                position: { lat: delivery.latitude, lng: delivery.longitude },
+                address: delivery.destination_address,
+                bairro: delivery.bairro,
+                city: delivery.city,
+                zipcode: delivery.zipcode,
                 deliveries: []
             };
         }
         groupedByLocation[coordKey].deliveries.push({
-            id: client.id,
-            name: client.name,
-            phone: client.phone,
-            address: client.address,
-            sequence: sequenceCounter
+            id: delivery.id,
+            spx_tn: delivery.spx_tn,
+            sequence: delivery.sequence || groupedByLocation[coordKey].deliveries.length + 1,
+            destination_address: delivery.destination_address
         });
-        sequenceCounter++;
     });
 
-    console.log(`📦 Total de entregas: ${clientsData.length}`);
-    console.log(`📍 Locais únicos: ${Object.keys(groupedByLocation).length}`);
+    console.log(`📦 Total de entregas: ${deliveryData.length}`);
+    console.log(`📍 Locais únicos (paradas): ${Object.keys(groupedByLocation).length}`);
 
     let markerNumber = 1; // Contador para numeração sequencial
     const bounds = new google.maps.LatLngBounds();
@@ -2888,46 +2889,68 @@ async function addDeliveryMarkers() {
         headerDiv.appendChild(closeBtn);
         infoWindowContent.appendChild(headerDiv);
 
-        // Adicionar cada entrega à InfoWindow
+        // Adicionar informações do endereço (parada)
+        const addressInfoDiv = document.createElement('div');
+        addressInfoDiv.style.fontSize = '12px';
+        addressInfoDiv.style.color = '#333';
+        addressInfoDiv.style.lineHeight = '1.5';
+        addressInfoDiv.style.marginBottom = '10px';
+        addressInfoDiv.style.padding = '8px';
+        addressInfoDiv.style.background = '#f5f5f5';
+        addressInfoDiv.style.borderRadius = '4px';
+
+        let fullAddress = locationData.address || '';
+        if (locationData.bairro) fullAddress += `\nBairro: ${locationData.bairro}`;
+        if (locationData.city && locationData.zipcode) fullAddress += `\n${locationData.city} - ${locationData.zipcode}`;
+
+        addressInfoDiv.innerHTML = fullAddress.replace(/\n/g, '<br>');
+        infoWindowContent.appendChild(addressInfoDiv);
+
+        // Título da lista de pacotes
+        const packagesTitle = document.createElement('div');
+        packagesTitle.style.fontWeight = 'bold';
+        packagesTitle.style.fontSize = '11px';
+        packagesTitle.style.color = '#666';
+        packagesTitle.style.marginBottom = '6px';
+        packagesTitle.textContent = `${deliveryCount} pacote${deliveryCount > 1 ? 's' : ''} nesta parada:`;
+        infoWindowContent.appendChild(packagesTitle);
+
+        // Adicionar cada pacote (QR code) à InfoWindow
         locationData.deliveries.forEach((delivery, index) => {
             const deliveryDiv = document.createElement('div');
-            deliveryDiv.style.fontSize = '12px';
+            deliveryDiv.style.fontSize = '11px';
             deliveryDiv.style.color = '#333';
             deliveryDiv.style.lineHeight = '1.4';
-            deliveryDiv.style.marginBottom = '6px';
-            deliveryDiv.style.paddingBottom = '6px';
+            deliveryDiv.style.marginBottom = '4px';
+            deliveryDiv.style.paddingBottom = '4px';
+            deliveryDiv.style.paddingLeft = '8px';
 
             if (index < locationData.deliveries.length - 1) {
                 deliveryDiv.style.borderBottom = '1px solid #eee';
             }
 
-            // Linha com Ordem e QR Code
+            // Linha com Ordem e Código QR
             const qrDiv = document.createElement('div');
             qrDiv.style.display = 'flex';
             qrDiv.style.justifyContent = 'space-between';
             qrDiv.style.alignItems = 'center';
-            qrDiv.style.fontWeight = 'bold';
-            qrDiv.style.color = '#666';
-            qrDiv.style.fontSize = '11px';
-            qrDiv.style.marginBottom = '2px';
+            qrDiv.style.gap = '8px';
 
             const sequenceSpan = document.createElement('span');
             sequenceSpan.style.color = '#EA4335';
-            sequenceSpan.textContent = `Ordem: ${delivery.sequence}`;
+            sequenceSpan.style.fontWeight = 'bold';
+            sequenceSpan.textContent = `#${delivery.sequence}`;
 
             const qrSpan = document.createElement('span');
-            qrSpan.textContent = `QR: ${delivery.qrCode}`;
+            qrSpan.style.fontSize = '10px';
+            qrSpan.style.color = '#666';
+            qrSpan.style.fontFamily = 'monospace';
+            qrSpan.textContent = delivery.spx_tn;
 
             qrDiv.appendChild(sequenceSpan);
             qrDiv.appendChild(qrSpan);
 
-            const addressDiv = document.createElement('div');
-            addressDiv.style.marginTop = '2px';
-            addressDiv.style.fontSize = '12px';
-            addressDiv.textContent = delivery.address;
-
             deliveryDiv.appendChild(qrDiv);
-            deliveryDiv.appendChild(addressDiv);
             infoWindowContent.appendChild(deliveryDiv);
         });
 
@@ -4851,24 +4874,24 @@ async function calculateOptimizedRoute(origin) {
 async function calculateOptimizedRouteFromDB(origin) {
     showToast(
         'Calculando rota otimizada...',
-        'Buscando dados dos clientes cadastrados',
+        'Buscando dados da planilha de entregas',
         'info',
         4000
     );
 
     try {
-        // Buscar todos os clientes do Supabase
-        const { data: clientsData, error } = await supabase
-            .from('clients')
+        // Buscar todos os dados da planilha do Supabase
+        const { data: deliveryData, error } = await supabase
+            .from('delivery_data')
             .select('*')
-            .order('created_at', { ascending: true });
+            .order('sequence', { ascending: true });
 
         if (error) throw error;
 
-        if (!clientsData || clientsData.length === 0) {
+        if (!deliveryData || deliveryData.length === 0) {
             showToast(
-                'Nenhum cliente encontrado',
-                'Faça upload de uma planilha ou adicione clientes manualmente',
+                'Nenhuma entrega encontrada',
+                'Faça upload de uma planilha para planejar rotas',
                 'warning',
                 4000
             );
@@ -4876,16 +4899,23 @@ async function calculateOptimizedRouteFromDB(origin) {
             return;
         }
 
-        // Criar array de pontos de entrega
-        let deliveryPoints = clientsData
-            .filter(client => client.latitude && client.longitude)
-            .map(client => ({
-                location: { lat: client.latitude, lng: client.longitude },
-                address: client.address,
-                name: client.name
-            }));
+        // Criar array de pontos de entrega com endereços formatados
+        let deliveryPoints = deliveryData
+            .filter(delivery => delivery.latitude && delivery.longitude)
+            .map(delivery => {
+                let address = delivery.destination_address || '';
+                if (delivery.bairro) address += `, ${delivery.bairro}`;
+                if (delivery.city) address += `, ${delivery.city}`;
 
-        console.log(`Total de clientes no banco: ${deliveryPoints.length}`);
+                return {
+                    location: { lat: delivery.latitude, lng: delivery.longitude },
+                    address: address,
+                    spx_tn: delivery.spx_tn,
+                    sequence: delivery.sequence
+                };
+            });
+
+        console.log(`Total de entregas na planilha: ${deliveryPoints.length}`);
 
         // Remover pontos duplicados (mesmas coordenadas)
         const uniquePoints = [];
