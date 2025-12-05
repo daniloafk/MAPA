@@ -2127,31 +2127,46 @@ function handleGeoError(error, isInitial = false) {
 // MARCADORES DE ENTREGAS
 // ===========================
 
-// Função auxiliar para criar SVG de pin do Google Maps com número (tamanho compacto)
+// Função auxiliar para criar SVG de pin do Google Maps com número (suporta 1-99)
 function createPinSVG(number) {
-    // SVG do pin do Google Maps (formato teardrop/gota invertida) - tamanho compacto
+    // Ajustar tamanho da fonte baseado no número de dígitos
+    const fontSize = number >= 10 ? '11' : '13';
+
+    // SVG do pin do Google Maps (formato teardrop/gota invertida)
     const svg = `
-        <svg width="20" height="28" viewBox="0 0 20 28" xmlns="http://www.w3.org/2000/svg">
+        <svg width="32" height="44" viewBox="0 0 32 44" xmlns="http://www.w3.org/2000/svg">
             <!-- Sombra -->
-            <ellipse cx="10" cy="27" rx="4" ry="1" fill="rgba(0,0,0,0.3)"/>
+            <ellipse cx="16" cy="42" rx="6.5" ry="2" fill="rgba(0,0,0,0.35)"/>
 
-            <!-- Pin vermelho -->
-            <path d="M10 0 C4.477 0 0 4.477 0 10 C0 17.5 10 28 10 28 S20 17.5 20 10 C20 4.477 15.523 0 10 0 Z"
-                  fill="#EA4335"
+            <!-- Pin vermelho com gradiente sutil -->
+            <defs>
+                <linearGradient id="pinGradient${number}" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#EA4335;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#C5221F;stop-opacity:1" />
+                </linearGradient>
+            </defs>
+            <path d="M16 0 C7.164 0 0 7.164 0 16 C0 28 16 44 16 44 S32 28 32 16 C32 7.164 24.836 0 16 0 Z"
+                  fill="url(#pinGradient${number})"
                   stroke="#FFFFFF"
-                  stroke-width="1.2"/>
+                  stroke-width="2"/>
 
-            <!-- Círculo branco interno -->
-            <circle cx="10" cy="10" r="6" fill="#FFFFFF"/>
+            <!-- Círculo branco interno maior -->
+            <circle cx="16" cy="16" r="10" fill="#FFFFFF"/>
 
-            <!-- Número -->
-            <text x="10" y="10"
+            <!-- Sombra interna sutil no círculo -->
+            <circle cx="16" cy="16" r="10" fill="none" stroke="rgba(0,0,0,0.08)" stroke-width="0.5"/>
+
+            <!-- Número com contorno para melhor legibilidade -->
+            <text x="16" y="17"
                   text-anchor="middle"
                   dominant-baseline="central"
-                  font-family="Arial, sans-serif"
-                  font-size="8"
-                  font-weight="bold"
-                  fill="#EA4335">${number}</text>
+                  font-family="'Arial Black', Arial, sans-serif"
+                  font-size="${fontSize}"
+                  font-weight="900"
+                  fill="#EA4335"
+                  stroke="#FFFFFF"
+                  stroke-width="0.8"
+                  paint-order="stroke">${number}</text>
         </svg>
     `;
 
@@ -2181,26 +2196,43 @@ function addDeliveryMarkers() {
     // PASSO 2: Resetar objeto completamente
     deliveryMarkers = {};
 
-    let markerNumber = 1; // Contador para numeração sequencial
-    const bounds = new google.maps.LatLngBounds(); // Criar bounds para ajustar visualização
-
-    // Adicionar marcador para cada endereço no banco de dados
+    // PASSO 3: Agrupar entregas por coordenadas
+    const groupedByLocation = {};
     Object.entries(addressDatabase).forEach(([qrCode, data]) => {
-        const position = {
-            lat: data.latitude,
-            lng: data.longitude
-        };
+        const coordKey = `${data.latitude.toFixed(6)},${data.longitude.toFixed(6)}`;
+        if (!groupedByLocation[coordKey]) {
+            groupedByLocation[coordKey] = {
+                position: { lat: data.latitude, lng: data.longitude },
+                deliveries: []
+            };
+        }
+        groupedByLocation[coordKey].deliveries.push({
+            qrCode,
+            address: data.address
+        });
+    });
+
+    console.log(`📦 Total de entregas: ${Object.keys(addressDatabase).length}`);
+    console.log(`📍 Locais únicos: ${Object.keys(groupedByLocation).length}`);
+
+    let markerNumber = 1; // Contador para numeração sequencial
+    const bounds = new google.maps.LatLngBounds();
+
+    // Criar um marcador para cada local único
+    Object.entries(groupedByLocation).forEach(([coordKey, locationData]) => {
+        const position = locationData.position;
+        const deliveryCount = locationData.deliveries.length;
 
         // Criar elemento do marcador com pin estilo Google Maps
         const markerDiv = document.createElement('div');
         markerDiv.style.cursor = 'pointer';
         markerDiv.style.transition = 'transform 0.2s';
 
-        // Criar imagem do pin com número (tamanho compacto)
+        // Criar imagem do pin com número de entregas
         const pinImg = document.createElement('img');
-        pinImg.src = createPinSVG(markerNumber);
-        pinImg.style.width = '20px';
-        pinImg.style.height = '28px';
+        pinImg.src = createPinSVG(deliveryCount);
+        pinImg.style.width = '32px';
+        pinImg.style.height = '44px';
         pinImg.style.display = 'block';
 
         markerDiv.appendChild(pinImg);
@@ -2213,21 +2245,23 @@ function addDeliveryMarkers() {
             markerDiv.style.transform = 'scale(1)';
         });
 
-        // Criar InfoWindow customizada para este marcador
+        // Criar InfoWindow customizada mostrando todas as entregas
         const infoWindowContent = document.createElement('div');
         infoWindowContent.style.padding = '8px';
-        infoWindowContent.style.maxWidth = '200px';
+        infoWindowContent.style.maxWidth = '250px';
+        infoWindowContent.style.maxHeight = '300px';
+        infoWindowContent.style.overflowY = 'auto';
 
         const headerDiv = document.createElement('div');
         headerDiv.style.display = 'flex';
         headerDiv.style.justifyContent = 'space-between';
         headerDiv.style.alignItems = 'center';
-        headerDiv.style.marginBottom = '4px';
+        headerDiv.style.marginBottom = '8px';
 
         const titleDiv = document.createElement('div');
         titleDiv.style.fontWeight = 'bold';
         titleDiv.style.color = '#EA4335';
-        titleDiv.textContent = `📍 Parada ${markerNumber}`;
+        titleDiv.textContent = `📍 ${deliveryCount} entrega${deliveryCount > 1 ? 's' : ''}`;
 
         const closeBtn = document.createElement('button');
         closeBtn.innerHTML = '×';
@@ -2248,19 +2282,39 @@ function addDeliveryMarkers() {
 
         headerDiv.appendChild(titleDiv);
         headerDiv.appendChild(closeBtn);
-
-        const addressDiv = document.createElement('div');
-        addressDiv.style.fontSize = '13px';
-        addressDiv.style.color = '#333';
-        addressDiv.style.lineHeight = '1.4';
-        addressDiv.textContent = data.address;
-
         infoWindowContent.appendChild(headerDiv);
-        infoWindowContent.appendChild(addressDiv);
+
+        // Adicionar cada entrega à InfoWindow
+        locationData.deliveries.forEach((delivery, index) => {
+            const deliveryDiv = document.createElement('div');
+            deliveryDiv.style.fontSize = '12px';
+            deliveryDiv.style.color = '#333';
+            deliveryDiv.style.lineHeight = '1.4';
+            deliveryDiv.style.marginBottom = '6px';
+            deliveryDiv.style.paddingBottom = '6px';
+
+            if (index < locationData.deliveries.length - 1) {
+                deliveryDiv.style.borderBottom = '1px solid #eee';
+            }
+
+            const qrDiv = document.createElement('div');
+            qrDiv.style.fontWeight = 'bold';
+            qrDiv.style.color = '#666';
+            qrDiv.style.fontSize = '11px';
+            qrDiv.textContent = `QR: ${delivery.qrCode}`;
+
+            const addressDiv = document.createElement('div');
+            addressDiv.style.marginTop = '2px';
+            addressDiv.textContent = delivery.address;
+
+            deliveryDiv.appendChild(qrDiv);
+            deliveryDiv.appendChild(addressDiv);
+            infoWindowContent.appendChild(deliveryDiv);
+        });
 
         const infoWindow = new google.maps.InfoWindow({
             content: infoWindowContent,
-            maxWidth: 250,
+            maxWidth: 280,
             disableAutoPan: false
         });
 
@@ -2271,7 +2325,7 @@ function addDeliveryMarkers() {
                     map,
                     position,
                     content: markerDiv,
-                    title: `${markerNumber}. ${data.address.split('\n')[0]}`
+                    title: `${deliveryCount} entrega${deliveryCount > 1 ? 's' : ''} neste local`
                 });
 
                 // Adicionar listener de clique no marcador
@@ -2289,17 +2343,18 @@ function addDeliveryMarkers() {
                     map.panTo(position);
                 });
 
-                deliveryMarkers[qrCode] = marker;
+                // Armazenar o marcador com a chave da coordenada
+                deliveryMarkers[coordKey] = marker;
             } else {
                 // Fallback: usar Marker clássico com ícone SVG
                 const marker = new google.maps.Marker({
                     map,
                     position,
-                    title: `${markerNumber}. ${data.address.split('\n')[0]}`,
+                    title: `${deliveryCount} entrega${deliveryCount > 1 ? 's' : ''} neste local`,
                     icon: {
-                        url: createPinSVG(markerNumber),
-                        scaledSize: new google.maps.Size(20, 28),
-                        anchor: new google.maps.Point(10, 28) // Ancorar na ponta do pin
+                        url: createPinSVG(deliveryCount),
+                        scaledSize: new google.maps.Size(32, 44),
+                        anchor: new google.maps.Point(16, 44) // Ancorar na ponta do pin
                     }
                 });
 
@@ -2318,19 +2373,20 @@ function addDeliveryMarkers() {
                     map.panTo(position);
                 });
 
-                deliveryMarkers[qrCode] = marker;
+                // Armazenar o marcador com a chave da coordenada
+                deliveryMarkers[coordKey] = marker;
             }
 
             // Adicionar posição aos bounds
             bounds.extend(position);
 
-            markerNumber++; // Incrementar número para próximo marcador
+            markerNumber++; // Incrementar contador (não usado mais, mas mantido para compatibilidade)
         } catch (error) {
             console.error('Erro ao criar marcador de entrega:', error);
         }
     });
 
-    console.log(`✅ Total: ${Object.keys(deliveryMarkers).length} marcadores com pins numerados adicionados`);
+    console.log(`✅ Total: ${Object.keys(deliveryMarkers).length} marcadores criados para ${Object.keys(addressDatabase).length} entregas`);
 
     // Ajustar mapa para mostrar todos os marcadores
     if (!bounds.isEmpty()) {
