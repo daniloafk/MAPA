@@ -958,6 +958,50 @@
         transform: scale(0.95);
     }
 
+    /* Modal de Scanner de Pacotes - versão compacta */
+    #modal-scan-package .modal-container {
+        max-width: 400px;
+        max-height: 85vh;
+    }
+
+    #modal-scan-package .modal-body {
+        padding: 16px;
+    }
+
+    #modal-scan-package .qr-scanner-section {
+        margin-bottom: 16px;
+    }
+
+    #modal-scan-package .scanner-title {
+        font-size: 14px;
+        margin-bottom: 10px;
+    }
+
+    #modal-scan-package .qr-camera-container {
+        max-width: 100%;
+        border-radius: 8px;
+    }
+
+    #modal-scan-package #qr-package-video {
+        max-height: 240px;
+        min-height: 180px;
+    }
+
+    #modal-scan-package .qr-overlay {
+        width: 160px;
+        height: 160px;
+    }
+
+    #modal-scan-package .scan-result {
+        margin-top: 12px !important;
+        padding: 12px !important;
+        font-size: 14px;
+    }
+
+    #modal-scan-package .form-footer {
+        padding: 12px 16px;
+    }
+
     .sidebar-content {
         flex: 1;
         overflow-y: auto;
@@ -1320,6 +1364,69 @@
 
         .qr-camera-container {
             max-width: 100%;
+        }
+
+        /* Modal Scanner de Pacotes - Mobile ainda mais compacto */
+        #modal-scan-package .modal-container {
+            width: 95%;
+            max-width: 100%;
+            max-height: 90vh;
+        }
+
+        #modal-scan-package .modal-body {
+            padding: 12px;
+        }
+
+        #modal-scan-package .scanner-title {
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        #modal-scan-package .modal-close {
+            width: 26px;
+            height: 26px;
+            font-size: 14px;
+        }
+
+        #modal-scan-package #qr-package-video {
+            max-height: 200px;
+            min-height: 150px;
+        }
+
+        #modal-scan-package .qr-overlay {
+            width: 140px;
+            height: 140px;
+            border-width: 1.5px;
+        }
+
+        #modal-scan-package .qr-status {
+            font-size: 12px;
+            padding: 6px 12px;
+        }
+
+        #modal-scan-package .camera-controls {
+            gap: 8px;
+        }
+
+        #modal-scan-package .camera-btn {
+            width: 36px;
+            height: 36px;
+            font-size: 16px;
+        }
+
+        #modal-scan-package .scan-result {
+            margin-top: 10px !important;
+            padding: 10px !important;
+            font-size: 13px;
+        }
+
+        #modal-scan-package .form-footer {
+            padding: 10px 12px;
+        }
+
+        #modal-scan-package .btn {
+            padding: 10px 16px;
+            font-size: 14px;
         }
 
         #qr-video {
