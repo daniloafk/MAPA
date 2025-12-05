@@ -1093,6 +1093,8 @@
     .result-details {
         font-size: 14px;
         color: #666;
+        margin-top: 10px;
+        line-height: 1.6;
     }
 
     .sidebar-content {
@@ -6045,9 +6047,16 @@ async function handleFile(file) {
             resultIcon.textContent = '✅';
             resultText.textContent = 'Planilha atualizada com sucesso!';
             resultText.style.color = '#4caf50';
-            resultDetails.textContent = result.message || `${jsonData.length} registros processados`;
 
-            // Fechar modal após 3 segundos
+            // Exibir estatísticas de comparação de endereços
+            let detailsHTML = `${result.count} registros processados<br><br>`;
+            detailsHTML += `<strong>📊 Análise de Endereços:</strong><br>`;
+            detailsHTML += `✅ <strong>${result.matchedCount}</strong> endereço${result.matchedCount !== 1 ? 's' : ''} já cadastrado${result.matchedCount !== 1 ? 's' : ''}<br>`;
+            detailsHTML += `⚠️ <strong>${result.notRegisteredCount}</strong> endereço${result.notRegisteredCount !== 1 ? 's' : ''} não cadastrado${result.notRegisteredCount !== 1 ? 's' : ''}`;
+
+            resultDetails.innerHTML = detailsHTML;
+
+            // Fechar modal após 5 segundos (tempo maior para ler as estatísticas)
             setTimeout(() => {
                 closeUploadModal();
 
@@ -6056,11 +6065,11 @@ async function handleFile(file) {
 
                 showToast(
                     'Planilha atualizada!',
-                    result.message,
+                    `${result.matchedCount} cadastrados, ${result.notRegisteredCount} não cadastrados`,
                     'success',
                     5000
                 );
-            }, 3000);
+            }, 5000);
         }, 500);
 
     } catch (error) {
@@ -6162,9 +6171,78 @@ async function processSpreadsheetData(jsonData) {
 
         console.log(`✓ ${deliveryDataRecords.length} registros salvos na tabela delivery_data`);
 
+        // 5. Buscar clientes cadastrados para comparação
+        const { data: clients, error: clientsError } = await supabase
+            .from('clients')
+            .select('*');
+
+        if (clientsError) {
+            console.warn('Erro ao buscar clientes:', clientsError);
+        }
+
+        // 6. Comparar endereços da planilha com clientes cadastrados (APENAS endereço)
+        let matchedCount = 0;
+        let notRegisteredCount = 0;
+
+        // Função para normalizar endereço (remove espaços extras, pontuação, lowercase)
+        const normalizeAddress = (address) => {
+            return address
+                .toLowerCase()
+                .trim()
+                // Remove múltiplos espaços
+                .replace(/\s+/g, ' ')
+                // Remove pontuação (vírgulas, pontos, etc.)
+                .replace(/[.,;:\-]/g, ' ')
+                // Remove espaços novamente após remover pontuação
+                .replace(/\s+/g, ' ')
+                .trim();
+        };
+
+        if (clients && clients.length > 0) {
+            console.log(`🔍 Iniciando comparação de ${deliveryDataRecords.length} endereços da planilha com ${clients.length} clientes cadastrados...`);
+
+            for (const delivery of deliveryDataRecords) {
+                const deliveryAddress = delivery.destination_address || '';
+                const normalizedDelivery = normalizeAddress(deliveryAddress);
+                let isMatched = false;
+
+                // Verificar se o endereço da planilha bate com algum cliente cadastrado
+                for (const client of clients) {
+                    const clientAddress = client.address || '';
+                    const normalizedClient = normalizeAddress(clientAddress);
+
+                    // Comparação APENAS por endereço normalizado (ignora nome e telefone)
+                    if (normalizedClient && normalizedDelivery && normalizedClient === normalizedDelivery) {
+                        isMatched = true;
+                        console.log(`✅ MATCH: "${deliveryAddress}" === "${clientAddress}"`);
+                        break;
+                    }
+                }
+
+                if (!isMatched && deliveryAddress) {
+                    console.log(`⚠️ NO MATCH: "${deliveryAddress}"`);
+                }
+
+                if (isMatched) {
+                    matchedCount++;
+                } else {
+                    notRegisteredCount++;
+                }
+            }
+        } else {
+            // Se não há clientes cadastrados, todos os endereços não estão registrados
+            notRegisteredCount = deliveryDataRecords.length;
+        }
+
+        console.log(`📊 Análise de endereços:`);
+        console.log(`   ✅ Cadastrados: ${matchedCount}`);
+        console.log(`   ⚠️ Não cadastrados: ${notRegisteredCount}`);
+
         return {
             success: true,
             count: deliveryDataRecords.length,
+            matchedCount: matchedCount,
+            notRegisteredCount: notRegisteredCount,
             message: `${deliveryDataRecords.length} registros salvos com sucesso`
         };
 
