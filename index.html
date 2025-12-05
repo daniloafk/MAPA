@@ -5929,14 +5929,9 @@ let matchedClientsVisible = false;
 
 // Toggle clientes identificados na planilha
 btnShowMatchedClients.addEventListener('click', async () => {
-    console.log('🔘 Botão "Mostrar clientes identificados" clicado');
-    console.log('Estado atual - matchedClientsVisible:', matchedClientsVisible);
-
     if (matchedClientsVisible) {
-        console.log('Ocultando clientes identificados...');
         hideMatchedClientMarkers();
     } else {
-        console.log('Mostrando clientes identificados...');
         await showMatchedClientMarkers();
     }
 });
@@ -5955,23 +5950,17 @@ function normalizeAddressForComparison(address) {
 // Mostrar marcadores dos clientes identificados na planilha
 async function showMatchedClientMarkers() {
     try {
-        console.log('📦 Iniciando busca de clientes identificados...');
-
         // 1. Buscar dados da planilha (delivery_data) do Supabase
-        console.log('1️⃣ Buscando dados da planilha (delivery_data)...');
         const { data: deliveryData, error: deliveryError } = await supabase
             .from('delivery_data')
             .select('*');
 
         if (deliveryError) {
-            console.error('❌ Erro ao buscar delivery_data:', deliveryError);
+            console.error('Erro ao buscar delivery_data:', deliveryError);
             throw deliveryError;
         }
 
-        console.log(`✅ Encontrados ${deliveryData?.length || 0} registros na planilha`);
-
         if (!deliveryData || deliveryData.length === 0) {
-            console.warn('⚠️ Nenhum dado encontrado na tabela delivery_data');
             showToast(
                 'Nenhuma planilha carregada',
                 'Faça upload de uma planilha primeiro',
@@ -5982,21 +5971,14 @@ async function showMatchedClientMarkers() {
         }
 
         // 2. Buscar todos os clientes do banco
-        console.log('2️⃣ Buscando clientes cadastrados...');
         const { data: clients, error: clientsError } = await supabase
             .from('clients')
             .select('*')
             .order('created_at', { ascending: true });
 
-        if (clientsError) {
-            console.error('❌ Erro ao buscar clients:', clientsError);
-            throw clientsError;
-        }
-
-        console.log(`✅ Encontrados ${clients?.length || 0} clientes cadastrados`);
+        if (clientsError) throw clientsError;
 
         if (!clients || clients.length === 0) {
-            console.warn('⚠️ Nenhum cliente cadastrado');
             showToast(
                 'Nenhum cliente cadastrado',
                 'Não há clientes para exibir',
@@ -6007,41 +5989,24 @@ async function showMatchedClientMarkers() {
         }
 
         // 3. Criar Set de endereços da planilha (normalizados)
-        console.log('3️⃣ Normalizando endereços da planilha...');
         const deliveryAddresses = new Set();
         deliveryData.forEach(delivery => {
             const addr = delivery.destination_address || '';
             if (addr) {
-                const normalized = normalizeAddressForComparison(addr);
-                deliveryAddresses.add(normalized);
-                console.log(`   📍 Planilha: "${addr}" → normalizado: "${normalized}"`);
+                deliveryAddresses.add(normalizeAddressForComparison(addr));
             }
         });
 
-        console.log(`✅ Total de ${deliveryAddresses.size} endereços únicos na planilha`);
-
         // 4. Filtrar apenas clientes cujos endereços batem com a planilha
-        console.log('4️⃣ Comparando endereços...');
         const matchedClients = clients.filter(client => {
             const clientAddress = client.address || '';
             const clientAddressFirstLine = clientAddress.split('\n')[0];
             const normalizedClient = normalizeAddressForComparison(clientAddressFirstLine);
 
-            const hasMatch = deliveryAddresses.has(normalizedClient);
-
-            if (hasMatch) {
-                console.log(`   ✅ MATCH: Cliente "${client.name}" - "${clientAddressFirstLine}"`);
-            } else {
-                console.log(`   ❌ NO MATCH: Cliente "${client.name}" - "${clientAddressFirstLine}" (normalizado: "${normalizedClient}")`);
-            }
-
-            return hasMatch;
+            return deliveryAddresses.has(normalizedClient);
         });
 
-        console.log(`✅ Total de ${matchedClients.length} clientes identificados na planilha`);
-
         if (matchedClients.length === 0) {
-            console.warn('⚠️ Nenhum cliente corresponde aos endereços da planilha');
             showToast(
                 'Nenhum cliente identificado',
                 'Os endereços da planilha não correspondem aos clientes cadastrados',
@@ -6265,6 +6230,9 @@ const resultIcon = document.getElementById('result-icon');
 const resultText = document.getElementById('result-text');
 const resultDetails = document.getElementById('result-details');
 
+// Variável para armazenar o timeout de fechamento automático
+let uploadModalAutoCloseTimeout = null;
+
 // Abrir modal de upload
 function openUploadModal() {
     modalUploadSpreadsheet.classList.add('active');
@@ -6280,6 +6248,12 @@ function openUploadModal() {
 
 // Fechar modal de upload
 function closeUploadModal() {
+    // Cancelar timeout de fechamento automático se existir
+    if (uploadModalAutoCloseTimeout) {
+        clearTimeout(uploadModalAutoCloseTimeout);
+        uploadModalAutoCloseTimeout = null;
+    }
+
     modalUploadSpreadsheet.classList.remove('active');
     document.body.style.overflow = '';
 }
@@ -6386,7 +6360,7 @@ async function handleFile(file) {
             resultDetails.innerHTML = detailsHTML;
 
             // Fechar modal após 5 segundos (tempo maior para ler as estatísticas)
-            setTimeout(() => {
+            uploadModalAutoCloseTimeout = setTimeout(() => {
                 closeUploadModal();
 
                 // Recarregar dados
