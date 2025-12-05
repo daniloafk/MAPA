@@ -2173,6 +2173,7 @@ function addDeliveryMarkers() {
     deliveryMarkers = {};
 
     let markerNumber = 1; // Contador para numeração sequencial
+    const bounds = new google.maps.LatLngBounds(); // Criar bounds para ajustar visualização
 
     // Adicionar marcador para cada endereço no banco de dados
     Object.entries(addressDatabase).forEach(([qrCode, data]) => {
@@ -2275,6 +2276,9 @@ function addDeliveryMarkers() {
                 deliveryMarkers[qrCode] = marker;
             }
 
+            // Adicionar posição aos bounds
+            bounds.extend(position);
+
             markerNumber++; // Incrementar número para próximo marcador
         } catch (error) {
             console.error('Erro ao criar marcador de entrega:', error);
@@ -2282,6 +2286,14 @@ function addDeliveryMarkers() {
     });
 
     console.log(`✅ Total: ${Object.keys(deliveryMarkers).length} marcadores com pins numerados adicionados`);
+
+    // Ajustar mapa para mostrar todos os marcadores
+    if (!bounds.isEmpty()) {
+        map.fitBounds(bounds, {
+            padding: 80 // Adicionar margem de 80px ao redor
+        });
+        console.log('🗺️ Mapa ajustado para mostrar todos os marcadores');
+    }
 }
 
 // ===========================
@@ -3593,8 +3605,13 @@ async function drawRouteInSegments(allPoints, totalDeliveries) {
     window.routePolylines = polylines;
     console.log(`✅ ${polylines.length} polylines armazenadas para limpeza futura`);
 
-    // Ajustar zoom para mostrar toda a rota
-    map.fitBounds(bounds);
+    // Ajustar zoom para mostrar toda a rota com padding
+    if (!bounds.isEmpty()) {
+        map.fitBounds(bounds, {
+            padding: 100 // Margem de 100px ao redor da rota
+        });
+        console.log('🗺️ Mapa ajustado para mostrar toda a rota otimizada');
+    }
 
     // Mostrar estatísticas
     const distanceKm = (totalDistance / 1000).toFixed(1);
