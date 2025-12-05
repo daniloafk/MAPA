@@ -987,11 +987,50 @@
         gap: 8px;
     }
 
+    .client-info.phone-info {
+        align-items: center;
+        justify-content: space-between;
+    }
+
     .client-info-icon {
         font-size: 14px;
         opacity: 0.7;
         flex-shrink: 0;
         margin-top: 2px;
+    }
+
+    .phone-actions {
+        display: flex;
+        gap: 6px;
+        margin-left: auto;
+    }
+
+    .phone-action-btn {
+        background: none;
+        border: none;
+        padding: 4px 8px;
+        cursor: pointer;
+        font-size: 16px;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .phone-action-btn.call-btn:hover {
+        background: #e3f2fd;
+        transform: scale(1.1);
+    }
+
+    .phone-action-btn.whatsapp-btn:hover {
+        background: #e8f5e9;
+        transform: scale(1.1);
+    }
+
+    .phone-action-btn:active {
+        transform: scale(0.95);
     }
 
     .empty-state {
@@ -3264,9 +3303,17 @@ function renderClients(clients) {
                 </div>
             </div>
             ${client.phone ? `
-                <div class="client-info">
+                <div class="client-info phone-info">
                     <span class="client-info-icon">📞</span>
                     <span>${escapeHtml(client.phone)}</span>
+                    <div class="phone-actions">
+                        <a href="tel:${client.phone.replace(/\D/g, '')}" class="phone-action-btn call-btn" title="Ligar">
+                            📞
+                        </a>
+                        <a href="https://wa.me/55${client.phone.replace(/\D/g, '')}" target="_blank" class="phone-action-btn whatsapp-btn" title="WhatsApp">
+                            💬
+                        </a>
+                    </div>
                 </div>
             ` : ''}
             ${client.address ? `
