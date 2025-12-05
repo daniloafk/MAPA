@@ -1804,7 +1804,6 @@ let deliveryMarkers = {}; // Armazena marcadores de endereços de entrega
 let directionsService = null; // Serviço de rotas do Google Maps
 let directionsRenderer = null; // Renderizador de rotas
 let routeMode = false; // Modo de planejamento de rota ativo/inativo
-let routeCalculating = false; // Flag para indicar que está calculando rota
 let lastPositionUpdate = 0; // Timestamp da última atualização de posição
 let updateThrottle = 1000; // Atualizar posição no máximo a cada 1 segundo (performance)
 let currentInfoWindow = null; // InfoWindow atualmente aberta
@@ -1985,11 +1984,8 @@ function startLocationTracking() {
                 const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                 locationAccuracy = pos.coords.accuracy;
 
-                // Não centralizar se estiver no modo de rota ou calculando rota
-                if (!routeMode && !routeCalculating) {
-                    map.setCenter(c);
-                    map.setZoom(17);
-                }
+                map.setCenter(c);
+                map.setZoom(17);
 
                 // Tenta usar AdvancedMarkerElement (recomendado pelo Google desde 2024)
                 if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
@@ -2291,8 +2287,13 @@ function addDeliveryMarkers() {
 
     console.log(`✅ Total: ${Object.keys(deliveryMarkers).length} marcadores com pins numerados adicionados`);
 
-    // NÃO ajustar o mapa aqui - deixar para a função de desenhar rotas fazer isso
-    // Isso evita que o mapa fique "pulando" entre diferentes bounds
+    // Ajustar mapa para mostrar todos os marcadores
+    if (!bounds.isEmpty()) {
+        map.fitBounds(bounds, {
+            padding: 80 // Adicionar margem de 80px ao redor
+        });
+        console.log('🗺️ Mapa ajustado para mostrar todos os marcadores');
+    }
 }
 
 // ===========================
@@ -3161,7 +3162,6 @@ function activateRouteMode() {
 
 function deactivateRouteMode() {
     routeMode = false;
-    routeCalculating = false; // Resetar flag de cálculo
     btnToggleRoute.classList.remove('active');
 
     // Mostrar botão de planejar rota e esconder botão de limpar
@@ -3209,7 +3209,6 @@ function clearAllRoutesAndMarkers() {
     if (routeMode) {
         console.log('🔴 Desativando modo de rota...');
         routeMode = false;
-        routeCalculating = false; // Resetar flag de cálculo
         btnToggleRoute.classList.remove('active');
     }
 
@@ -3296,9 +3295,6 @@ function clearAllRoutesAndMarkers() {
 async function calculateOptimizedRoute(origin) {
     // Marcadores já foram adicionados em activateRouteMode()
     // Removido: addDeliveryMarkers();
-
-    // Ativar flag de cálculo de rota
-    routeCalculating = true;
 
     showToast(
         'Calculando rota otimizada...',
@@ -3635,9 +3631,6 @@ async function drawRouteInSegments(allPoints, totalDeliveries) {
     );
 
     console.log(`✓ Rota completa: ${totalDeliveries} entregas, ${distanceKm}km, ${durationMin}min`);
-
-    // Desativar flag de cálculo de rota
-    routeCalculating = false;
 }
 
 // Fallback: Directions API (até 23 pontos)
