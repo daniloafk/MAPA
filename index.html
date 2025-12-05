@@ -505,7 +505,23 @@
         opacity: 0.3;
     }
 
-    #qr-canvas {
+    /* Vídeo do scanner de pacotes - mesmos estilos */
+    #qr-package-video {
+        width: 100%;
+        height: auto;
+        max-height: 300px;
+        min-height: 200px;
+        object-fit: cover;
+        display: block;
+        background: #000;
+    }
+
+    #qr-package-video:not([src]) {
+        opacity: 0.3;
+    }
+
+    #qr-canvas,
+    #qr-package-canvas {
         display: none;
     }
 
@@ -958,48 +974,27 @@
         transform: scale(0.95);
     }
 
-    /* Modal de Scanner de Pacotes - versão compacta */
-    #modal-scan-package .modal-container {
-        max-width: 400px;
-        max-height: 85vh;
-    }
-
-    #modal-scan-package .modal-body {
+    /* Resultado do scanner de pacotes */
+    .scan-result {
+        display: none;
+        margin-top: 20px;
         padding: 16px;
-    }
-
-    #modal-scan-package .qr-scanner-section {
-        margin-bottom: 16px;
-    }
-
-    #modal-scan-package .scanner-title {
-        font-size: 14px;
-        margin-bottom: 10px;
-    }
-
-    #modal-scan-package .qr-camera-container {
-        max-width: 100%;
+        background: #f5f5f5;
         border-radius: 8px;
     }
 
-    #modal-scan-package #qr-package-video {
-        max-height: 240px;
-        min-height: 180px;
+    .scan-result.active {
+        display: block;
     }
 
-    #modal-scan-package .qr-overlay {
-        width: 160px;
-        height: 160px;
+    .scan-result-label {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 8px;
     }
 
-    #modal-scan-package .scan-result {
-        margin-top: 12px !important;
-        padding: 12px !important;
-        font-size: 14px;
-    }
-
-    #modal-scan-package .form-footer {
-        padding: 12px 16px;
+    .scan-result-text {
+        color: #666;
     }
 
     .sidebar-content {
@@ -1366,70 +1361,8 @@
             max-width: 100%;
         }
 
-        /* Modal Scanner de Pacotes - Mobile ainda mais compacto */
-        #modal-scan-package .modal-container {
-            width: 95%;
-            max-width: 100%;
-            max-height: 90vh;
-        }
-
-        #modal-scan-package .modal-body {
-            padding: 12px;
-        }
-
-        #modal-scan-package .scanner-title {
-            font-size: 12px;
-            margin-bottom: 8px;
-        }
-
-        #modal-scan-package .modal-close {
-            width: 26px;
-            height: 26px;
-            font-size: 14px;
-        }
-
-        #modal-scan-package #qr-package-video {
-            max-height: 200px;
-            min-height: 150px;
-        }
-
-        #modal-scan-package .qr-overlay {
-            width: 140px;
-            height: 140px;
-            border-width: 1.5px;
-        }
-
-        #modal-scan-package .qr-status {
-            font-size: 12px;
-            padding: 6px 12px;
-        }
-
-        #modal-scan-package .camera-controls {
-            gap: 8px;
-        }
-
-        #modal-scan-package .camera-btn {
-            width: 36px;
-            height: 36px;
-            font-size: 16px;
-        }
-
-        #modal-scan-package .scan-result {
-            margin-top: 10px !important;
-            padding: 10px !important;
-            font-size: 13px;
-        }
-
-        #modal-scan-package .form-footer {
-            padding: 10px 12px;
-        }
-
-        #modal-scan-package .btn {
-            padding: 10px 16px;
-            font-size: 14px;
-        }
-
-        #qr-video {
+        #qr-video,
+        #qr-package-video {
             max-height: 250px;
         }
 
@@ -1668,9 +1601,9 @@
             </div>
 
             <!-- Resultado da busca -->
-            <div class="scan-result" id="scan-result" style="display: none; margin-top: 20px; padding: 16px; background: #f5f5f5; border-radius: 8px;">
-                <div style="font-weight: 600; color: #333; margin-bottom: 8px;">📋 Cliente Encontrado:</div>
-                <div id="scan-result-text" style="color: #666;"></div>
+            <div class="scan-result" id="scan-result">
+                <div class="scan-result-label">📋 Cliente Encontrado:</div>
+                <div class="scan-result-text" id="scan-result-text"></div>
             </div>
         </div>
 
@@ -5040,7 +4973,7 @@ async function openPackageScanner() {
     document.body.style.overflow = 'hidden';
 
     // Resetar resultado anterior
-    scanResult.style.display = 'none';
+    scanResult.classList.remove('active');
     scanResultText.textContent = '';
 
     // Verificar se câmera está disponível
@@ -5209,7 +5142,7 @@ async function findClientByQRCode(qrCode) {
             const client = clients[0];
 
             // Mostrar resultado
-            scanResult.style.display = 'block';
+            scanResult.classList.add('active');
             scanResultText.innerHTML = `
                 <strong>${escapeHtml(client.name)}</strong><br>
                 📞 ${escapeHtml(client.phone || 'Sem telefone')}<br>
@@ -5237,7 +5170,7 @@ async function findClientByQRCode(qrCode) {
 
         } else {
             // Cliente não encontrado
-            scanResult.style.display = 'block';
+            scanResult.classList.add('active');
             scanResultText.innerHTML = `
                 <strong style="color: #ea4335;">❌ Cliente não encontrado</strong><br>
                 O código <code>${escapeHtml(qrCode)}</code> não está cadastrado.
