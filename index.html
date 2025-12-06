@@ -4701,7 +4701,7 @@ function deactivateRouteMode() {
 }
 
 // Nova função: Limpar TUDO (marcadores + rotas + cluster)
-async function clearAllRoutesAndMarkers() {
+function clearAllRoutesAndMarkers() {
     console.log('🗑️ ========================================');
     console.log('🗑️ INICIANDO LIMPEZA COMPLETA...');
     console.log('🗑️ ========================================');
@@ -4781,36 +4781,13 @@ async function clearAllRoutesAndMarkers() {
     // 4. RESETAR completamente o objeto de marcadores
     deliveryMarkers = {};
 
-    // 5. Limpar dados da planilha do Supabase (delivery_data)
-    try {
-        console.log('🗑️ Limpando dados da planilha do banco de dados...');
-        const { error: deleteError } = await supabase
-            .from('delivery_data')
-            .delete()
-            .neq('id', '00000000-0000-0000-0000-000000000000'); // Deleta todos os registros
-
-        if (deleteError) {
-            console.error('Erro ao limpar delivery_data:', deleteError);
-            showToast(
-                'Erro ao limpar planilha',
-                'Não foi possível remover os dados da planilha',
-                'error',
-                4000
-            );
-        } else {
-            console.log('✅ Dados da planilha limpos do banco de dados');
-        }
-    } catch (error) {
-        console.error('Erro ao limpar planilha:', error);
-    }
-
     console.log('✅ ========================================');
     console.log('✅ LIMPEZA COMPLETA REALIZADA!');
     console.log('✅ ========================================');
 
     showToast(
         '🗑️ Tudo limpo!',
-        'Rotas, marcadores e dados da planilha removidos',
+        'Rotas e marcadores removidos do mapa',
         'success',
         3000
     );
