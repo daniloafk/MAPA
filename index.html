@@ -2671,6 +2671,11 @@ function animateMarkerToPosition(newPosition, duration = 1000) {
                 } else if (userLocationMarker.setPosition) {
                     userLocationMarker.setPosition(interpolatedPosition);
                 }
+
+                // Movimento suave da câmera acompanhando o marcador (sugestão Google Gemini)
+                if (map && map.panTo) {
+                    map.panTo(interpolatedPosition);
+                }
             } catch (error) {
                 console.error('Erro ao atualizar posição do marcador:', error);
             }
