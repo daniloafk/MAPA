@@ -4592,9 +4592,29 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Carregar clientes ao inicializar
-setTimeout(() => {
+// Carregar clientes ao inicializar e verificar se há dados da planilha
+setTimeout(async () => {
     loadClients();
+
+    // Verificar se há dados da planilha salvos no Supabase
+    try {
+        const { data, error } = await supabase
+            .from('delivery_data')
+            .select('id')
+            .limit(1);
+
+        if (!error && data && data.length > 0) {
+            // Se há dados da planilha, mudar botão para modo "Limpar"
+            setButtonToClearMode();
+            console.log('📊 Planilha detectada no banco de dados');
+        } else {
+            // Sem dados, manter botão em modo "Upload"
+            setButtonToUploadMode();
+            console.log('📋 Nenhuma planilha no banco de dados');
+        }
+    } catch (error) {
+        console.error('Erro ao verificar dados da planilha:', error);
+    }
 }, 2000);
 
 // ===========================
@@ -6244,9 +6264,167 @@ function closeUploadModal() {
     document.body.style.overflow = '';
 }
 
+// Variável para controlar estado do botão
+let hasSpreadsheetData = false;
+
 // Event listeners do modal
-btnUploadSpreadsheet.addEventListener('click', openUploadModal);
+btnUploadSpreadsheet.addEventListener('click', () => {
+    if (hasSpreadsheetData) {
+        // Se há planilha carregada, limpar dados
+        clearSpreadsheetData();
+    } else {
+        // Se não há planilha, abrir modal de upload
+        openUploadModal();
+    }
+});
 btnModalUploadClose.addEventListener('click', closeUploadModal);
+
+// Função para mudar botão para modo "Limpar planilha"
+function setButtonToClearMode() {
+    hasSpreadsheetData = true;
+    btnUploadSpreadsheet.textContent = '🗑️';
+    btnUploadSpreadsheet.title = 'Limpar planilha do dia';
+    btnUploadSpreadsheet.classList.add('active');
+}
+
+// Função para mudar botão para modo "Upload planilha"
+function setButtonToUploadMode() {
+    hasSpreadsheetData = false;
+    btnUploadSpreadsheet.textContent = '📊';
+    btnUploadSpreadsheet.title = 'Atualizar planilha do dia';
+    btnUploadSpreadsheet.classList.remove('active');
+}
+
+// Função para limpar dados da planilha
+async function clearSpreadsheetData() {
+    // Criar modal de confirmação customizado
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.style.position = 'fixed';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.right = '0';
+    modal.style.bottom = '0';
+    modal.style.backgroundColor = 'rgba(0,0,0,0.5)';
+    modal.style.display = 'flex';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
+    modal.style.zIndex = '10000';
+
+    modal.innerHTML = `
+        <div style="background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); max-width: 400px; width: 90%;">
+            <div style="font-size: 20px; font-weight: 600; color: #333; margin-bottom: 16px;">⚠️ Confirmar exclusão</div>
+            <div style="color: #666; margin-bottom: 20px; line-height: 1.6;">
+                <p style="margin-bottom: 12px;">Tem certeza que deseja limpar todos os dados da planilha?</p>
+                <p style="margin-bottom: 8px; font-weight: 600;">Isso irá remover:</p>
+                <ul style="margin-left: 20px;">
+                    <li>✓ Todos os dados de entrega</li>
+                    <li>✓ Marcadores no mapa</li>
+                    <li>✓ Rotas planejadas</li>
+                </ul>
+                <p style="margin-top: 12px; color: #e53e3e; font-weight: 600;">⚠️ Essa ação não pode ser desfeita!</p>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <button id="btn-cancel-clear" style="padding: 10px 20px; background: #e5e7eb; color: #333; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Cancelar</button>
+                <button id="btn-confirm-clear" style="padding: 10px 20px; background: #dc2626; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Limpar tudo</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Criar promise para aguardar resposta do usuário
+    const userResponse = await new Promise((resolve) => {
+        const btnCancel = modal.querySelector('#btn-cancel-clear');
+        const btnConfirm = modal.querySelector('#btn-confirm-clear');
+
+        btnCancel.addEventListener('click', () => {
+            modal.remove();
+            resolve(false);
+        });
+
+        btnConfirm.addEventListener('click', () => {
+            modal.remove();
+            resolve(true);
+        });
+
+        // Clicar fora do modal cancela
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+                resolve(false);
+            }
+        });
+    });
+
+    if (!userResponse) {
+        return;
+    }
+
+    try {
+        // Limpar dados da planilha do Supabase
+        const { error: deleteError } = await supabase
+            .from('delivery_data')
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000');
+
+        if (deleteError) {
+            console.error('Erro ao limpar delivery_data:', deleteError);
+            showToast(
+                'Erro ao limpar planilha',
+                'Não foi possível remover os dados',
+                'error',
+                4000
+            );
+            return;
+        }
+
+        // Limpar marcadores do mapa
+        Object.values(deliveryMarkers).forEach(marker => {
+            try {
+                if (marker.map !== undefined) {
+                    marker.map = null;
+                } else if (marker.setMap) {
+                    marker.setMap(null);
+                }
+            } catch (e) {
+                console.warn('Erro ao remover marcador:', e);
+            }
+        });
+        deliveryMarkers = {};
+
+        // Limpar rotas
+        if (directionsRenderer) {
+            directionsRenderer.setDirections({routes: []});
+            directionsRenderer.setMap(null);
+        }
+        if (window.routePolylines) {
+            window.routePolylines.forEach(polyline => polyline.setMap(null));
+            window.routePolylines = [];
+        }
+
+        // Voltar botão para modo upload
+        setButtonToUploadMode();
+
+        showToast(
+            '🗑️ Planilha limpa!',
+            'Todos os dados foram removidos. Sistema pronto para nova planilha.',
+            'success',
+            4000
+        );
+
+        console.log('✅ Planilha limpa com sucesso');
+
+    } catch (error) {
+        console.error('Erro ao limpar planilha:', error);
+        showToast(
+            'Erro ao limpar',
+            'Ocorreu um erro ao limpar os dados',
+            'error',
+            4000
+        );
+    }
+}
 
 modalUploadSpreadsheet.addEventListener('click', (e) => {
     if (e.target === modalUploadSpreadsheet) {
@@ -6350,6 +6528,9 @@ async function handleFile(file) {
 
                 // Recarregar dados
                 loadClients();
+
+                // Mudar botão para modo "Limpar planilha"
+                setButtonToClearMode();
 
                 showToast(
                     'Planilha atualizada!',
