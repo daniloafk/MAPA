@@ -2,10 +2,9 @@
    routing.js — Planejamento, otimização e desenho de rotas
 ========================================================== */
 
-import { getLastPosition } from "./gps.js";
-import { getMap } from "./map.js";
-import { appState, toggleClearButton, updateStatusBar, lockUI, unlockUI, resetUIState } from "./app.js";
-import { showToast } from "./utils.js";
+import { getMap } from "/js/map.js";
+import { appState, toggleClearButton, updateStatusBar, lockUI, unlockUI, resetUIState } from "/js/app.js";
+import { showToast } from "/js/utils.js";
 
 /* ==========================================================
    VARIÁVEIS GLOBAIS
@@ -17,14 +16,21 @@ let routeMarkers = [];
    INICIAR PLANEJAMENTO DE ROTA
 ========================================================== */
 export async function beginRoutePlanning() {
-    const userPos = getLastPosition();
 
-    if (!userPos) {
+    // Posição atual do usuário armazenada pelo GPS no localStorage (app_state)
+    const gpsData = JSON.parse(localStorage.getItem("gps_last_position") || "null");
+
+    if (!gpsData) {
         showToast("Localização ainda não detectada.", "warning");
         return;
     }
 
-    // Buscar clientes carregados
+    const userPos = {
+        lat: gpsData.lat,
+        lng: gpsData.lng
+    };
+
+    // Buscar lista de clientes
     const list = JSON.parse(localStorage.getItem("clients") || "[]");
 
     if (list.length === 0) {
@@ -63,17 +69,17 @@ export async function beginRoutePlanning() {
 ========================================================== */
 async function generateOptimizedRoute(start, clients) {
 
-    // Caso tenha muitos pontos, usa Fleet Routing API no backend (Cloudflare)
+    // Para muitos pontos → Fleet Routing API (Cloudflare)
     if (clients.length > 10) {
         return await callFleetRoutingAPI(start, clients);
     }
 
-    // Para poucas entregas, pode usar direto Directions API
+    // Poucos clientes → Directions API
     return await callDirectionsAPI(start, clients);
 }
 
 /* ==========================================================
-   CHAMADA CLOUDLFARE → FLEET ROUTING API
+   CLOUDLFARE → FLEET ROUTING API
 ========================================================== */
 async function callFleetRoutingAPI(start, clients) {
     const payload = {
@@ -92,19 +98,22 @@ async function callFleetRoutingAPI(start, clients) {
     }
 
     const data = await response.json();
+
     return data.route;
 }
 
 /* ==========================================================
-   DIRECTIONS API (fallback ou rotas pequenas)
+   DIRECTIONS API (rota pequena)
 ========================================================== */
 async function callDirectionsAPI(start, clients) {
+
     const waypoints = clients.map(c => ({
         location: { lat: c.lat, lng: c.lng },
         stopover: true
     }));
 
-    const url = `https://maps.googleapis.com/maps/api/directions/json?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU`;
+    const url =
+        `https://maps.googleapis.com/maps/api/directions/json?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU`;
 
     const payload = {
         origin: start,
@@ -127,7 +136,6 @@ async function callDirectionsAPI(start, clients) {
 
     const points = data.routes[0].overview_polyline.points;
 
-    // Decodificar polyline
     return google.maps.geometry.encoding.decodePath(points);
 }
 
@@ -137,9 +145,8 @@ async function callDirectionsAPI(start, clients) {
 function drawRoute(path) {
     const map = getMap();
 
-    clearCurrentRoute(); // Remove rota anterior
+    clearCurrentRoute();
 
-    // Criar polyline
     routePolyline = new google.maps.Polyline({
         map,
         path,
@@ -148,15 +155,12 @@ function drawRoute(path) {
         strokeOpacity: 0.9
     });
 
-    // Adicionar marcadores de início e fim
     addRouteMarkers(path);
-
-    // Centralizar mapa na rota
     centerRoute(path);
 }
 
 /* ==========================================================
-   MARCADORES DA ROTA
+   MARCADORES DE INÍCIO E FIM
 ========================================================== */
 function addRouteMarkers(path) {
     const map = getMap();
@@ -212,6 +216,5 @@ export function clearCurrentRoute() {
 
     toggleClearButton(false);
     resetUIState();
-
     updateStatusBar("Rota removida", false);
 }
