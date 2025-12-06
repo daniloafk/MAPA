@@ -548,3 +548,41 @@ body, html {
         height: 48px;
     }
 }
+
+/* ==========================================================
+   NOVO — PAINEL DE PRECISÃO DO GPS (TOTALMENTE INTEGRADO)
+========================================================== */
+.gps-panel {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    width: 240px;
+    padding: 14px 16px;
+    background: rgba(0,0,0,0.72);
+    color: white;
+    border-radius: 16px;
+    font-size: 13px;
+    line-height: 1.4em;
+    box-shadow: var(--shadow-md);
+    z-index: 99999;
+    backdrop-filter: blur(6px);
+}
+
+.gps-panel h3 {
+    margin-bottom: 8px;
+    font-size: 15px;
+    font-weight: bold;
+    text-align: left;
+    color: #fff;
+}
+
+/* Responsivo — GPS Panel */
+@media (max-width: 768px) {
+    .gps-panel {
+        width: 90%;
+        left: 50%;
+        bottom: 15px;
+        transform: translateX(-50%);
+        font-size: 14px;
+    }
+}
