@@ -1,8 +1,7 @@
 /* ==========================================================
-   routing.js — Planejamento, otimização e desenho de rotas
+   routing.js — Rotas Otimizadas (VERSÃO FINAL)
 ========================================================== */
 
-import { getLastPosition } from "./gps.js";
 import { getMap } from "./map.js";
 import { appState, toggleClearButton, updateStatusBar, lockUI, unlockUI, resetUIState } from "./app.js";
 import { showToast } from "./utils.js";
@@ -10,19 +9,23 @@ import { showToast } from "./utils.js";
 /* ==========================================================
    VARIÁVEIS GLOBAIS
 ========================================================== */
-let routePolyline = null;
-let routeMarkers = [];
+let directionsService = null;
+let directionsRenderer = null;
 
 /* ==========================================================
    INICIAR PLANEJAMENTO DE ROTA
 ========================================================== */
 export async function beginRoutePlanning() {
-    const userPos = getLastPosition();
 
-    if (!userPos) {
+    if (!appState.lastGPS) {
         showToast("Localização ainda não detectada.", "warning");
         return;
     }
+
+    const origin = {
+        lat: appState.lastGPS.lat,
+        lng: appState.lastGPS.lng
+    };
 
     // Buscar clientes carregados
     const list = JSON.parse(localStorage.getItem("clients") || "[]");
@@ -36,17 +39,10 @@ export async function beginRoutePlanning() {
     updateStatusBar("Gerando rota otimizada...", true);
 
     try {
-        const waypoints = list.map(c => ({
-            lat: c.lat,
-            lng: c.lng,
-            name: c.name
-        }));
+        const route = await generateOptimizedRoute(origin, list);
+        drawRoute(route);
 
-        const fullRoute = await generateOptimizedRoute(userPos, waypoints);
-
-        drawRoute(fullRoute);
         toggleClearButton(true);
-
         updateStatusBar("Rota pronta", true);
         showToast("Rota gerada com sucesso!", "success", 2500);
 
@@ -61,140 +57,56 @@ export async function beginRoutePlanning() {
 /* ==========================================================
    GERAR ROTA OTIMIZADA
 ========================================================== */
-async function generateOptimizedRoute(start, clients) {
+async function generateOptimizedRoute(origin, clients) {
 
-    // Caso tenha muitos pontos, usa Fleet Routing API no backend (Cloudflare)
-    if (clients.length > 10) {
-        return await callFleetRoutingAPI(start, clients);
-    }
+    directionsService = new google.maps.DirectionsService();
 
-    // Para poucas entregas, pode usar direto Directions API
-    return await callDirectionsAPI(start, clients);
-}
-
-/* ==========================================================
-   CHAMADA CLOUDLFARE → FLEET ROUTING API
-========================================================== */
-async function callFleetRoutingAPI(start, clients) {
-    const payload = {
-        origin: start,
-        clients
-    };
-
-    const response = await fetch("/api/optimize-route", {
-        method: "POST",
-        body: JSON.stringify(payload),
-        headers: { "Content-Type": "application/json" }
-    });
-
-    if (!response.ok) {
-        throw new Error("Erro ao chamar otimização de rota");
-    }
-
-    const data = await response.json();
-    return data.route;
-}
-
-/* ==========================================================
-   DIRECTIONS API (fallback ou rotas pequenas)
-========================================================== */
-async function callDirectionsAPI(start, clients) {
     const waypoints = clients.map(c => ({
         location: { lat: c.lat, lng: c.lng },
         stopover: true
     }));
 
-    const url = `https://maps.googleapis.com/maps/api/directions/json?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU`;
+    return new Promise((resolve, reject) => {
 
-    const payload = {
-        origin: start,
-        destination: waypoints[waypoints.length - 1].location,
-        waypoints: waypoints.slice(0, -1).map(w => w.location),
-        travelMode: "DRIVING",
-        optimizeWaypoints: true
-    };
-
-    const response = await fetch(url, {
-        method: "POST",
-        body: JSON.stringify(payload)
+        directionsService.route(
+            {
+                origin: origin,
+                destination: waypoints[waypoints.length - 1].location,
+                waypoints: waypoints.slice(0, -1),
+                travelMode: google.maps.TravelMode.DRIVING,
+                optimizeWaypoints: true
+            },
+            (result, status) => {
+                if (status === google.maps.DirectionsStatus.OK) {
+                    resolve(result);
+                } else {
+                    reject("Google Directions falhou: " + status);
+                }
+            }
+        );
     });
-
-    const data = await response.json();
-
-    if (!data.routes?.length) {
-        throw new Error("Directions API não retornou rotas");
-    }
-
-    const points = data.routes[0].overview_polyline.points;
-
-    // Decodificar polyline
-    return google.maps.geometry.encoding.decodePath(points);
 }
 
 /* ==========================================================
    DESENHAR ROTA NO MAPA
 ========================================================== */
-function drawRoute(path) {
+function drawRoute(result) {
     const map = getMap();
 
-    clearCurrentRoute(); // Remove rota anterior
+    clearCurrentRoute(); // remove rota anterior
 
-    // Criar polyline
-    routePolyline = new google.maps.Polyline({
+    directionsRenderer = new google.maps.DirectionsRenderer({
         map,
-        path,
-        strokeColor: "#4285f4",
-        strokeWeight: 6,
-        strokeOpacity: 0.9
-    });
-
-    // Adicionar marcadores de início e fim
-    addRouteMarkers(path);
-
-    // Centralizar mapa na rota
-    centerRoute(path);
-}
-
-/* ==========================================================
-   MARCADORES DA ROTA
-========================================================== */
-function addRouteMarkers(path) {
-    const map = getMap();
-
-    const start = path[0];
-    const end = path[path.length - 1];
-
-    const startMarker = new google.maps.Marker({
-        map,
-        position: start,
-        icon: {
-            url: "https://maps.google.com/mapfiles/kml/paddle/grn-circle.png",
-            scaledSize: new google.maps.Size(42, 42)
+        suppressMarkers: false,
+        preserveViewport: false,
+        polylineOptions: {
+            strokeColor: "#4285f4",
+            strokeWeight: 6,
+            strokeOpacity: 0.9
         }
     });
 
-    const endMarker = new google.maps.Marker({
-        map,
-        position: end,
-        icon: {
-            url: "https://maps.google.com/mapfiles/kml/paddle/red-circle.png",
-            scaledSize: new google.maps.Size(42, 42)
-        }
-    });
-
-    routeMarkers.push(startMarker, endMarker);
-}
-
-/* ==========================================================
-   CENTRALIZAR MAPA NA ROTA
-========================================================== */
-function centerRoute(path) {
-    const map = getMap();
-    const bounds = new google.maps.LatLngBounds();
-
-    path.forEach(p => bounds.extend(p));
-
-    map.fitBounds(bounds);
+    directionsRenderer.setDirections(result);
 }
 
 /* ==========================================================
@@ -202,13 +114,10 @@ function centerRoute(path) {
 ========================================================== */
 export function clearCurrentRoute() {
 
-    if (routePolyline) {
-        routePolyline.setMap(null);
-        routePolyline = null;
+    if (directionsRenderer) {
+        directionsRenderer.setMap(null);
+        directionsRenderer = null;
     }
-
-    routeMarkers.forEach(m => m.setMap(null));
-    routeMarkers = [];
 
     toggleClearButton(false);
     resetUIState();
