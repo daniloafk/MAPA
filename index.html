@@ -1759,6 +1759,9 @@
 <!-- SheetJS - Biblioteca para processamento de Excel -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
+<!-- Tween.js - Biblioteca para animações fluidas -->
+<script src="https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@23.1.3/dist/tween.umd.js"></script>
+
 <!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -2373,6 +2376,17 @@ let locationAccuracy = null;
 let deliveryMarkers = {}; // Armazena marcadores de endereços de entrega
 let directionsService = null; // Serviço de rotas do Google Maps
 let directionsRenderer = null; // Renderizador de rotas
+
+// Variáveis para animação Tween.js
+let currentTween = null;
+let markerCoords = { lat: 0, lng: 0 }; // Coordenadas atuais do marcador
+
+// Loop de animação Tween.js (sincronizado com requestAnimationFrame)
+function animateTweens(time) {
+    requestAnimationFrame(animateTweens);
+    TWEEN.update(time);
+}
+requestAnimationFrame(animateTweens);
 let routeMode = false; // Modo de planejamento de rota ativo/inativo
 let lastPositionUpdate = 0; // Timestamp da última atualização de posição
 let updateThrottle = 1000; // Atualizar posição no máximo a cada 1 segundo (performance)
@@ -2621,6 +2635,52 @@ function startLocationTracking() {
     );
 }
 
+// Função para animar o marcador com Tween.js (100% fluido)
+function animateMarkerToPosition(newPosition, duration = 1000) {
+    if (!userLocationMarker) return;
+
+    // Se é a primeira posição, não animar (ir direto)
+    if (markerCoords.lat === 0 && markerCoords.lng === 0) {
+        markerCoords.lat = newPosition.lat;
+        markerCoords.lng = newPosition.lng;
+
+        if (userLocationMarker.position !== undefined) {
+            userLocationMarker.position = newPosition;
+        } else if (userLocationMarker.setPosition) {
+            userLocationMarker.setPosition(newPosition);
+        }
+        return;
+    }
+
+    // Parar animação anterior se existir
+    if (currentTween) {
+        currentTween.stop();
+    }
+
+    // Criar nova animação com Tween.js
+    currentTween = new TWEEN.Tween(markerCoords)
+        .to({ lat: newPosition.lat, lng: newPosition.lng }, duration)
+        .easing(TWEEN.Easing.Quadratic.Out) // Suavização quadrática (desaceleração suave)
+        .onUpdate(() => {
+            // Atualiza a posição do marcador em cada frame
+            try {
+                const interpolatedPosition = { lat: markerCoords.lat, lng: markerCoords.lng };
+
+                if (userLocationMarker.position !== undefined) {
+                    userLocationMarker.position = interpolatedPosition;
+                } else if (userLocationMarker.setPosition) {
+                    userLocationMarker.setPosition(interpolatedPosition);
+                }
+            } catch (error) {
+                console.error('Erro ao atualizar posição do marcador:', error);
+            }
+        })
+        .onComplete(() => {
+            currentTween = null; // Limpar referência quando concluir
+        })
+        .start();
+}
+
 function updateUserLocation(position) {
     // Throttle: atualizar apenas a cada X milissegundos (performance)
     const now = Date.now();
@@ -2637,13 +2697,8 @@ function updateUserLocation(position) {
     if (!userLocationMarker) return;
 
     try {
-        // AdvancedMarkerElement usa a propriedade 'position'
-        if (userLocationMarker.position !== undefined) {
-            userLocationMarker.position = newPos;
-        } else if (userLocationMarker.setPosition) {
-            // Fallback para Marker clássico
-            userLocationMarker.setPosition(newPos);
-        }
+        // Usar animação Tween.js para transição 100% fluida
+        animateMarkerToPosition(newPos, 800); // 800ms de duração
 
         // Atualiza precisão
         locationAccuracy = position.coords.accuracy;
