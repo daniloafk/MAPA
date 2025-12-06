@@ -2758,6 +2758,11 @@ function updateUserLocation(position) {
         // Usar animação suave para mover o marcador
         animateMarkerTo(userLocationMarker, newPos, 800); // 800ms de duração
 
+        // Mover câmera suavemente para acompanhar o marcador (sempre centralizado)
+        if (map) {
+            map.panTo(newPos);
+        }
+
         // Atualiza precisão
         locationAccuracy = position.coords.accuracy;
         updateStatus(`Precisão: ${Math.round(locationAccuracy)}m`, true);
