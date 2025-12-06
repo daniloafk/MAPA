@@ -499,8 +499,6 @@
         object-fit: cover;
         display: block;
         background: #000;
-        /* Leve aumento de contraste sem brilho excessivo */
-        filter: contrast(1.1);
     }
 
     #qr-video:not([src]) {
@@ -3459,13 +3457,8 @@ async function startCamera() {
     const constraints = {
         video: {
             facingMode: currentFacingMode,
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-            frameRate: { ideal: 30, min: 15 },
-            // Melhorar foco e exposição para leitura de QR Code
-            focusMode: 'continuous',
-            exposureMode: 'continuous',
-            whiteBalanceMode: 'continuous'
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
         }
     };
 
@@ -3567,46 +3560,14 @@ function startScanning() {
             // Obter dados da imagem
             const imageData = canvasContext.getImageData(0, 0, qrCanvas.width, qrCanvas.height);
 
-            let code = null;
-
-            // Tentativa 1: Original com attemptBoth
-            code = jsQR(imageData.data, imageData.width, imageData.height, {
-                inversionAttempts: "attemptBoth",
+            // Tentar decodificar QR code
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "dontInvert",
             });
-
-            // Tentativa 2: Original sem inversão
-            if (!code) {
-                code = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: "dontInvert",
-                });
-            }
-
-            // Tentativa 3: Apenas invertido
-            if (!code) {
-                code = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: "onlyInvert",
-                });
-            }
-
-            // Tentativa 4: Com conversão para escala de cinza otimizada
-            if (!code) {
-                const grayData = convertToGrayscaleOptimized(cloneImageData(imageData));
-                code = jsQR(grayData.data, grayData.width, grayData.height, {
-                    inversionAttempts: "attemptBoth",
-                });
-            }
-
-            // Tentativa 5: Com aumento de contraste moderado
-            if (!code) {
-                const contrastData = applyContrast(cloneImageData(imageData), 1.5);
-                code = jsQR(contrastData.data, contrastData.width, contrastData.height, {
-                    inversionAttempts: "attemptBoth",
-                });
-            }
 
             if (code && code.data !== lastScannedCode) {
                 lastScannedCode = code.data;
-                console.log('✅ QR Code detectado:', code.data);
+                console.log('QR Code detectado:', code.data);
 
                 // Feedback visual
                 qrStatus.textContent = '✓ QR Code detectado!';
@@ -3624,45 +3585,7 @@ function startScanning() {
                 }, 1000);
             }
         }
-    }, 50); // Scan a cada 50ms (20 fps) - MAIS RÁPIDO
-}
-
-// Clonar ImageData para não modificar o original
-function cloneImageData(imageData) {
-    const cloned = new ImageData(imageData.width, imageData.height);
-    cloned.data.set(imageData.data);
-    return cloned;
-}
-
-// Converter para escala de cinza otimizada
-function convertToGrayscaleOptimized(imageData) {
-    const data = imageData.data;
-
-    for (let i = 0; i < data.length; i += 4) {
-        // Usar ponderação padrão ITU-R BT.709
-        const gray = Math.round(0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]);
-
-        data[i] = gray;     // R
-        data[i + 1] = gray; // G
-        data[i + 2] = gray; // B
-        // Alpha permanece igual
-    }
-
-    return imageData;
-}
-
-// Aplicar contraste ajustável
-function applyContrast(imageData, factor) {
-    const data = imageData.data;
-    const intercept = 128 * (1 - factor);
-
-    for (let i = 0; i < data.length; i += 4) {
-        data[i] = Math.min(255, Math.max(0, data[i] * factor + intercept));
-        data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * factor + intercept));
-        data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * factor + intercept));
-    }
-
-    return imageData;
+    }, 100); // Scan a cada 100ms (10 fps)
 }
 
 // Som de beep ao detectar QR code
