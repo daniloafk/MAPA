@@ -34,19 +34,9 @@
         left: 0;
         opacity: 0;
         transition: opacity 0.5s ease-in-out;
-        /* GPU acceleration otimizada para multimídia de carro */
+        /* GPU acceleration para melhor performance */
         transform: translateZ(0);
-        -webkit-transform: translateZ(0);
-        will-change: transform;
-        /* Otimizações de renderização */
-        -webkit-backface-visibility: hidden;
-        backface-visibility: hidden;
-        -webkit-perspective: 1000;
-        perspective: 1000;
-        /* Permitir todos os gestos (rotação, zoom, arrasto) */
-        touch-action: manipulation;
-        -webkit-overflow-scrolling: touch;
-        -webkit-font-smoothing: antialiased;
+        will-change: transform, opacity;
     }
 
     #map.loaded {
@@ -220,9 +210,6 @@
         border-radius: 50%;
         box-shadow: 0 2px 6px rgba(0,0,0,0.4);
         position: relative;
-        /* Transição suave para movimentos fluidos */
-        transition: transform 0.1s ease-out;
-        will-change: transform;
     }
 
     .location-marker::after {
@@ -2386,8 +2373,7 @@ let directionsService = null; // Serviço de rotas do Google Maps
 let directionsRenderer = null; // Renderizador de rotas
 let routeMode = false; // Modo de planejamento de rota ativo/inativo
 let lastPositionUpdate = 0; // Timestamp da última atualização de posição
-let updateThrottle = 200; // Atualizar posição no máximo a cada 200ms (mais fluido)
-let lastKnownPosition = null; // Última posição conhecida para interpolação
+let updateThrottle = 1000; // Atualizar posição no máximo a cada 1 segundo (performance)
 let currentInfoWindow = null; // InfoWindow atualmente aberta
 
 // IMPORTANTE: Inicializar array de polylines globalmente
@@ -2483,32 +2469,12 @@ window.initMap = function () {
             rotateControl: true,
             zoomControl: true,
             streetViewControl: false,
-            fullscreenControl: false, // Desabilitar fullscreen para performance
-            mapTypeControl: false, // Desabilitar controle de tipo de mapa
-            scaleControl: false, // Desabilitar escala
-            // Otimizações de performance para multimídia de carro
+            fullscreenControl: true,
+            // Otimizações de performance
             disableDefaultUI: false,
-            clickableIcons: false, // Desabilita cliques em POIs
-            disableDoubleClickZoom: false,
-            draggable: true,
-            scrollwheel: true,
-            minZoom: 10, // Limitar zoom mínimo para menos detalhes
-            maxZoom: 20, // Limitar zoom máximo para melhor performance
-            // Otimizações de renderização
-            renderingType: 'RASTER', // Usar renderização raster (mais leve que VECTOR)
-            // Reduzir detalhes do mapa
-            styles: [
-                {
-                    featureType: "poi",
-                    elementType: "labels",
-                    stylers: [{ visibility: "off" }] // Ocultar labels de POIs
-                },
-                {
-                    featureType: "transit",
-                    elementType: "labels",
-                    stylers: [{ visibility: "off" }] // Ocultar labels de transporte
-                }
-            ]
+            clickableIcons: false, // Desabilita cliques em POIs para melhor performance
+            minZoom: 3, // Permite zoom global
+            maxZoom: 22 // Zoom máximo detalhado
         });
 
         // Inicializar serviços de rota
@@ -2523,32 +2489,12 @@ window.initMap = function () {
             }
         });
 
-        // Otimizações adicionais para performance em multimídia de carro
-        // Debounce para eventos de drag (arrasto) - melhora fluidez
-        let dragTimeout;
-        map.addListener('dragstart', () => {
-            if (dragTimeout) clearTimeout(dragTimeout);
-        });
-
-        map.addListener('drag', () => {
-            if (dragTimeout) clearTimeout(dragTimeout);
-            dragTimeout = setTimeout(() => {
-                // Força renderização após arrasto parar
-                google.maps.event.trigger(map, 'resize');
-            }, 100);
-        });
-
         // Fechar InfoWindow ao clicar no mapa (fora dos marcadores)
         map.addListener('click', () => {
             if (currentInfoWindow) {
                 currentInfoWindow.close();
                 currentInfoWindow = null;
             }
-        });
-
-        // Desabilitar animações em zoom para melhor performance
-        map.addListener('zoom_changed', () => {
-            if (dragTimeout) clearTimeout(dragTimeout);
         });
 
         console.log('Mapa criado, aguardando tiles...');
@@ -2593,9 +2539,9 @@ function startLocationTracking() {
     markerDiv.className = 'location-marker active';
 
     const geoOptions = {
-        enableHighAccuracy: true, // Máxima precisão do GPS
-        timeout: 15000, // Timeout aumentado para 15s
-        maximumAge: 0 // Sempre buscar posição atualizada (sem cache)
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 2000 // Cachear posição por até 2s (performance)
     };
 
     console.log('Solicitando posição do GPS...');
@@ -2689,70 +2635,17 @@ function updateUserLocation(position) {
     if (!userLocationMarker) return;
 
     try {
-        // Interpolação suave entre posições para movimento fluido
-        if (lastKnownPosition) {
-            // Calcular distância entre posições
-            const latDiff = newPos.lat - lastKnownPosition.lat;
-            const lngDiff = newPos.lng - lastKnownPosition.lng;
-            const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-
-            // Se movimento muito pequeno (< 0.00001 graus ≈ 1 metro), ignorar para evitar "tremor"
-            if (distance < 0.00001) {
-                return;
-            }
-
-            // Animação suave com interpolação (easing)
-            const steps = 10; // Número de passos da animação
-            const stepDelay = updateThrottle / steps; // Delay entre cada passo
-            let currentStep = 0;
-
-            const animate = () => {
-                if (currentStep >= steps) {
-                    lastKnownPosition = newPos;
-                    return;
-                }
-
-                currentStep++;
-                const progress = currentStep / steps;
-
-                // Easing function (easeOutQuad) para movimento mais natural
-                const easeProgress = 1 - (1 - progress) * (1 - progress);
-
-                const interpolatedPos = {
-                    lat: lastKnownPosition.lat + (latDiff * easeProgress),
-                    lng: lastKnownPosition.lng + (lngDiff * easeProgress)
-                };
-
-                // Atualizar posição do marcador
-                if (userLocationMarker.position !== undefined) {
-                    userLocationMarker.position = interpolatedPos;
-                } else if (userLocationMarker.setPosition) {
-                    userLocationMarker.setPosition(interpolatedPos);
-                }
-
-                setTimeout(animate, stepDelay);
-            };
-
-            animate();
-        } else {
-            // Primeira atualização, sem interpolação
-            if (userLocationMarker.position !== undefined) {
-                userLocationMarker.position = newPos;
-            } else if (userLocationMarker.setPosition) {
-                userLocationMarker.setPosition(newPos);
-            }
-            lastKnownPosition = newPos;
+        // AdvancedMarkerElement usa a propriedade 'position'
+        if (userLocationMarker.position !== undefined) {
+            userLocationMarker.position = newPos;
+        } else if (userLocationMarker.setPosition) {
+            // Fallback para Marker clássico
+            userLocationMarker.setPosition(newPos);
         }
 
         // Atualiza precisão
         locationAccuracy = position.coords.accuracy;
         updateStatus(`Precisão: ${Math.round(locationAccuracy)}m`, true);
-
-        // Log para debug (opcional)
-        if (position.coords.speed !== null && position.coords.speed > 0) {
-            console.log(`Velocidade: ${Math.round(position.coords.speed * 3.6)} km/h`);
-        }
-
     } catch (error) {
         console.error('Erro ao atualizar posição do marcador:', error);
     }
