@@ -2373,6 +2373,8 @@ let userLocationMarker = null;
 let watchId = null;
 let _animating3D = false;
 let locationAccuracy = null;
+let positionHistory = []; // Histórico das últimas posições para suavização
+const maxHistorySize = 5; // Número de posições para calcular média
 let deliveryMarkers = {}; // Armazena marcadores de endereços de entrega
 let directionsService = null; // Serviço de rotas do Google Maps
 let directionsRenderer = null; // Renderizador de rotas
@@ -2389,7 +2391,7 @@ function animateTweens(time) {
 requestAnimationFrame(animateTweens);
 let routeMode = false; // Modo de planejamento de rota ativo/inativo
 let lastPositionUpdate = 0; // Timestamp da última atualização de posição
-let updateThrottle = 1000; // Atualizar posição no máximo a cada 1 segundo (performance)
+let updateThrottle = 500; // Atualizar posição no máximo a cada 500ms (mais responsivo)
 let currentInfoWindow = null; // InfoWindow atualmente aberta
 
 // IMPORTANTE: Inicializar array de polylines globalmente
@@ -2555,9 +2557,9 @@ function startLocationTracking() {
     markerDiv.className = 'location-marker active';
 
     const geoOptions = {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 2000 // Cachear posição por até 2s (performance)
+        enableHighAccuracy: true, // Força uso de GPS (não WiFi/célula)
+        timeout: 15000, // Tempo máximo para obter posição (15s)
+        maximumAge: 0 // NUNCA usar cache - sempre obter posição nova
     };
 
     console.log('Solicitando posição do GPS...');
@@ -2692,23 +2694,71 @@ function updateUserLocation(position) {
     }
     lastPositionUpdate = now;
 
-    const newPos = {
+    const accuracy = position.coords.accuracy;
+
+    // FILTRO 1: Rejeitar leituras muito imprecisas (> 50m)
+    if (accuracy > 50) {
+        console.warn(`GPS impreciso (${Math.round(accuracy)}m), ignorando...`);
+        return;
+    }
+
+    const rawPos = {
         lat: position.coords.latitude,
-        lng: position.coords.longitude
+        lng: position.coords.longitude,
+        accuracy: accuracy,
+        timestamp: now
     };
+
+    // FILTRO 2: Adicionar ao histórico
+    positionHistory.push(rawPos);
+
+    // Manter apenas as últimas N posições
+    if (positionHistory.length > maxHistorySize) {
+        positionHistory.shift();
+    }
+
+    // FILTRO 3: Calcular posição suavizada (média ponderada por precisão)
+    const smoothedPos = calculateSmoothedPosition(positionHistory);
 
     if (!userLocationMarker) return;
 
     try {
         // Usar animação Tween.js para transição 100% fluida
-        animateMarkerToPosition(newPos, 800); // 800ms de duração
+        animateMarkerToPosition(smoothedPos, 600); // 600ms de duração (mais rápido)
 
         // Atualiza precisão
-        locationAccuracy = position.coords.accuracy;
-        updateStatus(`Precisão: ${Math.round(locationAccuracy)}m`, true);
+        locationAccuracy = accuracy;
+        updateStatus(`Precisão: ${Math.round(accuracy)}m`, true);
+
+        console.log(`📍 GPS atualizado: ${accuracy.toFixed(1)}m de precisão`);
     } catch (error) {
         console.error('Erro ao atualizar posição do marcador:', error);
     }
+}
+
+// Função para calcular posição suavizada (média ponderada por precisão)
+function calculateSmoothedPosition(history) {
+    if (history.length === 0) return null;
+    if (history.length === 1) return { lat: history[0].lat, lng: history[0].lng };
+
+    let totalWeight = 0;
+    let weightedLat = 0;
+    let weightedLng = 0;
+
+    // Usar precisão como peso (quanto menor a accuracy, maior o peso)
+    history.forEach(pos => {
+        // Inverter accuracy para que posições mais precisas tenham maior peso
+        const weight = 1 / (pos.accuracy + 1); // +1 para evitar divisão por zero
+
+        weightedLat += pos.lat * weight;
+        weightedLng += pos.lng * weight;
+        totalWeight += weight;
+    });
+
+    return {
+        lat: weightedLat / totalWeight,
+        lng: weightedLng / totalWeight
+    };
 }
 
 function handleGeoError(error, isInitial = false) {
