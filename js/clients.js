@@ -2,16 +2,17 @@
    clients.js — CRUD de clientes + UI + Supabase
 ========================================================== */
 
-import { showToast } from "./utils.js";
-import { addClientMarker, clearClientMarkers } from "./markers.js";
-import { closeModal } from "./app.js";
+import { showToast } from "/js/utils.js";
+import { addClientMarker, clearClientMarkers } from "/js/markers.js";
+import { closeModal } from "/js/app.js";
 
 /* ==========================================================
    SUPABASE
 ========================================================== */
 
 const SUPABASE_URL = "https://pstiwhopekblruynrfbv.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzdGl3aG9wZWtibHJ1eW5yZmJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU2MzMyNzgsImV4cCI6MjA1MTIwOTI3OH0.enSadNFS48baryc-Z2HqU-Kl-QzslZf2ZzS0PTsuU10";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzdGl3aG9wZWtibHJ1eW5yZmJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU2MzMyNzgsImV4cCI6MjA1MTIwOTI3OH0.enSadNFS48baryc-Z2HqU-Kl-QzslZf2ZzS0PTsuU10";
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -35,10 +36,8 @@ export async function loadClientsFromSupabase() {
 
     clients = data || [];
 
-    // Salva localmente (backup + busca mais rápida)
     localStorage.setItem("clients", JSON.stringify(clients));
 
-    // Atualiza marcadores
     clearClientMarkers();
     clients.forEach(c => addClientMarker(c));
 }
@@ -79,7 +78,7 @@ export function renderClientList() {
 }
 
 /* ==========================================================
-   SALVAR CLIENTE (Adicionar ou atualizar)
+   SALVAR CLIENTE
 ========================================================== */
 export async function handleClientSave(e) {
     e.preventDefault();
@@ -98,7 +97,6 @@ export async function handleClientSave(e) {
         return;
     }
 
-    // Geocodificação do endereço (garante lat/lng)
     const coords = await geocodeAddress(address);
 
     if (!coords) {
@@ -114,7 +112,6 @@ export async function handleClientSave(e) {
         lng: coords.lng
     };
 
-    // Salvar no Supabase
     const { data, error } = await supabase
         .from("clientes")
         .insert(newClient)
@@ -126,10 +123,8 @@ export async function handleClientSave(e) {
         return;
     }
 
-    // Adicionar na memória
     clients.push(data[0]);
 
-    // Atualizar UI
     localStorage.setItem("clients", JSON.stringify(clients));
     renderClientList();
     addClientMarker(data[0]);
@@ -144,7 +139,8 @@ export async function handleClientSave(e) {
 ========================================================== */
 async function geocodeAddress(text) {
     try {
-        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(text)}&key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU`;
+        const url =
+          `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(text)}&key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU`;
 
         const res = await fetch(url);
         const data = await res.json();
@@ -152,7 +148,6 @@ async function geocodeAddress(text) {
         if (!data.results || data.results.length === 0) return null;
 
         return data.results[0].geometry.location;
-
     } catch (err) {
         console.error(err);
         return null;
@@ -160,7 +155,7 @@ async function geocodeAddress(text) {
 }
 
 /* ==========================================================
-   PESQUISA LOCAL NA LISTA
+   PESQUISA LOCAL
 ========================================================== */
 export function searchClients(term) {
     term = term.toLowerCase();
