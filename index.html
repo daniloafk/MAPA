@@ -3459,13 +3459,13 @@ async function startCamera() {
     const constraints = {
         video: {
             facingMode: currentFacingMode,
-            width: { ideal: 1920, min: 1280 },
-            height: { ideal: 1080, min: 720 },
-            frameRate: { ideal: 30 },
-            // Solicitar melhor qualidade de foco e exposição
-            focusMode: { ideal: 'continuous' },
-            exposureMode: { ideal: 'continuous' },
-            whiteBalanceMode: { ideal: 'continuous' }
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            frameRate: { ideal: 30, min: 15 },
+            // Melhorar foco e exposição para leitura de QR Code
+            focusMode: 'continuous',
+            exposureMode: 'continuous',
+            whiteBalanceMode: 'continuous'
         }
     };
 
@@ -3564,44 +3564,49 @@ function startScanning() {
             // Desenhar frame atual do vídeo no canvas
             canvasContext.drawImage(qrVideo, 0, 0, qrCanvas.width, qrCanvas.height);
 
-            // Obter dados da imagem original
-            const originalImageData = canvasContext.getImageData(0, 0, qrCanvas.width, qrCanvas.height);
+            // Obter dados da imagem
+            const imageData = canvasContext.getImageData(0, 0, qrCanvas.width, qrCanvas.height);
 
-            // ESTRATÉGIA MULTI-TENTATIVA: Tentar ler com diferentes processamentos
             let code = null;
 
-            // Tentativa 1: Imagem ORIGINAL (sem processamento)
-            code = jsQR(originalImageData.data, originalImageData.width, originalImageData.height, {
+            // Tentativa 1: Original com attemptBoth
+            code = jsQR(imageData.data, imageData.width, imageData.height, {
                 inversionAttempts: "attemptBoth",
             });
 
-            // Tentativa 2: Se não encontrou, tentar com CONTRASTE LEVE
+            // Tentativa 2: Original sem inversão
             if (!code) {
-                const contrastData = applyContrast(cloneImageData(originalImageData), 1.3);
+                code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: "dontInvert",
+                });
+            }
+
+            // Tentativa 3: Apenas invertido
+            if (!code) {
+                code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: "onlyInvert",
+                });
+            }
+
+            // Tentativa 4: Com conversão para escala de cinza otimizada
+            if (!code) {
+                const grayData = convertToGrayscaleOptimized(cloneImageData(imageData));
+                code = jsQR(grayData.data, grayData.width, grayData.height, {
+                    inversionAttempts: "attemptBoth",
+                });
+            }
+
+            // Tentativa 5: Com aumento de contraste moderado
+            if (!code) {
+                const contrastData = applyContrast(cloneImageData(imageData), 1.5);
                 code = jsQR(contrastData.data, contrastData.width, contrastData.height, {
-                    inversionAttempts: "attemptBoth",
-                });
-            }
-
-            // Tentativa 3: Se não encontrou, tentar com EQUALIZAÇÃO adaptativa
-            if (!code) {
-                const equalizedData = adaptiveEqualization(cloneImageData(originalImageData));
-                code = jsQR(equalizedData.data, equalizedData.width, equalizedData.height, {
-                    inversionAttempts: "attemptBoth",
-                });
-            }
-
-            // Tentativa 4: Se não encontrou, tentar com SHARPEN (nitidez)
-            if (!code) {
-                const sharpenedData = applySharpen(cloneImageData(originalImageData));
-                code = jsQR(sharpenedData.data, sharpenedData.width, sharpenedData.height, {
                     inversionAttempts: "attemptBoth",
                 });
             }
 
             if (code && code.data !== lastScannedCode) {
                 lastScannedCode = code.data;
-                console.log('QR Code detectado:', code.data);
+                console.log('✅ QR Code detectado:', code.data);
 
                 // Feedback visual
                 qrStatus.textContent = '✓ QR Code detectado!';
@@ -3619,7 +3624,7 @@ function startScanning() {
                 }, 1000);
             }
         }
-    }, 100); // Scan a cada 100ms (10 fps)
+    }, 50); // Scan a cada 50ms (20 fps) - MAIS RÁPIDO
 }
 
 // Clonar ImageData para não modificar o original
@@ -3629,88 +3634,35 @@ function cloneImageData(imageData) {
     return cloned;
 }
 
+// Converter para escala de cinza otimizada
+function convertToGrayscaleOptimized(imageData) {
+    const data = imageData.data;
+
+    for (let i = 0; i < data.length; i += 4) {
+        // Usar ponderação padrão ITU-R BT.709
+        const gray = Math.round(0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]);
+
+        data[i] = gray;     // R
+        data[i + 1] = gray; // G
+        data[i + 2] = gray; // B
+        // Alpha permanece igual
+    }
+
+    return imageData;
+}
+
 // Aplicar contraste ajustável
 function applyContrast(imageData, factor) {
     const data = imageData.data;
-    const contrast = (factor - 1) * 128;
+    const intercept = 128 * (1 - factor);
 
     for (let i = 0; i < data.length; i += 4) {
-        data[i] = Math.min(255, Math.max(0, data[i] * factor - contrast));
-        data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * factor - contrast));
-        data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * factor - contrast));
+        data[i] = Math.min(255, Math.max(0, data[i] * factor + intercept));
+        data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * factor + intercept));
+        data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * factor + intercept));
     }
 
     return imageData;
-}
-
-// Equalização adaptativa (CLAHE simplificado)
-function adaptiveEqualization(imageData) {
-    const data = imageData.data;
-
-    // Converter para escala de cinza e calcular histograma
-    const histogram = new Array(256).fill(0);
-
-    for (let i = 0; i < data.length; i += 4) {
-        const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-        histogram[gray]++;
-    }
-
-    // Calcular CDF (Cumulative Distribution Function)
-    const cdf = new Array(256);
-    cdf[0] = histogram[0];
-    for (let i = 1; i < 256; i++) {
-        cdf[i] = cdf[i - 1] + histogram[i];
-    }
-
-    // Normalizar CDF
-    const totalPixels = imageData.width * imageData.height;
-    const cdfMin = cdf.find(val => val > 0);
-
-    for (let i = 0; i < data.length; i += 4) {
-        const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-        const equalized = Math.round(((cdf[gray] - cdfMin) / (totalPixels - cdfMin)) * 255);
-
-        data[i] = equalized;
-        data[i + 1] = equalized;
-        data[i + 2] = equalized;
-    }
-
-    return imageData;
-}
-
-// Aplicar filtro de nitidez (sharpen)
-function applySharpen(imageData) {
-    const data = imageData.data;
-    const width = imageData.width;
-    const height = imageData.height;
-    const output = cloneImageData(imageData);
-    const outputData = output.data;
-
-    // Kernel de sharpen
-    const kernel = [
-        0, -1, 0,
-        -1, 5, -1,
-        0, -1, 0
-    ];
-
-    for (let y = 1; y < height - 1; y++) {
-        for (let x = 1; x < width - 1; x++) {
-            for (let c = 0; c < 3; c++) {
-                let sum = 0;
-                for (let ky = -1; ky <= 1; ky++) {
-                    for (let kx = -1; kx <= 1; kx++) {
-                        const idx = ((y + ky) * width + (x + kx)) * 4 + c;
-                        const kernelIdx = (ky + 1) * 3 + (kx + 1);
-                        sum += data[idx] * kernel[kernelIdx];
-                    }
-                }
-                const outIdx = (y * width + x) * 4 + c;
-                outputData[outIdx] = Math.min(255, Math.max(0, sum));
-            }
-        }
-    }
-
-    return output;
 }
 
 // Som de beep ao detectar QR code
