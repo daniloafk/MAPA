@@ -2672,10 +2672,8 @@ function animateMarkerToPosition(newPosition, duration = 1000) {
                     userLocationMarker.setPosition(interpolatedPosition);
                 }
 
-                // Movimento suave da câmera acompanhando o marcador (sugestão Google Gemini)
-                if (map && map.panTo) {
-                    map.panTo(interpolatedPosition);
-                }
+                // Movimento suave da câmera removido para não travar gestos do usuário
+                // O map.panTo() a 60 FPS causava conflito com drag/pinch do touchscreen
             } catch (error) {
                 console.error('Erro ao atualizar posição do marcador:', error);
             }
