@@ -12,7 +12,7 @@
             <text y='.9em' font-size='90'>📍</text>
         </svg>">
 
-    <!-- CSS principal (novo e otimizado) -->
+    <!-- CSS principal -->
     <link rel="stylesheet" href="styles/styles.css">
 
     <!-- SheetJS -->
@@ -27,12 +27,11 @@
     <!-- jsQR -->
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
-    <!-- Google Maps (apenas bootstrap, init vem de app.js) -->
+    <!-- Google Maps -->
     <script async
         src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&callback=initApp&libraries=geometry,places,marker&v=beta">
     </script>
 </head>
-
 
 <body>
 
@@ -48,10 +47,10 @@
     <!-- MAPA -->
     <div id="map" class="map"></div>
 
-    <!-- CONTROLES DO MAPA (UI NOVA) -->
+    <!-- CONTROLES DO MAPA -->
     <div id="map-controls" class="map-controls hidden">
         <button id="btn3D" class="control-btn" title="Alternar 3D/2D">3D</button>
-        <button id="btnCenter" class="control-btn" title="Centralizar">📍</button>
+        <button id="btnCenter" class="control-btn" title="Centralizar GPS">📍</button>
         <button id="btnRoute" class="control-btn" title="Planejar rota">🚗</button>
         <button id="btnClear" class="control-btn hidden" title="Limpar rotas">🗑️</button>
         <button id="btnSidebar" class="control-btn" title="Lista de clientes">👥</button>
@@ -60,10 +59,10 @@
         <button id="btnMatchedClients" class="control-btn" title="Clientes identificados">📍</button>
     </div>
 
-    <!-- TOAST (notificações) -->
+    <!-- TOASTS -->
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- STATUS BAR -->
+    <!-- STATUS BAR (GPS) -->
     <div id="status-bar" class="status-bar hidden">
         <div id="status-indicator" class="status-indicator"></div>
         <span id="status-text">Rastreando localização...</span>
@@ -74,7 +73,7 @@
         ➕ Adicionar Cliente
     </button>
 
-    <!-- SIDEBAR (LISTA DE CLIENTES) -->
+    <!-- SIDEBAR CLIENTES -->
     <div id="sidebar-overlay" class="sidebar-overlay"></div>
 
     <div id="sidebar" class="sidebar">
@@ -99,7 +98,7 @@
         </div>
     </div>
 
-    <!-- MODAL: ADICIONAR / EDITAR CLIENTE -->
+    <!-- MODAL CLIENTE -->
     <div id="modal-client" class="modal">
         <div class="modal-content">
             <button id="modal-client-close" class="modal-close">✕</button>
@@ -153,7 +152,7 @@
         </div>
     </div>
 
-    <!-- MODAL UPLOAD PLANILHA -->
+    <!-- MODAL PLANILHA -->
     <div id="modal-spreadsheet" class="modal">
         <div class="modal-content">
             <button id="modal-spreadsheet-close" class="modal-close">✕</button>
@@ -180,12 +179,21 @@
         </div>
     </div>
 
+    <!-- PAINEL COMPLETO DE PRECISÃO DO GPS -->
+    <div id="gps-panel" class="gps-panel">
+        <h3>GPS INFO</h3>
+        <div><b>Precisão:</b> <span id="gps-accuracy">--</span> m</div>
+        <div><b>Velocidade:</b> <span id="gps-speed">--</span> m/s</div>
+        <div><b>Heading:</b> <span id="gps-heading">--</span>°</div>
+        <div><b>Bússola:</b> <span id="gps-compass">--</span>°</div>
+        <div><b>Lat:</b> <span id="gps-lat">--</span></div>
+        <div><b>Lng:</b> <span id="gps-lng">--</span></div>
+    </div>
 
-    <!-- INICIALIZAÇÃO DA APLICAÇÃO -->
+    <!-- INICIALIZAÇÃO -->
     <script type="module">
         import { initApp } from "./js/app.js";
-        window.initApp = initApp; // usado pelo callback do Google Maps
+        window.initApp = initApp;
     </script>
 </body>
-
 </html>
