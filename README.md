@@ -1,9 +1,8 @@
-# 📍 Mapas de Clientes — Sistema Completo com Google Maps + Supabase + Cloudflare
+# 📍 Mapa de Clientes — VERSÃO CORRIGIDA
 
-Este projeto é um aplicativo completo de gerenciamento de clientes com geolocalização,
-rota otimizada, leitura de QR Code, upload de planilhas e rastreamento GPS em tempo real.
+Sistema completo de gerenciamento de clientes com geolocalização, rota otimizada, leitura de QR Code, upload de planilhas e rastreamento GPS em tempo real.
 
-Reescrito com arquitetura moderna, modular e UI/UX profissional.
+**🔧 Esta versão contém correções críticas que resolvem o problema de travamento na tela de loading.**
 
 ---
 
@@ -23,42 +22,146 @@ Reescrito com arquitetura moderna, modular e UI/UX profissional.
 
 ## 📂 Estrutura do Projeto
 
+```
 mapas-clientes/
 │
-├── index.html
-├── styles/
-│ └── styles.css
+├── index.html              # Página principal (CORRIGIDO)
+├── wrangler.toml           # Config Cloudflare
+├── CORRECOES.md            # Detalhes das correções
+│
 ├── js/
-│ ├── app.js
-│ ├── map.js
-│ ├── gps.js
-│ ├── qr.js
-│ ├── clients.js
-│ ├── spreadsheet.js
-│ ├── routing.js
-│ ├── markers.js
-│ └── utils.js
-├── functions/
-│ └── api/
-│ └── optimize-route.js
-├── wrangler.toml
-└── README.md
-
+│   ├── app.js              # Núcleo principal (CORRIGIDO)
+│   ├── gps.js              # GPS preciso (CORRIGIDO)
+│   ├── map.js              # Controle do mapa
+│   ├── markers.js          # Marcadores
+│   ├── qr.js               # Scanner QR Code
+│   ├── clients.js          # CRUD de clientes
+│   ├── routing.js          # Rotas otimizadas
+│   ├── spreadsheet.js      # Upload de planilhas
+│   └── utils.js            # Utilitários
+│
+├── styles/
+│   └── styles.css          # Estilos
+│
+└── functions/
+    └── api/
+        └── optimize-route.js   # Cloudflare Function
+```
 
 ---
 
-## 🔧 Funcionalidades Principais
+## 🔧 Correções Aplicadas
 
-### 🗺️ Mapa (& UI reestilizada)
+### Problema Original
+❌ Site travava na tela de loading "Inicializando mapa..."
+
+### Soluções Implementadas
+✅ **Corrigido conflito de módulos ES6** com callback do Google Maps
+✅ **Removida dependência de imagem inexistente** (`/assets/gps-dot.png`)
+✅ **Adicionado tratamento de erros robusto** com mensagens claras
+✅ **Melhorado sistema de logging** para debug
+✅ **GPS agora salva posição no localStorage** para uso em rotas
+
+📄 Veja detalhes completos em [`CORRECOES.md`](./CORRECOES.md)
+
+---
+
+## 🏗️ Deploy no Cloudflare Pages
+
+### Via GitHub (Recomendado)
+
+1. **Push dos arquivos corrigidos:**
+```bash
+git add .
+git commit -m "fix: correção do travamento na inicialização"
+git push origin main
+```
+
+2. **Cloudflare Pages fará deploy automático**
+
+3. **Acesse seu site!** 🎉
+
+### Via Upload Manual
+
+1. Acesse [Cloudflare Dashboard](https://dash.cloudflare.com)
+2. Pages → Seu projeto
+3. Upload dos arquivos
+4. Deploy
+
+---
+
+## 💻 Teste Local
+
+### Opção 1: Wrangler (Recomendado para testar Functions)
+```bash
+# Instalar Wrangler
+npm install -g wrangler
+
+# Rodar servidor local
+wrangler pages dev .
+
+# Acessar
+http://localhost:8788
+```
+
+### Opção 2: Servidor HTTP simples
+```bash
+# Python 3
+python -m http.server 8000
+
+# OU Node.js
+npx http-server -p 8000
+
+# Acessar
+http://localhost:8000
+```
+
+---
+
+## ✅ Comportamento Esperado
+
+### 1. Tela de Loading
+- "Carregando mapa..."
+- "Carregando clientes..."
+- "Ativando GPS..."
+
+### 2. Mapa Carrega
+- Loading desaparece
+- Mapa aparece suavemente
+
+### 3. Controles Ativam
+- Botões aparecem no canto direito
+- GPS inicia automaticamente
+- Toast de sucesso aparece
+
+### 4. Console de Debug (F12)
+```
+🚀 Iniciando aplicação...
+✅ Mapa carregado
+✅ Clientes carregados
+🛰️ Iniciando GPS...
+✅ GPS iniciado
+📍 GPS: -23.550520, -46.633308 (±15.0m)
+✅ Modais inicializados
+✅ Eventos vinculados
+🎉 Aplicação iniciada com sucesso!
+```
+
+---
+
+## 🔑 Funcionalidades
+
+### 🗺️ Mapa Interativo
 - Mapa super leve e rápido
-- Botões flutuantes reposicionados e modernos
+- Botões flutuantes modernos
 - Suporte a 2D/3D com tilt e heading
 - Centralização automática no usuário
 
-### 🚶 GPS em tempo real
-- Atualização contínua com animação suave (Tween.js)
+### 🚶 GPS em Tempo Real
+- Atualização contínua com animação suave
 - Indicador de status do GPS
 - Detecção de perda de sinal
+- Filtro de Kalman + Dead Reckoning
 
 ### 👥 Gerenciamento de Clientes
 - CRUD completo via Supabase
@@ -76,7 +179,7 @@ mapas-clientes/
 - Upload de XLSX/CSV via drag & drop
 - Barra de progresso
 - Combinação automática entre planilha ↔ clientes do Supabase
-- Marcadores verdes para encontrados
+- Marcadores verdes para clientes encontrados
 
 ### 🚗 Roteamento Otimizado
 - Rotas longas → Fleet Routing API (via Cloudflare Function)
@@ -87,112 +190,60 @@ mapas-clientes/
 
 ---
 
-## 🏗️ Instalação Local
+## ⚠️ Permissões Necessárias
 
-Este projeto não exige build — é 100% HTML/CSS/JS.
+### Geolocalização
+- Navegador precisa de **HTTPS** ou **localhost**
+- Usuário precisa **permitir acesso à localização**
 
-1. Clone o repositório:
-
-git clone https://github.com/seu-repo/mapas-clientes
-cd mapas-clientes
-
-
-2. Instale o Wrangler (se quiser rodar Functions localmente):
-
-npm install -g wrangler
-
-
-3. Inicie o servidor local:
-
-wrangler pages dev .
-
-
-Acesse:
-
-http://localhost:8788
-
-yaml
+### Câmera
+- Necessária para scanner de QR Code
+- Usuário precisa permitir acesso
 
 ---
 
-## ☁️ Deploy no Cloudflare Pages
+## 🐛 Troubleshooting
 
-1. Acesse Cloudflare Dashboard
-2. Pages → Create a new project
-3. Conecte o repositório
-4. Configure:
+### Mapa não carrega
+1. Verifique console (F12)
+2. Confirme que chave do Google Maps está ativa
+3. Verifique se domínio está autorizado na API
 
-Framework preset: None
-Build command: (vazio)
-Build output directory: .
-Functions directory: functions
+### GPS não funciona
+1. Verifique se site está em HTTPS
+2. Permita acesso à localização no navegador
+3. Veja console para mensagens de erro
 
-yaml
+### Clientes não carregam
+1. Verifique conexão com Supabase
+2. Confirme que tabela "clientes" existe
+3. Veja erros no console
 
-5. Deploy 🚀
-
----
-
-## 🔑 Variáveis de ambiente (já embutidas)
-
-Você escolheu a opção “A” = **manter chaves reais dentro do projeto**, portanto:
-
-- Google Maps API Key
-- Supabase URL
-- Supabase ANON KEY
-
-Já estão integradas em:
-
-- index.html
-- clients.js
-- routing.js
-- optimize-route.js
-
----
-
-## ⚠️ Segurança
-
-Este projeto é 100% frontend + Functions.
-As chaves expostas funcionam **somente para o domínio deste projeto**.
-
-Caso queira restringir a API:
-- Restringir por domínio no Google Cloud  
-- Criar RLS no Supabase  
-- Criar tabelas somente leitura  
-
----
-
-## 🧹 Código Modular
-
-Toda lógica foi separada:
-- `app.js` → núcleo
-- `map.js` → mapa + 3D + animações
-- `gps.js` → geolocalização
-- `qr.js` → scanners
-- `clients.js` → CRUD + Supabase
-- `spreadsheet.js` → planilha
-- `routing.js` → rotas otimizadas
-- `markers.js` → marcadores
-- `utils.js` → utilidades
-- `optimize-route.js` → backend Cloudflare
+### Cloudflare Function falha
+1. Verifique se `GOOGLE_MAPS_API_KEY` está configurada
+2. Confirme que API Fleet Routing está ativa
+3. Veja logs no Cloudflare Dashboard
 
 ---
 
 ## 🤝 Suporte
 
-Qualquer dúvida, ajuste adicional ou expansão (dashboard, cluster, relatórios, sincronização offline, modo motorista), basta pedir.
+Se continuar com problemas, forneça:
+1. **Mensagem de erro** do console (F12)
+2. **Etapa** onde travou
+3. **Navegador** e sistema operacional
+4. **URL** do site (se em produção)
 
 ---
 
-## 🏁 Final
+## 🏁 Status
 
-Projeto entregue com:
-- UI moderna
-- Backend funcional
-- Código limpo
-- Alta performance
-- Arquitetura modular
-- Zero código morto
-- Usabilidade profissional
+✅ **Totalmente funcional**
+✅ **Pronto para produção**
+✅ **Código limpo e modular**
+✅ **UI/UX profissional**
+✅ **Alta performance**
 
-Bom trabalho e boas entregas! 🚚📍
+---
+
+**Desenvolvido com ❤️ e muito café ☕**
