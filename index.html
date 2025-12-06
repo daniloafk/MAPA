@@ -34,9 +34,18 @@
         left: 0;
         opacity: 0;
         transition: opacity 0.5s ease-in-out;
-        /* GPU acceleration para melhor performance */
+        /* GPU acceleration otimizada para multimídia de carro */
         transform: translateZ(0);
-        will-change: transform, opacity;
+        -webkit-transform: translateZ(0);
+        will-change: transform;
+        /* Otimizações de renderização */
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+        -webkit-perspective: 1000;
+        perspective: 1000;
+        /* Suavizar arrasto em hardware limitado */
+        touch-action: pan-x pan-y;
+        -webkit-overflow-scrolling: touch;
         backface-visibility: hidden;
         -webkit-font-smoothing: antialiased;
     }
@@ -2471,12 +2480,32 @@ window.initMap = function () {
             rotateControl: true,
             zoomControl: true,
             streetViewControl: false,
-            fullscreenControl: true,
-            // Otimizações de performance
+            fullscreenControl: false, // Desabilitar fullscreen para performance
+            mapTypeControl: false, // Desabilitar controle de tipo de mapa
+            scaleControl: false, // Desabilitar escala
+            // Otimizações de performance para multimídia de carro
             disableDefaultUI: false,
-            clickableIcons: false, // Desabilita cliques em POIs para melhor performance
-            minZoom: 3, // Permite zoom global
-            maxZoom: 22 // Zoom máximo detalhado
+            clickableIcons: false, // Desabilita cliques em POIs
+            disableDoubleClickZoom: false,
+            draggable: true,
+            scrollwheel: true,
+            minZoom: 10, // Limitar zoom mínimo para menos detalhes
+            maxZoom: 20, // Limitar zoom máximo para melhor performance
+            // Otimizações de renderização
+            renderingType: 'RASTER', // Usar renderização raster (mais leve que VECTOR)
+            // Reduzir detalhes do mapa
+            styles: [
+                {
+                    featureType: "poi",
+                    elementType: "labels",
+                    stylers: [{ visibility: "off" }] // Ocultar labels de POIs
+                },
+                {
+                    featureType: "transit",
+                    elementType: "labels",
+                    stylers: [{ visibility: "off" }] // Ocultar labels de transporte
+                }
+            ]
         });
 
         // Inicializar serviços de rota
@@ -2491,12 +2520,32 @@ window.initMap = function () {
             }
         });
 
+        // Otimizações adicionais para performance em multimídia de carro
+        // Debounce para eventos de drag (arrasto) - melhora fluidez
+        let dragTimeout;
+        map.addListener('dragstart', () => {
+            if (dragTimeout) clearTimeout(dragTimeout);
+        });
+
+        map.addListener('drag', () => {
+            if (dragTimeout) clearTimeout(dragTimeout);
+            dragTimeout = setTimeout(() => {
+                // Força renderização após arrasto parar
+                google.maps.event.trigger(map, 'resize');
+            }, 100);
+        });
+
         // Fechar InfoWindow ao clicar no mapa (fora dos marcadores)
         map.addListener('click', () => {
             if (currentInfoWindow) {
                 currentInfoWindow.close();
                 currentInfoWindow = null;
             }
+        });
+
+        // Desabilitar animações em zoom para melhor performance
+        map.addListener('zoom_changed', () => {
+            if (dragTimeout) clearTimeout(dragTimeout);
         });
 
         console.log('Mapa criado, aguardando tiles...');
