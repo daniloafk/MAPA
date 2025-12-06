@@ -1,42 +1,16 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mapa de Clientes</title>
+    <title>Sistema de Rotas</title>
 
-    <!-- Ícone -->
-    <link rel="icon" href="data:image/svg+xml,
-        <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
-            <text y='.9em' font-size='90'>📍</text>
-        </svg>">
-
-    <!-- CSS principal -->
-    <link rel="stylesheet" href="/styles/styles.css">
-
-    <!-- SheetJS -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
-    <!-- TweenJS -->
-    <script src="https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@23.1.3/dist/tween.umd.js"></script>
-
-    <!-- Supabase -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <!-- jsQR -->
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-
-    <!-- Google Maps -->
-    <script async defer
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&callback=initApp&libraries=geometry,places,marker&v=beta">
-    </script>
+    <link rel="stylesheet" href="/styles/styles.css" />
 </head>
 
 <body>
 
-    <!-- TELA DE LOADING -->
-    <div id="loading-screen" class="loading-screen">
+    <div id="loading-screen">
         <div class="loading-content">
             <div class="spinner"></div>
             <div id="loading-text">Inicializando mapa...</div>
@@ -44,142 +18,24 @@
         </div>
     </div>
 
-    <!-- MAPA -->
     <div id="map" class="map"></div>
 
-    <!-- CONTROLES -->
-    <div id="map-controls" class="map-controls hidden">
-        <button id="btn3D" class="control-btn" title="Alternar 3D/2D">3D</button>
-        <button id="btnCenter" class="control-btn" title="Centralizar">📍</button>
-        <button id="btnRoute" class="control-btn" title="Planejar rota">🚗</button>
-        <button id="btnClear" class="control-btn hidden" title="Limpar rotas">🗑️</button>
-        <button id="btnSidebar" class="control-btn" title="Lista de clientes">👥</button>
-        <button id="btnSpreadsheet" class="control-btn" title="Planilha do dia">📊</button>
-        <button id="btnToggleClients" class="control-btn" title="Clientes no mapa">👤</button>
-        <button id="btnMatchedClients" class="control-btn" title="Clientes identificados">📍</button>
-    </div>
+    <!-- Google Maps sem callback (correto para 2025) -->
+    <script async 
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&libraries=geometry,places,marker&v=beta&loading=async">
+    </script>
 
-    <!-- TOAST -->
-    <div id="toast-container" class="toast-container"></div>
-
-    <!-- STATUS BAR -->
-    <div id="status-bar" class="status-bar hidden">
-        <div id="status-indicator" class="status-indicator"></div>
-        <span id="status-text">Rastreando localização...</span>
-    </div>
-
-    <!-- BOTÃO ADICIONAR CLIENTE -->
-    <button id="btnAddClient" class="btn-add-client hidden">
-        ➕ Adicionar Cliente
-    </button>
-
-    <!-- SIDEBAR -->
-    <div id="sidebar-overlay" class="sidebar-overlay"></div>
-
-    <div id="sidebar" class="sidebar">
-        <div class="sidebar-header">
-            <div class="sidebar-title">
-                👥 Clientes <span id="client-count" class="client-count">0</span>
-            </div>
-            <button id="sidebar-close" class="sidebar-close">✕</button>
-        </div>
-
-        <div class="sidebar-search">
-            <input id="search-input" class="search-input" placeholder="Buscar cliente..." />
-            <button id="btnScanPackage" class="btn-scan-package">📦</button>
-        </div>
-
-        <div id="clients-list" class="clients-list">
-            <div class="empty-state">
-                <div class="empty-icon">📋</div>
-                <div>Nenhum cliente cadastrado</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL CLIENTE -->
-    <div id="modal-client" class="modal">
-        <div class="modal-content">
-            <button id="modal-client-close" class="modal-close">✕</button>
-
-            <h2 class="modal-title">Adicionar Cliente</h2>
-
-            <div class="qr-area">
-                <video id="qr-video" autoplay playsinline></video>
-                <canvas id="qr-canvas"></canvas>
-                <div id="qr-status" class="qr-status">Procurando QR Code...</div>
-            </div>
-
-            <div id="address-display" class="address-display hidden">
-                <b>📍 Endereço:</b>
-                <div id="address-text"></div>
-            </div>
-
-            <form id="client-form" class="modal-form">
-                <label>Nome *</label>
-                <input id="client-name" required />
-
-                <label>Telefone</label>
-                <input id="client-phone" maxlength="16" />
-
-                <button id="btnClientSave" class="btn-primary" type="submit">
-                    Salvar
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL PACOTE -->
-    <div id="modal-package" class="modal">
-        <div class="modal-content">
-            <button id="modal-package-close" class="modal-close">✕</button>
-
-            <h2 class="modal-title">Escanear Pacote</h2>
-
-            <video id="qr-package-video" autoplay playsinline></video>
-            <canvas id="qr-package-canvas"></canvas>
-            <div id="qr-package-status" class="qr-status">Procurando código...</div>
-
-            <div id="scan-result" class="scan-result hidden"></div>
-
-            <button id="btnPackageClose" class="btn-secondary">
-                Fechar
-            </button>
-        </div>
-    </div>
-
-    <!-- MODAL UPLOAD PLANILHA -->
-    <div id="modal-spreadsheet" class="modal">
-        <div class="modal-content">
-            <button id="modal-spreadsheet-close" class="modal-close">✕</button>
-
-            <h2 class="modal-title">Atualizar Planilha</h2>
-
-            <div class="upload-warning">
-                ⚠️ Ao enviar uma nova planilha, os dados anteriores serão apagados.
-            </div>
-
-            <div id="upload-area" class="upload-area">
-                <div class="upload-icon">📊</div>
-                <p>Arraste sua planilha aqui</p>
-                <p class="upload-sub">Ou clique para selecionar</p>
-                <input id="file-input" type="file" accept=".xlsx,.xls,.csv" hidden />
-            </div>
-
-            <div id="upload-progress" class="upload-progress hidden">
-                <div class="progress-bar"><div id="progress-fill"></div></div>
-                <p id="progress-text">Processando planilha...</p>
-            </div>
-
-            <div id="upload-result" class="upload-result hidden"></div>
-        </div>
-    </div>
-
-    <!-- INICIALIZAÇÃO -->
+    <!-- Carrega app somente quando Maps estiver pronto -->
     <script type="module">
         import { initApp } from "/js/app.js";
-        window.initApp = initApp;
-    </script>
-</body>
 
+        const wait = setInterval(() => {
+            if (window.google?.maps) {
+                clearInterval(wait);
+                initApp();
+            }
+        }, 50);
+    </script>
+
+</body>
 </html>
