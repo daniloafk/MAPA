@@ -254,7 +254,7 @@ body, html {
     left: 0;
 }
 
-/* header */
+/* HEADER */
 .sidebar-header {
     padding: 22px;
     background: linear-gradient(135deg, #667eea, #764ba2);
@@ -282,7 +282,7 @@ body, html {
     cursor: pointer;
 }
 
-/* search */
+/* SEARCH */
 .sidebar-search {
     padding: 14px;
     border-bottom: 1px solid #eee;
@@ -308,7 +308,7 @@ body, html {
     font-size: 22px;
 }
 
-/* client list */
+/* LISTA DE CLIENTES */
 .clients-list {
     padding: 16px;
     overflow-y: auto;
@@ -388,7 +388,7 @@ body, html {
     margin-bottom: 16px;
 }
 
-/* form */
+/* FORM */
 .modal-form label {
     font-weight: 600;
     font-size: 14px;
@@ -404,7 +404,7 @@ body, html {
     margin-bottom: 10px;
 }
 
-/* buttons */
+/* BOTÕES */
 .btn-primary {
     width: 100%;
     padding: 12px;
