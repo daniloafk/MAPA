@@ -1,8 +1,0 @@
-name = "mapas-clientes"
-compatibility_date = "2025-01-01"
-
-[functions]
-directory = "functions"
-
-[vars]
-GOOGLE_MAPS_API_KEY = "AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU"
