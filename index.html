@@ -3039,8 +3039,19 @@ async function addDeliveryMarkers() {
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
 
-                    // Centralizar mapa suavemente
+                    // Centralizar mapa suavemente SEM rotação
+                    // Salvar heading e tilt atuais
+                    const currentHeading = map.getHeading() || 0;
+                    const currentTilt = map.getTilt() || 0;
+
+                    // Centralizar no marcador
                     map.panTo(position);
+
+                    // Restaurar heading e tilt (previne rotação automática)
+                    setTimeout(() => {
+                        map.setHeading(currentHeading);
+                        map.setTilt(currentTilt);
+                    }, 0);
                 });
 
                 // Armazenar o marcador com a chave da coordenada
@@ -3069,8 +3080,19 @@ async function addDeliveryMarkers() {
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
 
-                    // Centralizar mapa suavemente
+                    // Centralizar mapa suavemente SEM rotação
+                    // Salvar heading e tilt atuais
+                    const currentHeading = map.getHeading() || 0;
+                    const currentTilt = map.getTilt() || 0;
+
+                    // Centralizar no marcador
                     map.panTo(position);
+
+                    // Restaurar heading e tilt (previne rotação automática)
+                    setTimeout(() => {
+                        map.setHeading(currentHeading);
+                        map.setTilt(currentTilt);
+                    }, 0);
                 });
 
                 // Armazenar o marcador com a chave da coordenada
