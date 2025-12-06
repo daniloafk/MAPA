@@ -3,15 +3,14 @@
    UI + Inicialização + Liga todos os módulos
 ========================================================== */
 
-import { initMap, setMapLoaded, toggle3D, centerUserOnMap } from "./map.js";
-import { startGPS, stopGPS } from "./gps.js";
-import { initQRClientModal, initQRPackageModal } from "./qr.js";
-import { loadClientsFromSupabase, renderClientList, handleClientSave } from "./clients.js";
-import { initSpreadsheetUpload } from "./spreadsheet.js";
-import { beginRoutePlanning, clearCurrentRoute } from "./routing.js";
-import { toggleClientMarkers, toggleMatchedMarkers } from "./markers.js";
-import { showToast } from "./utils.js";
-
+import { initMap, setMapLoaded, toggle3D, centerUserOnMap } from "/js/map.js";
+import { startGPS, stopGPS } from "/js/gps.js";
+import { initQRClientModal, initQRPackageModal } from "/js/qr.js";
+import { loadClientsFromSupabase, renderClientList, handleClientSave } from "/js/clients.js";
+import { initSpreadsheetUpload } from "/js/spreadsheet.js";
+import { beginRoutePlanning, clearCurrentRoute } from "/js/routing.js";
+import { toggleClientMarkers, toggleMatchedMarkers } from "/js/markers.js";
+import { showToast } from "/js/utils.js";
 
 /* ==========================================================
    VARIÁVEIS GLOBAIS
@@ -24,9 +23,8 @@ export let appState = {
     matchedVisible: false
 };
 
-
 /* ==========================================================
-   INICIALIZAÇÃO PRINCIPAL DO APP (chamada pelo Google Maps)
+   INICIALIZAÇÃO PRINCIPAL DO APP (chamada pelo Maps)
 ========================================================== */
 export async function initApp() {
     console.log("💡 Iniciando aplicação...");
@@ -35,11 +33,11 @@ export async function initApp() {
     appState.map = await initMap();
     console.log("🗺️ Mapa carregado.");
 
-    // 2) Carregar clientes do Supabase
+    // 2) Carregar clientes
     await loadClientsFromSupabase();
     renderClientList();
 
-    // 3) Inicializar GPS
+    // 3) GPS
     startGPS(appState.map);
     appState.gpsActive = true;
 
@@ -48,16 +46,15 @@ export async function initApp() {
     initQRPackageModal();
     initSpreadsheetUpload();
 
-    // 5) Ligar botões da UI
+    // 5) UI
     bindUIEvents();
 
-    // 6) Mostrar controles após tudo carregado
+    // 6) Mostrar controles
     enableUI();
 
     // 7) Finalizar loading
     finishLoading();
 }
-
 
 /* ==========================================================
    FINALIZA TELA DE LOADING
@@ -70,7 +67,6 @@ function finishLoading() {
     }, 300);
 }
 
-
 /* ==========================================================
    MOSTRAR CONTROLES
 ========================================================== */
@@ -79,78 +75,46 @@ function enableUI() {
     document.getElementById("btnAddClient")?.classList.add("visible");
 }
 
-
 /* ==========================================================
    EVENTOS DA INTERFACE
 ========================================================== */
 function bindUIEvents() {
 
-    /* --------- Controle: 3D --------- */
-    document.getElementById("btn3D").onclick = () => {
-        toggle3D();
-    };
+    document.getElementById("btn3D").onclick = toggle3D;
 
-    /* --------- Centralizar --------- */
-    document.getElementById("btnCenter").onclick = () => {
-        centerUserOnMap();
-    };
+    document.getElementById("btnCenter").onclick = centerUserOnMap;
 
-    /* --------- Planejar rota --------- */
-    document.getElementById("btnRoute").onclick = () => {
-        beginRoutePlanning();
-    };
+    document.getElementById("btnRoute").onclick = beginRoutePlanning;
 
-    /* --------- Limpar rota --------- */
-    document.getElementById("btnClear").onclick = () => {
-        clearCurrentRoute();
-    };
+    document.getElementById("btnClear").onclick = clearCurrentRoute;
 
-    /* --------- Mostrar sidebar --------- */
-    document.getElementById("btnSidebar").onclick = () => {
-        openSidebar();
-    };
+    document.getElementById("btnSidebar").onclick = openSidebar;
 
-    /* --------- Abrir planilha --------- */
-    document.getElementById("btnSpreadsheet").onclick = () => {
+    document.getElementById("btnSpreadsheet").onclick = () =>
         openModal("modal-spreadsheet");
-    };
 
-    /* --------- Alternar marcadores de clientes --------- */
-    document.getElementById("btnToggleClients").onclick = () => {
-        toggleClientMarkers();
-    };
+    document.getElementById("btnToggleClients").onclick = toggleClientMarkers;
 
-    /* --------- Alternar clientes encontrados --------- */
-    document.getElementById("btnMatchedClients").onclick = () => {
-        toggleMatchedMarkers();
-    };
+    document.getElementById("btnMatchedClients").onclick = toggleMatchedMarkers;
 
-    /* --------- Abrir modal adicionar cliente --------- */
-    document.getElementById("btnAddClient").onclick = () => {
+    document.getElementById("btnAddClient").onclick = () =>
         openModal("modal-client");
-    };
 
-    /* --------- Fechar modais --------- */
     document.querySelectorAll(".modal-close").forEach(btn => {
         btn.onclick = () => closeModal(btn.closest(".modal").id);
     });
 
-    /* --------- Sidebar overlay --------- */
     document.getElementById("sidebar-overlay").onclick = closeSidebar;
 
-    /* --------- Fechar sidebar --------- */
     document.getElementById("sidebar-close").onclick = closeSidebar;
 
-    /* --------- Salvar cliente --------- */
     document.getElementById("client-form").onsubmit = handleClientSave;
 
-    /* --------- Fechar modal pacote --------- */
     document.getElementById("btnPackageClose").onclick = () =>
         closeModal("modal-package");
 
     showToast("Aplicação carregada com sucesso!", "success", 2500);
 }
-
 
 /* ==========================================================
    SIDEBAR
@@ -165,7 +129,6 @@ export function closeSidebar() {
     document.getElementById("sidebar-overlay").classList.remove("active");
 }
 
-
 /* ==========================================================
    MODAIS
 ========================================================== */
@@ -178,9 +141,8 @@ export function closeModal(id) {
     document.getElementById(id).classList.remove("active");
 }
 
-
 /* ==========================================================
-   ATUALIZAÇÃO DINÂMICA DO STATUS BAR (GPS)
+   STATUS BAR
 ========================================================== */
 export function updateStatusBar(text, active = true) {
     const bar = document.getElementById("status-bar");
@@ -198,9 +160,8 @@ export function updateStatusBar(text, active = true) {
     bar.classList.add("visible");
 }
 
-
 /* ==========================================================
-   CONTROLE DE BOTÕES GLOBAIS
+   UI GLOBAL
 ========================================================== */
 export function toggleClearButton(show) {
     document.getElementById("btnClear").classList.toggle("hidden", !show);
@@ -214,17 +175,12 @@ export function unlockUI() {
     document.querySelectorAll("button").forEach(b => b.disabled = false);
 }
 
-
-/* ==========================================================
-   RESET GLOBAL (usado após limpar rota)
-========================================================== */
 export function resetUIState() {
     toggleClearButton(false);
 }
 
-
 /* ==========================================================
-   DEBUGGER (opcional)
+   DEBUG
 ========================================================== */
 export function debug(msg) {
     console.log("🐞 DEBUG:", msg);
