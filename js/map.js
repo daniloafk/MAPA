@@ -2,7 +2,7 @@
    map.js — Controle principal do Google Maps
 ========================================================== */
 
-import { appState, updateStatusBar } from "./app.js";
+import { appState, updateStatusBar } from "/js/app.js";
 
 /* ==========================================================
    VARIÁVEIS GLOBAIS DO MAPA
@@ -11,7 +11,6 @@ let map;
 let is3D = false;
 let userMarker;
 
-/* Tone down animation for smoother experience */
 const DEFAULT_TILT = 45;
 const DEFAULT_ZOOM = 18;
 const DEFAULT_ZOOM_2D = 17;
@@ -22,13 +21,13 @@ const DEFAULT_ZOOM_2D = 17;
 export function initMap() {
     return new Promise(resolve => {
         map = new google.maps.Map(document.getElementById("map"), {
-            center: { lat: -23.55052, lng: -46.633308 }, // São Paulo centro
+            center: { lat: -23.55052, lng: -46.633308 },
             zoom: 16,
             disableDefaultUI: true,
             gestureHandling: "greedy",
             tilt: 0,
             heading: 0,
-            mapId: "4504f8b37365c3d0" // ID padrão do Google
+            mapId: "4504f8b37365c3d0"
         });
 
         google.maps.event.addListenerOnce(map, "tilesloaded", () => {
@@ -97,7 +96,7 @@ export function centerUserOnMap() {
 }
 
 /* ==========================================================
-   FUNÇÃO DE ANIMAÇÃO DO MARCADOR (Tween.js)
+   ANIMAÇÃO DO MARCADOR (Tween.js)
 ========================================================== */
 function animateMarker(marker, targetPos) {
     const start = marker.getPosition();
@@ -109,10 +108,7 @@ function animateMarker(marker, targetPos) {
     };
 
     new TWEEN.Tween(coords)
-        .to(
-            { lat: end.lat(), lng: end.lng() },
-            650
-        )
+        .to({ lat: end.lat(), lng: end.lng() }, 650)
         .easing(TWEEN.Easing.Quadratic.Out)
         .onUpdate(() => {
             marker.setPosition(new google.maps.LatLng(coords.lat, coords.lng));
@@ -121,16 +117,16 @@ function animateMarker(marker, targetPos) {
 }
 
 /* ==========================================================
-   LOOP DE ANIMAÇÃO GLOBAL (Tween.js)
+   LOOP DE ANIMAÇÃO GLOBAL
 ========================================================== */
-function animate() {
-    requestAnimationFrame(animate);
+function animateLoop() {
+    requestAnimationFrame(animateLoop);
     TWEEN.update();
 }
-animate();
+animateLoop();
 
 /* ==========================================================
-   EXPORTA O MAP ATUAL
+   EXPORTAR MAPA
 ========================================================== */
 export function getMap() {
     return map;
