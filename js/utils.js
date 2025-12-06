@@ -5,7 +5,6 @@
 /* ==========================================================
    TOAST — Sistema de Notificações
 ========================================================== */
-
 export function showToast(message, type = "info", duration = 3000) {
     const container = document.getElementById("toast-container");
 
@@ -49,7 +48,9 @@ export function formatPhone(phone) {
    GERAR ID ÚNICO
 ========================================================== */
 export function uuid() {
-    return crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substr(2));
+    return crypto.randomUUID
+        ? crypto.randomUUID()
+        : Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
 /* ==========================================================
