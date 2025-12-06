@@ -2472,29 +2472,11 @@ window.initMap = function () {
             zoomControl: true,
             streetViewControl: false,
             fullscreenControl: true,
-            // Desabilitar inclinação (tilt) mas manter rotação
-            isFractionalZoomEnabled: false,
             // Otimizações de performance
             disableDefaultUI: false,
             clickableIcons: false, // Desabilita cliques em POIs para melhor performance
             minZoom: 3, // Permite zoom global
-            maxZoom: 22, // Zoom máximo detalhado
-            restriction: {
-                strictBounds: false
-            }
-        });
-
-        // Desabilitar gestos de inclinação, mas manter rotação
-        map.setOptions({
-            tilt: 0,
-            gestureHandling: 'greedy'
-        });
-
-        // Listener para forçar tilt = 0 sempre
-        map.addListener('tilt_changed', () => {
-            if (map.getTilt() !== 0) {
-                map.setTilt(0);
-            }
+            maxZoom: 22 // Zoom máximo detalhado
         });
 
         // Inicializar serviços de rota
