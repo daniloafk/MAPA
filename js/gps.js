@@ -9,7 +9,7 @@
 ====================================================================== */
 
 import { showToast } from "/js/utils.js";
-import { getMap } from "/js/map.js";
+import { getMap, updateUserPosition } from "/js/map.js";
 
 let gpsMarker = null;
 let watchId = null;
@@ -35,8 +35,11 @@ const GEO_OPTIONS = {
    INICIAR GPS
 ====================================================================== */
 export function startGPS() {
+    console.log("🛰️ Iniciando GPS...");
+
     if (!navigator.geolocation) {
         showToast("Geolocalização não suportada", "error");
+        console.error("❌ Geolocalização não disponível");
         return;
     }
 
@@ -50,7 +53,8 @@ export function startGPS() {
         GEO_OPTIONS
     );
 
-    showToast("GPS Iniciado com precisão máxima", "success");
+    console.log("✅ GPS iniciado");
+    showToast("GPS Iniciado", "success", 1500);
 }
 
 /* ======================================================================
@@ -70,10 +74,20 @@ export function stopGPS() {
 function handlePosition(pos) {
     const { latitude, longitude, accuracy, speed, heading } = pos.coords;
 
-    if (accuracy > 20) return;
+    console.log(`📍 GPS: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} (±${accuracy.toFixed(1)}m)`);
 
-    if (accuracy > 10) {
-        showToast("GPS com baixa precisão (> 10m)", "warning", 1000);
+    // Salvar última posição no localStorage para uso em rotas
+    localStorage.setItem("gps_last_position", JSON.stringify({
+        lat: latitude,
+        lng: longitude,
+        accuracy,
+        timestamp: pos.timestamp
+    }));
+
+    // Aceitar posições com precisão razoável
+    if (accuracy > 50) {
+        console.warn("⚠️ Baixa precisão GPS:", accuracy, "m");
+        return;
     }
 
     const rawPos = {
@@ -93,7 +107,8 @@ function handlePosition(pos) {
     const kalman = kalmanFilter(avg);
     const finalPos = deadReckoning(kalman, speed, heading, pos.timestamp);
 
-    updateMarker(finalPos);
+    // Atualizar marcador no mapa
+    updateUserPosition(finalPos.lat, finalPos.lng);
 }
 
 /* ======================================================================
@@ -105,7 +120,10 @@ function driftFilter(pos) {
     const last = lastPositions[lastPositions.length - 1];
     const d = distance(last.lat, last.lng, pos.lat, pos.lng);
 
-    if (d > 50) return null;
+    if (d > 100) {
+        console.warn("⚠️ Salto muito grande detectado:", d.toFixed(1), "m");
+        return null;
+    }
 
     return pos;
 }
@@ -209,29 +227,6 @@ function stopSensors() {
 }
 
 /* ======================================================================
-   ATUALIZA MARCADOR NO MAPA
-====================================================================== */
-function updateMarker(pos) {
-    const map = getMap();
-    if (!map) return;
-
-    if (!gpsMarker) {
-        gpsMarker = new google.maps.Marker({
-            map,
-            position: pos,
-            icon: {
-                url: "/assets/gps-dot.png",
-                scaledSize: new google.maps.Size(16, 16)
-            }
-        });
-    } else {
-        gpsMarker.setPosition(pos);
-    }
-
-    map.panTo(pos);
-}
-
-/* ======================================================================
    UTILS
 ====================================================================== */
 function distance(lat1, lon1, lat2, lon2) {
@@ -250,5 +245,6 @@ function distance(lat1, lon1, lat2, lon2) {
 }
 
 function handleError(err) {
+    console.error("❌ Erro GPS:", err);
     showToast("Erro de GPS: " + err.message, "error");
 }
