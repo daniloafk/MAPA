@@ -43,10 +43,9 @@
         backface-visibility: hidden;
         -webkit-perspective: 1000;
         perspective: 1000;
-        /* Suavizar arrasto em hardware limitado */
-        touch-action: pan-x pan-y;
+        /* Permitir todos os gestos (rotação, zoom, arrasto) */
+        touch-action: manipulation;
         -webkit-overflow-scrolling: touch;
-        backface-visibility: hidden;
         -webkit-font-smoothing: antialiased;
     }
 
