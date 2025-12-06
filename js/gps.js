@@ -1,43 +1,45 @@
 /* ======================================================================
-   gps.js — GPS Ultra Preciso com:
-   - Alta precisão ativada
-   - Média móvel
-   - Filtro de Kalman 2D
-   - Dead Reckoning
-   - Fusão com sensores (acelerômetro + bússola)
-   - Detecção de saltos ("anti-drift")
+   gps.js — GPS Ultra Preciso FINAL
+   Integrado com app.js + map.js + painel de precisão
 ====================================================================== */
 
 import { showToast } from "./utils.js";
-import { getMap } from "./map.js";
+import { getMap, updateUserPosition } from "./map.js";
 
+/* ==========================================================
+   CALLBACKS PARA O app.js
+========================================================== */
+let gpsCallbacks = [];
+export function onGPSData(fn) {
+    gpsCallbacks.push(fn);
+}
+
+/* ==========================================================
+   VARIÁVEIS GERAIS
+========================================================== */
 let gpsMarker = null;
 let watchId = null;
 
-// Histórico para média móvel e detecção de ruido
 let lastPositions = [];
-
-// Dead reckoning
 let lastTimestamp = 0;
 let lastSpeed = 0;
 let lastHeading = 0;
 
-// Dados de sensores
 let compassHeading = null;
 let accelerationVector = { x: 0, y: 0, z: 0 };
 
-/* ======================================================================
-   CONFIGURAÇÃO DO GPS
-====================================================================== */
+/* ==========================================================
+   CONFIG
+========================================================== */
 const GEO_OPTIONS = {
     enableHighAccuracy: true,
     maximumAge: 0,
     timeout: 20000
 };
 
-/* ======================================================================
+/* ==========================================================
    INICIAR GPS
-====================================================================== */
+========================================================== */
 export function startGPS() {
     if (!navigator.geolocation) {
         showToast("Geolocalização não suportada", "error");
@@ -46,7 +48,6 @@ export function startGPS() {
 
     if (watchId) stopGPS();
 
-    // Sensores
     startSensors();
 
     watchId = navigator.geolocation.watchPosition(
@@ -55,12 +56,12 @@ export function startGPS() {
         GEO_OPTIONS
     );
 
-    showToast("GPS Iniciado com precisão máxima", "success");
+    showToast("GPS iniciado com precisão máxima", "success");
 }
 
-/* ======================================================================
+/* ==========================================================
    PARAR GPS
-====================================================================== */
+========================================================== */
 export function stopGPS() {
     if (watchId) {
         navigator.geolocation.clearWatch(watchId);
@@ -69,80 +70,85 @@ export function stopGPS() {
     stopSensors();
 }
 
-/* ======================================================================
-   TRATAMENTO DE POSIÇÃO
-====================================================================== */
+/* ==========================================================
+   PROCESSAR POSIÇÃO
+========================================================== */
 function handlePosition(pos) {
     const { latitude, longitude, accuracy, speed, heading } = pos.coords;
 
-    if (accuracy > 20) return; // ignora leituras muito ruins
-
-    if (accuracy > 10) {
-        showToast("GPS com baixa precisão (> 10m)", "warning", 1000);
-    }
+    if (accuracy > 25) return;
+    if (accuracy > 10) showToast("GPS com baixa precisão (> 10m)", "warning", 1000);
 
     const timestamp = pos.timestamp;
 
-    const rawPos = {
+    const raw = {
         lat: latitude,
         lng: longitude,
         accuracy,
+        speed,
+        heading,
         timestamp
     };
 
-    // 1. Filtra saltos bruscos
-    const stablePos = driftFilter(rawPos);
-    if (!stablePos) return;
+    const stable = driftFilter(raw);
+    if (!stable) return;
 
-    // 2. Guarda histórico
-    lastPositions.push(stablePos);
+    lastPositions.push(stable);
     if (lastPositions.length > 10) lastPositions.shift();
 
-    // 3. Média móvel
-    const smoothed = movingAverage(lastPositions);
+    const avg = movingAverage(lastPositions);
+    const kalman = kalmanFilter(avg);
+    const final = deadReckoning(kalman, speed, heading, timestamp);
 
-    // 4. Kalman 2D
-    const kalmanPos = kalmanFilter(smoothed);
-
-    // 5. Dead Reckoning (movimento estimado)
-    const finalPos = deadReckoning(kalmanPos, speed, heading, timestamp);
-
-    updateMarker(finalPos);
+    updateMarker(final);
+    fireCallbacks(final, accuracy, speed, heading);
 }
 
-/* ======================================================================
-   FILTRO DE DRIFT (anti saltos)
-====================================================================== */
+/* ==========================================================
+   DISPARAR CALLBACKS PARA app.js
+========================================================== */
+function fireCallbacks(pos, accuracy, speed, heading) {
+    gpsCallbacks.forEach(fn =>
+        fn({
+            lat: pos.lat,
+            lng: pos.lng,
+            accuracy: accuracy,
+            speed: speed,
+            heading: heading ?? compassHeading ?? lastHeading,
+            compass: compassHeading ?? null
+        })
+    );
+}
+
+/* ==========================================================
+   ANTI‑DRIFT
+========================================================== */
 function driftFilter(pos) {
     if (lastPositions.length === 0) return pos;
 
     const last = lastPositions[lastPositions.length - 1];
     const d = distance(last.lat, last.lng, pos.lat, pos.lng);
 
-    if (d > 50) return null; // salto suspeito
-
+    if (d > 60) return null; // salto suspeito
     return pos;
 }
 
-/* ======================================================================
+/* ==========================================================
    MÉDIA MÓVEL
-====================================================================== */
+========================================================== */
 function movingAverage(list) {
     const n = list.length;
-    const sum = list.reduce((acc, p) => ({
-        lat: acc.lat + p.lat,
-        lng: acc.lng + p.lng
-    }), { lat: 0, lng: 0 });
+    const sum = list.reduce(
+        (a, p) => ({ lat: a.lat + p.lat, lng: a.lng + p.lng }),
+        { lat: 0, lng: 0 }
+    );
 
-    return {
-        lat: sum.lat / n,
-        lng: sum.lng / n
-    };
+    return { lat: sum.lat / n, lng: sum.lng / n };
 }
 
-/* ======================================================================
-   FILTRO DE KALMAN 2D
-====================================================================== */
+/* ==========================================================
+   KALMAN FILTER
+========================================================== */
 let kalmanState = { lat: null, lng: null };
 let kalmanVariance = 1;
 
@@ -152,8 +158,8 @@ function kalmanFilter(pos) {
         return pos;
     }
 
-    const R = 0.00001; // ruído de medição
-    const Q = 0.0000001; // ruído de processo
+    const R = 0.00001;
+    const Q = 0.0000001;
 
     kalmanVariance += Q;
 
@@ -170,9 +176,9 @@ function kalmanFilter(pos) {
     };
 }
 
-/* ======================================================================
-   DEAD RECKONING — estimativa de movimento entre medições
-====================================================================== */
+/* ==========================================================
+   DEAD RECKONING
+========================================================== */
 function deadReckoning(pos, gpsSpeed, gpsHeading, timestamp) {
     if (!lastTimestamp) {
         lastTimestamp = timestamp;
@@ -180,12 +186,9 @@ function deadReckoning(pos, gpsSpeed, gpsHeading, timestamp) {
     }
 
     const dt = (timestamp - lastTimestamp) / 1000;
-
     lastTimestamp = timestamp;
 
-    // Usa heading do compass se existir (mais estável)
     const heading = compassHeading ?? gpsHeading ?? lastHeading;
-
     if (heading != null) lastHeading = heading;
 
     const speed = gpsSpeed ?? lastSpeed;
@@ -193,31 +196,31 @@ function deadReckoning(pos, gpsSpeed, gpsHeading, timestamp) {
 
     if (!speed || speed < 0.2) return pos;
 
-    const distanceMeters = speed * dt;
+    const dist = speed * dt;
+    const rad = heading * (Math.PI / 180);
 
-    const headingRad = heading * (Math.PI / 180);
-
-    const newLat = pos.lat + (distanceMeters * Math.cos(headingRad)) / 111111;
-    const newLng = pos.lng + (distanceMeters * Math.sin(headingRad)) / (111111 * Math.cos(pos.lat * Math.PI/180));
+    const newLat = pos.lat + (dist * Math.cos(rad)) / 111111;
+    const newLng =
+        pos.lng +
+        (dist * Math.sin(rad)) /
+            (111111 * Math.cos(pos.lat * Math.PI / 180));
 
     return { lat: newLat, lng: newLng };
 }
 
-/* ======================================================================
-   SENSORES — Compass + Acelerômetro
-====================================================================== */
+/* ==========================================================
+   SENSORES — COMPASS + MOTION
+========================================================== */
 function startSensors() {
     if (window.DeviceOrientationEvent) {
-        window.addEventListener("deviceorientation", evt => {
-            if (evt.alpha != null) {
-                compassHeading = 360 - evt.alpha;
-            }
+        window.addEventListener("deviceorientation", e => {
+            if (e.alpha != null) compassHeading = 360 - e.alpha;
         });
     }
 
     if (window.DeviceMotionEvent) {
-        window.addEventListener("devicemotion", evt => {
-            accelerationVector = evt.acceleration ?? accelerationVector;
+        window.addEventListener("devicemotion", e => {
+            accelerationVector = e.acceleration ?? accelerationVector;
         });
     }
 }
@@ -227,48 +230,36 @@ function stopSensors() {
     window.removeEventListener("devicemotion", () => {});
 }
 
-/* ======================================================================
-   ATUALIZA MARCADOR NO MAPA
-====================================================================== */
+/* ==========================================================
+   ATUALIZAR MARCADOR NO MAPA + INTEGRAR COM map.js
+========================================================== */
 function updateMarker(pos) {
     const map = getMap();
     if (!map) return;
 
-    if (!gpsMarker) {
-        gpsMarker = new google.maps.Marker({
-            map,
-            position: pos,
-            icon: {
-                url: "/assets/gps-dot.png",
-                scaledSize: new google.maps.Size(16, 16)
-            }
-        });
-    } else {
-        gpsMarker.setPosition(pos);
-    }
-
-    map.panTo(pos);
+    updateUserPosition(pos.lat, pos.lng, compassHeading);
 }
 
-/* ======================================================================
-   FUNÇÕES AUXILIARES
-====================================================================== */
+/* ==========================================================
+   DISTÂNCIA
+========================================================== */
 function distance(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
 
     const a =
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(lat1*Math.PI/180) *
-        Math.cos(lat2*Math.PI/180) *
-        Math.sin(dLon/2) *
-        Math.sin(dLon/2);
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1 * Math.PI / 180) *
+            Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) ** 2;
 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/* ==========================================================
+   ERRO
+========================================================== */
 function handleError(err) {
     showToast("Erro de GPS: " + err.message, "error");
 }
