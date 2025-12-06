@@ -1,10 +1,10 @@
 /* ==========================================================
-   clients.js — CRUD de clientes + UI + Supabase
+   clients.js — CRUD + UI + Supabase (VERSÃO FINAL INTEGRADA)
 ========================================================== */
 
 import { showToast } from "./utils.js";
-import { addClientMarker, clearClientMarkers } from "./markers.js";
-import { closeModal } from "./app.js";
+import { addClientMarker, clearClientMarkers, focusClientMarker } from "./markers.js";
+import { closeModal, openModal } from "./app.js";
 
 /* ==========================================================
    SUPABASE
@@ -22,7 +22,7 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 export let clients = [];
 
 /* ==========================================================
-   CARREGAR CLIENTES DO SUPABASE
+   CARREGA CLIENTES DO SUPABASE
 ========================================================== */
 export async function loadClientsFromSupabase() {
     const { data, error } = await supabase.from("clientes").select("*");
@@ -35,12 +35,10 @@ export async function loadClientsFromSupabase() {
 
     clients = data || [];
 
-    // Salva localmente (backup + busca mais rápida)
     localStorage.setItem("clients", JSON.stringify(clients));
 
-    // Atualiza marcadores
     clearClientMarkers();
-    clients.forEach(c => addClientMarker(c));
+    clients.forEach(addClientMarker);
 }
 
 /* ==========================================================
@@ -55,16 +53,16 @@ export function renderClientList() {
             <div class="empty-state">
                 <div class="empty-icon">📋</div>
                 Nenhum cliente cadastrado
-            </div>
-        `;
+            </div>`;
         document.getElementById("client-count").textContent = "0";
         return;
     }
 
     clients.forEach(client => {
-        const div = document.createElement("div");
-        div.className = "client-card";
-        div.innerHTML = `
+        const card = document.createElement("div");
+        card.className = "client-card";
+
+        card.innerHTML = `
             <div><b>${client.name}</b></div>
             <div>${client.phone || ""}</div>
             <div style="font-size:12px; opacity:0.7;">
@@ -72,14 +70,22 @@ export function renderClientList() {
             </div>
         `;
 
-        list.appendChild(div);
+        /* =====================================================
+           EVENTO: Clicar no cliente → centralizar no mapa
+        ====================================================== */
+        card.onclick = () => {
+            focusClientMarker(client.id);
+            showToast(`Centralizando em ${client.name}...`, "success", 1500);
+        };
+
+        list.appendChild(card);
     });
 
     document.getElementById("client-count").textContent = clients.length;
 }
 
 /* ==========================================================
-   SALVAR CLIENTE (Adicionar ou atualizar)
+   SALVAR CLIENTE
 ========================================================== */
 export async function handleClientSave(e) {
     e.preventDefault();
@@ -98,7 +104,6 @@ export async function handleClientSave(e) {
         return;
     }
 
-    // Geocodificação do endereço (garante lat/lng)
     const coords = await geocodeAddress(address);
 
     if (!coords) {
@@ -114,7 +119,6 @@ export async function handleClientSave(e) {
         lng: coords.lng
     };
 
-    // Salvar no Supabase
     const { data, error } = await supabase
         .from("clientes")
         .insert(newClient)
@@ -126,30 +130,32 @@ export async function handleClientSave(e) {
         return;
     }
 
-    // Adicionar na memória
-    clients.push(data[0]);
+    const saved = data[0];
+    clients.push(saved);
 
-    // Atualizar UI
     localStorage.setItem("clients", JSON.stringify(clients));
     renderClientList();
-    addClientMarker(data[0]);
-
-    showToast("Cliente salvo com sucesso!", "success", 2500);
+    addClientMarker(saved);
 
     closeModal("modal-client");
+
+    showToast("Cliente salvo com sucesso!", "success", 2500);
 }
 
 /* ==========================================================
-   GEOCODING DO ENDEREÇO
+   GEOCODING DO QR CODE
 ========================================================== */
 async function geocodeAddress(text) {
     try {
-        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(text)}&key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU`;
+        const url =
+            `https://maps.googleapis.com/maps/api/geocode/json?address=` +
+            encodeURIComponent(text) +
+            `&key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU`;
 
         const res = await fetch(url);
         const data = await res.json();
 
-        if (!data.results || data.results.length === 0) return null;
+        if (!data.results?.length) return null;
 
         return data.results[0].geometry.location;
 
@@ -160,7 +166,7 @@ async function geocodeAddress(text) {
 }
 
 /* ==========================================================
-   PESQUISA LOCAL NA LISTA
+   BUSCA LOCAL
 ========================================================== */
 export function searchClients(term) {
     term = term.toLowerCase();
