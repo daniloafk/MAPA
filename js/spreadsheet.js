@@ -3,9 +3,9 @@
    Usa SheetJS + Supabase + Marcadores automáticos
 ========================================================== */
 
-import { showToast } from "./utils.js";
-import { clients, loadClientsFromSupabase } from "./clients.js";
-import { addMatchedMarker, clearMatchedMarkers } from "./markers.js";
+import { showToast } from "/js/utils.js";
+import { clients, loadClientsFromSupabase } from "/js/clients.js";
+import { addMatchedMarker, clearMatchedMarkers } from "/js/markers.js";
 
 /* ==========================================================
    ELEMENTOS
@@ -79,10 +79,9 @@ async function processFile(file) {
 
     const reader = new FileReader();
 
-    reader.onload = async (evt) => {
+    reader.onload = async evt => {
         const data = evt.target.result;
 
-        // Ler planilha
         const workbook = XLSX.read(data, { type: "binary" });
         const sheetName = workbook.SheetNames[0];
         const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
@@ -99,7 +98,7 @@ async function processFile(file) {
 
         updateProgress(75, "Salvando resultados...");
 
-        // Salvar planilha no Supabase (tabela: planilha_dia)
+        // Salvar planilha no Supabase
         await supabase.from("planilha_dia").delete().neq("id", 0);
         await supabase.from("planilha_dia").insert(sheet);
 
@@ -125,7 +124,7 @@ function updateProgress(percent, text) {
 }
 
 /* ==========================================================
-   COMPARAR PLANILHA COM CLIENTES
+   VERIFICAR CLIENTES DA PLANILHA
 ========================================================== */
 function matchClients(rows) {
     const matched = [];
