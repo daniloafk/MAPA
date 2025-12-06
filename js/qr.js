@@ -3,7 +3,7 @@
    Usa jsQR + câmera nativa
 ========================================================== */
 
-import { showToast } from "./utils.js";
+import { showToast } from "/js/utils.js";
 
 /* ==========================================================
    VARIÁVEIS GLOBAIS
@@ -24,8 +24,8 @@ export function initQRClientModal() {
     qrCtx = qrCanvas.getContext("2d");
 
     document.getElementById("modal-client").addEventListener("transitionend", () => {
-        // Se modal abriu
         const modal = document.getElementById("modal-client");
+
         if (modal.classList.contains("active")) {
             startClientScanner();
         } else {
@@ -44,6 +44,7 @@ export function initQRPackageModal() {
 
     document.getElementById("modal-package").addEventListener("transitionend", () => {
         const modal = document.getElementById("modal-package");
+
         if (modal.classList.contains("active")) {
             startPackageScanner();
         } else {
@@ -60,7 +61,9 @@ async function startClientScanner() {
     scanningPackage = false;
 
     try {
-        qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        qrStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" }
+        });
 
         qrVideo.srcObject = qrStream;
         qrVideo.play();
@@ -73,7 +76,7 @@ async function startClientScanner() {
 }
 
 /* ==========================================================
-   LOOP DO SCANNER DE CLIENTE
+   LOOP DO SCANNER — CLIENTE
 ========================================================== */
 function scanClientLoop() {
     if (!scanningClient) return;
@@ -97,7 +100,7 @@ function scanClientLoop() {
 }
 
 /* ==========================================================
-   PROCESSAR QR DO CLIENTE
+   PROCESSAR QR — CLIENTE
 ========================================================== */
 function handleClientQRCode(text) {
     showToast("QR Code detectado!", "success");
@@ -116,7 +119,9 @@ async function startPackageScanner() {
     scanningPackage = true;
 
     try {
-        qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        qrStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" }
+        });
 
         qrPackageVideo.srcObject = qrStream;
         qrPackageVideo.play();
@@ -129,7 +134,7 @@ async function startPackageScanner() {
 }
 
 /* ==========================================================
-   LOOP DO SCANNER DE PACOTE
+   LOOP DO SCANNER — PACOTE
 ========================================================== */
 function scanPackageLoop() {
     if (!scanningPackage) return;
@@ -138,9 +143,21 @@ function scanPackageLoop() {
         qrPackageCanvas.width = qrPackageVideo.videoWidth;
         qrPackageCanvas.height = qrPackageVideo.videoHeight;
 
-        qrPackageCtx.drawImage(qrPackageVideo, 0, 0, qrPackageCanvas.width, qrPackageCanvas.height);
+        qrPackageCtx.drawImage(
+            qrPackageVideo,
+            0,
+            0,
+            qrPackageCanvas.width,
+            qrPackageCanvas.height
+        );
 
-        const imageData = qrPackageCtx.getImageData(0, 0, qrPackageCanvas.width, qrPackageCanvas.height);
+        const imageData = qrPackageCtx.getImageData(
+            0,
+            0,
+            qrPackageCanvas.width,
+            qrPackageCanvas.height
+        );
+
         const code = jsQR(imageData.data, qrPackageCanvas.width, qrPackageCanvas.height);
 
         if (code) {
@@ -153,7 +170,7 @@ function scanPackageLoop() {
 }
 
 /* ==========================================================
-   PROCESSAR QR DE PACOTE
+   PROCESSAR QR — PACOTE
 ========================================================== */
 function handlePackageQRCode(data) {
     const resultBox = document.getElementById("scan-result");
