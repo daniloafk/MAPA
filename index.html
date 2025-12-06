@@ -12,13 +12,13 @@
             <text y='.9em' font-size='90'>📍</text>
         </svg>">
 
-    <!-- CSS principal (novo e otimizado) -->
-    <link rel="stylesheet" href="styles/styles.css">
+    <!-- CSS principal -->
+    <link rel="stylesheet" href="/styles/styles.css">
 
     <!-- SheetJS -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-    <!-- TweenJS (animações do GPS + marcadores) -->
+    <!-- TweenJS -->
     <script src="https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@23.1.3/dist/tween.umd.js"></script>
 
     <!-- Supabase -->
@@ -27,16 +27,15 @@
     <!-- jsQR -->
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
-    <!-- Google Maps (apenas bootstrap, init vem de app.js) -->
-    <script async
+    <!-- Google Maps -->
+    <script async defer
         src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&callback=initApp&libraries=geometry,places,marker&v=beta">
     </script>
 </head>
 
-
 <body>
 
-    <!-- TELA DE LOADING GLOBAL -->
+    <!-- TELA DE LOADING -->
     <div id="loading-screen" class="loading-screen">
         <div class="loading-content">
             <div class="spinner"></div>
@@ -48,7 +47,7 @@
     <!-- MAPA -->
     <div id="map" class="map"></div>
 
-    <!-- CONTROLES DO MAPA (UI NOVA) -->
+    <!-- CONTROLES -->
     <div id="map-controls" class="map-controls hidden">
         <button id="btn3D" class="control-btn" title="Alternar 3D/2D">3D</button>
         <button id="btnCenter" class="control-btn" title="Centralizar">📍</button>
@@ -60,7 +59,7 @@
         <button id="btnMatchedClients" class="control-btn" title="Clientes identificados">📍</button>
     </div>
 
-    <!-- TOAST (notificações) -->
+    <!-- TOAST -->
     <div id="toast-container" class="toast-container"></div>
 
     <!-- STATUS BAR -->
@@ -74,7 +73,7 @@
         ➕ Adicionar Cliente
     </button>
 
-    <!-- SIDEBAR (LISTA DE CLIENTES) -->
+    <!-- SIDEBAR -->
     <div id="sidebar-overlay" class="sidebar-overlay"></div>
 
     <div id="sidebar" class="sidebar">
@@ -85,7 +84,6 @@
             <button id="sidebar-close" class="sidebar-close">✕</button>
         </div>
 
-        <!-- BUSCA -->
         <div class="sidebar-search">
             <input id="search-input" class="search-input" placeholder="Buscar cliente..." />
             <button id="btnScanPackage" class="btn-scan-package">📦</button>
@@ -99,27 +97,24 @@
         </div>
     </div>
 
-    <!-- MODAL: ADICIONAR / EDITAR CLIENTE -->
+    <!-- MODAL CLIENTE -->
     <div id="modal-client" class="modal">
         <div class="modal-content">
             <button id="modal-client-close" class="modal-close">✕</button>
 
             <h2 class="modal-title">Adicionar Cliente</h2>
 
-            <!-- Scanner QR -->
             <div class="qr-area">
                 <video id="qr-video" autoplay playsinline></video>
                 <canvas id="qr-canvas"></canvas>
                 <div id="qr-status" class="qr-status">Procurando QR Code...</div>
             </div>
 
-            <!-- Endereço detectado -->
             <div id="address-display" class="address-display hidden">
                 <b>📍 Endereço:</b>
                 <div id="address-text"></div>
             </div>
 
-            <!-- Form -->
             <form id="client-form" class="modal-form">
                 <label>Nome *</label>
                 <input id="client-name" required />
@@ -134,7 +129,7 @@
         </div>
     </div>
 
-    <!-- MODAL SCAN PACOTE -->
+    <!-- MODAL PACOTE -->
     <div id="modal-package" class="modal">
         <div class="modal-content">
             <button id="modal-package-close" class="modal-close">✕</button>
@@ -180,11 +175,10 @@
         </div>
     </div>
 
-
-    <!-- INICIALIZAÇÃO DA APLICAÇÃO -->
+    <!-- INICIALIZAÇÃO -->
     <script type="module">
-        import { initApp } from "./js/app.js";
-        window.initApp = initApp; // usado pelo callback do Google Maps
+        import { initApp } from "/js/app.js";
+        window.initApp = initApp;
     </script>
 </body>
 
