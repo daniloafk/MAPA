@@ -1,0 +1,9 @@
+name = "mapas-clientes"
+compatibility_date = "2025-12-04"
+
+[site]
+bucket = "."
+
+# Assets estáticos (HTML, CSS, JS)
+[[assets]]
+directory = "."
