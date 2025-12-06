@@ -4,25 +4,21 @@
    - Média móvel
    - Filtro de Kalman 2D
    - Dead Reckoning
-   - Fusão com sensores (acelerômetro + bússola)
-   - Detecção de saltos ("anti-drift")
+   - Fusão com sensores
+   - Anti-drift
 ====================================================================== */
 
-import { showToast } from "./utils.js";
-import { getMap } from "./map.js";
+import { showToast } from "/js/utils.js";
+import { getMap } from "/js/map.js";
 
 let gpsMarker = null;
 let watchId = null;
 
-// Histórico para média móvel e detecção de ruido
 let lastPositions = [];
-
-// Dead reckoning
 let lastTimestamp = 0;
 let lastSpeed = 0;
 let lastHeading = 0;
 
-// Dados de sensores
 let compassHeading = null;
 let accelerationVector = { x: 0, y: 0, z: 0 };
 
@@ -46,7 +42,6 @@ export function startGPS() {
 
     if (watchId) stopGPS();
 
-    // Sensores
     startSensors();
 
     watchId = navigator.geolocation.watchPosition(
@@ -75,43 +70,34 @@ export function stopGPS() {
 function handlePosition(pos) {
     const { latitude, longitude, accuracy, speed, heading } = pos.coords;
 
-    if (accuracy > 20) return; // ignora leituras muito ruins
+    if (accuracy > 20) return;
 
     if (accuracy > 10) {
         showToast("GPS com baixa precisão (> 10m)", "warning", 1000);
     }
 
-    const timestamp = pos.timestamp;
-
     const rawPos = {
         lat: latitude,
         lng: longitude,
         accuracy,
-        timestamp
+        timestamp: pos.timestamp
     };
 
-    // 1. Filtra saltos bruscos
     const stablePos = driftFilter(rawPos);
     if (!stablePos) return;
 
-    // 2. Guarda histórico
     lastPositions.push(stablePos);
     if (lastPositions.length > 10) lastPositions.shift();
 
-    // 3. Média móvel
-    const smoothed = movingAverage(lastPositions);
-
-    // 4. Kalman 2D
-    const kalmanPos = kalmanFilter(smoothed);
-
-    // 5. Dead Reckoning (movimento estimado)
-    const finalPos = deadReckoning(kalmanPos, speed, heading, timestamp);
+    const avg = movingAverage(lastPositions);
+    const kalman = kalmanFilter(avg);
+    const finalPos = deadReckoning(kalman, speed, heading, pos.timestamp);
 
     updateMarker(finalPos);
 }
 
 /* ======================================================================
-   FILTRO DE DRIFT (anti saltos)
+   FILTRO "ANTI-DERIVA"
 ====================================================================== */
 function driftFilter(pos) {
     if (lastPositions.length === 0) return pos;
@@ -119,7 +105,7 @@ function driftFilter(pos) {
     const last = lastPositions[lastPositions.length - 1];
     const d = distance(last.lat, last.lng, pos.lat, pos.lng);
 
-    if (d > 50) return null; // salto suspeito
+    if (d > 50) return null;
 
     return pos;
 }
@@ -152,8 +138,8 @@ function kalmanFilter(pos) {
         return pos;
     }
 
-    const R = 0.00001; // ruído de medição
-    const Q = 0.0000001; // ruído de processo
+    const R = 0.00001;
+    const Q = 0.0000001;
 
     kalmanVariance += Q;
 
@@ -164,14 +150,11 @@ function kalmanFilter(pos) {
 
     kalmanVariance *= (1 - K);
 
-    return {
-        lat: kalmanState.lat,
-        lng: kalmanState.lng
-    };
+    return { lat: kalmanState.lat, lng: kalmanState.lng };
 }
 
 /* ======================================================================
-   DEAD RECKONING — estimativa de movimento entre medições
+   DEAD RECKONING
 ====================================================================== */
 function deadReckoning(pos, gpsSpeed, gpsHeading, timestamp) {
     if (!lastTimestamp) {
@@ -180,12 +163,9 @@ function deadReckoning(pos, gpsSpeed, gpsHeading, timestamp) {
     }
 
     const dt = (timestamp - lastTimestamp) / 1000;
-
     lastTimestamp = timestamp;
 
-    // Usa heading do compass se existir (mais estável)
     const heading = compassHeading ?? gpsHeading ?? lastHeading;
-
     if (heading != null) lastHeading = heading;
 
     const speed = gpsSpeed ?? lastSpeed;
@@ -193,18 +173,19 @@ function deadReckoning(pos, gpsSpeed, gpsHeading, timestamp) {
 
     if (!speed || speed < 0.2) return pos;
 
-    const distanceMeters = speed * dt;
+    const meters = speed * dt;
 
-    const headingRad = heading * (Math.PI / 180);
+    const rad = heading * (Math.PI / 180);
 
-    const newLat = pos.lat + (distanceMeters * Math.cos(headingRad)) / 111111;
-    const newLng = pos.lng + (distanceMeters * Math.sin(headingRad)) / (111111 * Math.cos(pos.lat * Math.PI/180));
+    const newLat = pos.lat + (meters * Math.cos(rad)) / 111111;
+    const newLng = pos.lng + (meters * Math.sin(rad)) /
+        (111111 * Math.cos(pos.lat * Math.PI/180));
 
     return { lat: newLat, lng: newLng };
 }
 
 /* ======================================================================
-   SENSORES — Compass + Acelerômetro
+   SENSORES
 ====================================================================== */
 function startSensors() {
     if (window.DeviceOrientationEvent) {
@@ -251,7 +232,7 @@ function updateMarker(pos) {
 }
 
 /* ======================================================================
-   FUNÇÕES AUXILIARES
+   UTILS
 ====================================================================== */
 function distance(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
@@ -259,11 +240,10 @@ function distance(lat1, lon1, lat2, lon2) {
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
 
     const a =
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(lat1*Math.PI/180) *
-        Math.cos(lat2*Math.PI/180) *
-        Math.sin(dLon/2) *
-        Math.sin(dLon/2);
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1 * Math.PI / 180) *
+        Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) ** 2;
 
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
