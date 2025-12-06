@@ -2,8 +2,8 @@
 <html lang="pt-BR">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8" >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" >
     <title>Mapa de Clientes</title>
 
     <!-- Ícone -->
@@ -25,9 +25,16 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- jsQR -->
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsqr.min.js"></script>
 
-    <!-- Google Maps -->
+    <!-- Inicialização ANTES do Google Maps -->
+    <script type="module">
+        import { initApp } from "/js/app.js";
+        // Expor globalmente ANTES do Maps carregar
+        window.initApp = initApp;
+    </script>
+
+    <!-- Google Maps (carrega por último) -->
     <script async defer
         src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&callback=initApp&libraries=geometry,places,marker&v=beta">
     </script>
@@ -85,7 +92,7 @@
         </div>
 
         <div class="sidebar-search">
-            <input id="search-input" class="search-input" placeholder="Buscar cliente..." />
+            <input id="search-input" class="search-input" placeholder="Buscar cliente..." >
             <button id="btnScanPackage" class="btn-scan-package">📦</button>
         </div>
 
@@ -117,10 +124,10 @@
 
             <form id="client-form" class="modal-form">
                 <label>Nome *</label>
-                <input id="client-name" required />
+                <input id="client-name" required >
 
                 <label>Telefone</label>
-                <input id="client-phone" maxlength="16" />
+                <input id="client-phone" maxlength="16" >
 
                 <button id="btnClientSave" class="btn-primary" type="submit">
                     Salvar
@@ -163,7 +170,7 @@
                 <div class="upload-icon">📊</div>
                 <p>Arraste sua planilha aqui</p>
                 <p class="upload-sub">Ou clique para selecionar</p>
-                <input id="file-input" type="file" accept=".xlsx,.xls,.csv" hidden />
+                <input id="file-input" type="file" accept=".xlsx,.xls,.csv" hidden >
             </div>
 
             <div id="upload-progress" class="upload-progress hidden">
@@ -175,11 +182,6 @@
         </div>
     </div>
 
-    <!-- INICIALIZAÇÃO -->
-    <script type="module">
-        import { initApp } from "/js/app.js";
-        window.initApp = initApp;
-    </script>
 </body>
 
 </html>
