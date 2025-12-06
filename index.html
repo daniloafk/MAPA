@@ -3035,9 +3035,35 @@ async function addDeliveryMarkers() {
                         currentInfoWindow.close();
                     }
 
-                    // Abrir nova InfoWindow (SEM mover ou girar o mapa)
+                    // Salvar orientação atual ANTES de qualquer ação
+                    const savedHeading = map.getHeading() || 0;
+                    const savedTilt = map.getTilt() || 0;
+
+                    // Criar listeners temporários para TRAVAR rotação durante pan
+                    const headingListener = map.addListener('heading_changed', () => {
+                        if (map.getHeading() !== savedHeading) {
+                            map.setHeading(savedHeading);
+                        }
+                    });
+
+                    const tiltListener = map.addListener('tilt_changed', () => {
+                        if (map.getTilt() !== savedTilt) {
+                            map.setTilt(savedTilt);
+                        }
+                    });
+
+                    // Centralizar suavemente no marcador
+                    map.panTo(position);
+
+                    // Abrir InfoWindow
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
+
+                    // Remover listeners após 500ms (tempo suficiente para completar o pan)
+                    setTimeout(() => {
+                        google.maps.event.removeListener(headingListener);
+                        google.maps.event.removeListener(tiltListener);
+                    }, 500);
                 });
 
                 // Armazenar o marcador com a chave da coordenada
@@ -3062,9 +3088,35 @@ async function addDeliveryMarkers() {
                         currentInfoWindow.close();
                     }
 
-                    // Abrir nova InfoWindow (SEM mover ou girar o mapa)
+                    // Salvar orientação atual ANTES de qualquer ação
+                    const savedHeading = map.getHeading() || 0;
+                    const savedTilt = map.getTilt() || 0;
+
+                    // Criar listeners temporários para TRAVAR rotação durante pan
+                    const headingListener = map.addListener('heading_changed', () => {
+                        if (map.getHeading() !== savedHeading) {
+                            map.setHeading(savedHeading);
+                        }
+                    });
+
+                    const tiltListener = map.addListener('tilt_changed', () => {
+                        if (map.getTilt() !== savedTilt) {
+                            map.setTilt(savedTilt);
+                        }
+                    });
+
+                    // Centralizar suavemente no marcador
+                    map.panTo(position);
+
+                    // Abrir InfoWindow
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
+
+                    // Remover listeners após 500ms (tempo suficiente para completar o pan)
+                    setTimeout(() => {
+                        google.maps.event.removeListener(headingListener);
+                        google.maps.event.removeListener(tiltListener);
+                    }, 500);
                 });
 
                 // Armazenar o marcador com a chave da coordenada
