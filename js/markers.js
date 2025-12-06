@@ -2,7 +2,7 @@
    markers.js — Controle dos marcadores no mapa
 ========================================================== */
 
-import { getMap } from "./map.js";
+import { getMap } from "/js/map.js";
 
 /* ==========================================================
    LISTAS DE MARCADORES
@@ -47,7 +47,9 @@ export function clearClientMarkers() {
 export function toggleClientMarkers() {
     clientsVisible = !clientsVisible;
 
-    clientMarkers.forEach(m => m.setMap(clientsVisible ? getMap() : null));
+    clientMarkers.forEach(m =>
+        m.setMap(clientsVisible ? getMap() : null)
+    );
 
     const btn = document.getElementById("btnToggleClients");
     btn.classList.toggle("active", clientsVisible);
@@ -71,14 +73,14 @@ export function addMatchedMarker(client) {
 
     matchedMarkers.push(marker);
 
-    // Só aparece se o toggle estiver ativo
+    // Só aparece se estiver ativado
     if (!matchedVisible) {
         marker.setMap(null);
     }
 }
 
 /* ==========================================================
-   LIMPAR MARCADORES DE CLIENTES ENCONTRADOS
+   LIMPAR MARCADORES ENCONTRADOS
 ========================================================== */
 export function clearMatchedMarkers() {
     matchedMarkers.forEach(m => m.setMap(null));
