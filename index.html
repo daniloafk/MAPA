@@ -3015,7 +3015,7 @@ async function addDeliveryMarkers() {
         const infoWindow = new google.maps.InfoWindow({
             content: infoWindowContent,
             maxWidth: 280,
-            disableAutoPan: false
+            disableAutoPan: true
         });
 
         try {
@@ -3035,22 +3035,9 @@ async function addDeliveryMarkers() {
                         currentInfoWindow.close();
                     }
 
-                    // Abrir nova InfoWindow
+                    // Abrir nova InfoWindow (SEM mover ou girar o mapa)
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
-
-                    // Centralizar mapa SEM rotação - captura estado atual ANTES
-                    const currentZoom = map.getZoom();
-                    const currentHeading = map.getHeading() || 0;
-                    const currentTilt = map.getTilt() || 0;
-
-                    // Usar setCenter ao invés de panTo
-                    map.setCenter(position);
-
-                    // Restaurar orientação imediatamente
-                    map.setZoom(currentZoom);
-                    map.setHeading(currentHeading);
-                    map.setTilt(currentTilt);
                 });
 
                 // Armazenar o marcador com a chave da coordenada
@@ -3075,22 +3062,9 @@ async function addDeliveryMarkers() {
                         currentInfoWindow.close();
                     }
 
-                    // Abrir nova InfoWindow
+                    // Abrir nova InfoWindow (SEM mover ou girar o mapa)
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
-
-                    // Centralizar mapa SEM rotação - captura estado atual ANTES
-                    const currentZoom = map.getZoom();
-                    const currentHeading = map.getHeading() || 0;
-                    const currentTilt = map.getTilt() || 0;
-
-                    // Usar setCenter ao invés de panTo
-                    map.setCenter(position);
-
-                    // Restaurar orientação imediatamente
-                    map.setZoom(currentZoom);
-                    map.setHeading(currentHeading);
-                    map.setTilt(currentTilt);
                 });
 
                 // Armazenar o marcador com a chave da coordenada
