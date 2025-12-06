@@ -1,6 +1,6 @@
 // ==========================================================
 //  optimize-route.js — Cloudflare Pages Function
-//  Usa Google Fleet Routing API para montar rotas otimizadas
+//  Usa Google Fleet Routing API para rotas otimizadas
 // ==========================================================
 
 export const onRequestPost = async ({ request, env }) => {
@@ -14,17 +14,16 @@ export const onRequestPost = async ({ request, env }) => {
             return jsonResponse({ error: "Dados inválidos" }, 400);
         }
 
-        // Sua chave real (conforme escolha A)
-        const apiKey = "AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU";
+        // Chave do Google (já autorizada para o domínio Cloudflare Pages)
+        const apiKey = env.GOOGLE_MAPS_API_KEY;
 
         const url = `https://fleetrouting.googleapis.com/v2:optimizeTours?key=${apiKey}`;
 
-        // Construção do payload da Fleet Routing API
+        // Payload da Fleet Routing API
         const payload = {
             model: {
                 shipments: clients.map((c, idx) => ({
                     pickupToDelivery: {
-                        // Apenas uma "delivery" por cliente
                         delivery: {
                             arrivalLocation: {
                                 latLng: {
@@ -72,20 +71,18 @@ export const onRequestPost = async ({ request, env }) => {
 
         const result = await response.json();
 
-        // Extrair pontos na rota retornada
         const points = extractRoutePoints(result);
 
         return jsonResponse({ route: points });
-        
+
     } catch (err) {
         console.error("Erro interno:", err);
         return jsonResponse({ error: "Falha interna do servidor" }, 500);
     }
 };
 
-
 // ==========================================================
-//  Converte o retorno complexo em uma lista simples de coordenadas
+//  Converte o retorno complexo em uma lista de coordenadas
 // ==========================================================
 function extractRoutePoints(result) {
     try {
@@ -104,7 +101,6 @@ function extractRoutePoints(result) {
         return [];
     }
 }
-
 
 // ==========================================================
 //  Helper de resposta JSON
