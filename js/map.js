@@ -1,17 +1,16 @@
 /* ==========================================================
-   map.js — Controle principal do Google Maps
+   map.js — Controle principal do Google Maps (VERSÃO FINAL)
 ========================================================== */
 
 import { appState, updateStatusBar } from "./app.js";
 
 /* ==========================================================
-   VARIÁVEIS GLOBAIS DO MAPA
+   VARIÁVEIS
 ========================================================== */
 let map;
 let is3D = false;
 let userMarker;
 
-/* Tone down animation for smoother experience */
 const DEFAULT_TILT = 45;
 const DEFAULT_ZOOM = 18;
 const DEFAULT_ZOOM_2D = 17;
@@ -22,13 +21,13 @@ const DEFAULT_ZOOM_2D = 17;
 export function initMap() {
     return new Promise(resolve => {
         map = new google.maps.Map(document.getElementById("map"), {
-            center: { lat: -23.55052, lng: -46.633308 }, // São Paulo centro
-            zoom: 16,
+            center: { lat: -23.55052, lng: -46.633308 }, // SP
+            zoom: DEFAULT_ZOOM_2D,
             disableDefaultUI: true,
             gestureHandling: "greedy",
             tilt: 0,
             heading: 0,
-            mapId: "4504f8b37365c3d0" // ID padrão do Google
+            mapId: "4504f8b37365c3d0"
         });
 
         google.maps.event.addListenerOnce(map, "tilesloaded", () => {
@@ -42,7 +41,7 @@ export function setMapLoaded() {
 }
 
 /* ==========================================================
-   CONTROLE 3D / 2D
+   MODO 3D / 2D
 ========================================================== */
 export function toggle3D() {
     is3D = !is3D;
@@ -50,16 +49,16 @@ export function toggle3D() {
     map.moveCamera({
         tilt: is3D ? DEFAULT_TILT : 0,
         zoom: is3D ? DEFAULT_ZOOM : DEFAULT_ZOOM_2D,
-        heading: is3D ? 20 : 0
+        heading: is3D ? map.getHeading() : 0
     });
 
     document.getElementById("btn3D").textContent = is3D ? "2D" : "3D";
 }
 
 /* ==========================================================
-   ATUALIZAÇÃO DA POSIÇÃO DO USUÁRIO
+   ATUALIZA POSIÇÃO DO USUÁRIO
 ========================================================== */
-export function updateUserPosition(lat, lng) {
+export function updateUserPosition(lat, lng, heading = null) {
     if (!map) return;
 
     const pos = new google.maps.LatLng(lat, lng);
@@ -81,6 +80,13 @@ export function updateUserPosition(lat, lng) {
     }
 
     animateMarker(userMarker, pos);
+
+    // Integração real de heading do GPS
+    if (heading !== null && is3D) {
+        map.moveCamera({
+            heading: heading
+        });
+    }
 }
 
 /* ==========================================================
@@ -97,7 +103,7 @@ export function centerUserOnMap() {
 }
 
 /* ==========================================================
-   FUNÇÃO DE ANIMAÇÃO DO MARCADOR (Tween.js)
+   ANIMAÇÃO DO MARCADOR (TWEEN)
 ========================================================== */
 function animateMarker(marker, targetPos) {
     const start = marker.getPosition();
@@ -111,7 +117,7 @@ function animateMarker(marker, targetPos) {
     new TWEEN.Tween(coords)
         .to(
             { lat: end.lat(), lng: end.lng() },
-            650
+            500
         )
         .easing(TWEEN.Easing.Quadratic.Out)
         .onUpdate(() => {
@@ -121,7 +127,7 @@ function animateMarker(marker, targetPos) {
 }
 
 /* ==========================================================
-   LOOP DE ANIMAÇÃO GLOBAL (Tween.js)
+   LOOP GLOBAL DO TWEEN
 ========================================================== */
 function animate() {
     requestAnimationFrame(animate);
@@ -130,7 +136,7 @@ function animate() {
 animate();
 
 /* ==========================================================
-   EXPORTA O MAP ATUAL
+   EXPORTAR MAPA
 ========================================================== */
 export function getMap() {
     return map;
