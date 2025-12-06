@@ -27,33 +27,92 @@ export let appState = {
    INICIALIZAÇÃO PRINCIPAL DO APP (chamada pelo Maps)
 ========================================================== */
 export async function initApp() {
-    console.log("💡 Iniciando aplicação...");
+    console.log("🚀 Iniciando aplicação...");
 
-    // 1) Inicializar mapa
-    appState.map = await initMap();
-    console.log("🗺️ Mapa carregado.");
+    try {
+        // 1) Atualizar mensagem de loading
+        updateLoadingText("Carregando mapa...");
 
-    // 2) Carregar clientes
-    await loadClientsFromSupabase();
-    renderClientList();
+        // 2) Inicializar mapa
+        appState.map = await initMap();
+        console.log("✅ Mapa carregado");
 
-    // 3) GPS
-    startGPS(appState.map);
-    appState.gpsActive = true;
+        // 3) Atualizar loading
+        updateLoadingText("Carregando clientes...");
 
-    // 4) Inicializar modais
-    initQRClientModal();
-    initQRPackageModal();
-    initSpreadsheetUpload();
+        // 4) Carregar clientes
+        await loadClientsFromSupabase();
+        renderClientList();
+        console.log("✅ Clientes carregados");
 
-    // 5) UI
-    bindUIEvents();
+        // 5) Iniciar GPS
+        updateLoadingText("Ativando GPS...");
+        startGPS(appState.map);
+        appState.gpsActive = true;
+        console.log("✅ GPS ativado");
 
-    // 6) Mostrar controles
-    enableUI();
+        // 6) Inicializar modais
+        initQRClientModal();
+        initQRPackageModal();
+        initSpreadsheetUpload();
+        console.log("✅ Modais inicializados");
 
-    // 7) Finalizar loading
-    finishLoading();
+        // 7) UI
+        bindUIEvents();
+        console.log("✅ Eventos vinculados");
+
+        // 8) Mostrar controles
+        enableUI();
+
+        // 9) Finalizar loading
+        finishLoading();
+
+        console.log("🎉 Aplicação iniciada com sucesso!");
+
+    } catch (error) {
+        console.error("❌ Erro ao inicializar aplicação:", error);
+        showLoadingError("Erro ao carregar aplicação: " + error.message);
+    }
+}
+
+/* ==========================================================
+   ATUALIZAR TEXTO DO LOADING
+========================================================== */
+function updateLoadingText(text) {
+    const loadingText = document.getElementById("loading-text");
+    if (loadingText) {
+        loadingText.textContent = text;
+    }
+}
+
+/* ==========================================================
+   MOSTRAR ERRO NO LOADING
+========================================================== */
+function showLoadingError(message) {
+    const loading = document.getElementById("loading-screen");
+    const content = loading.querySelector(".loading-content");
+
+    content.innerHTML = `
+        <div style="color: #ff4444; font-size: 48px; margin-bottom: 20px;">⚠️</div>
+        <div style="font-size: 18px; font-weight: 600; color: white; margin-bottom: 10px;">
+            Erro ao Carregar
+        </div>
+        <div style="font-size: 14px; color: rgba(255,255,255,0.9); margin-bottom: 20px;">
+            ${message}
+        </div>
+        <button onclick="location.reload()" style="
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        ">
+            Recarregar Página
+        </button>
+    `;
 }
 
 /* ==========================================================
@@ -73,6 +132,7 @@ function finishLoading() {
 function enableUI() {
     document.querySelector(".map-controls")?.classList.add("visible");
     document.getElementById("btnAddClient")?.classList.add("visible");
+    document.getElementById("status-bar")?.classList.add("visible");
 }
 
 /* ==========================================================
@@ -99,6 +159,9 @@ function bindUIEvents() {
 
     document.getElementById("btnAddClient").onclick = () =>
         openModal("modal-client");
+
+    document.getElementById("btnScanPackage").onclick = () =>
+        openModal("modal-package");
 
     document.querySelectorAll(".modal-close").forEach(btn => {
         btn.onclick = () => closeModal(btn.closest(".modal").id);
