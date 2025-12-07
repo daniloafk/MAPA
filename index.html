@@ -2985,7 +2985,12 @@ async function markAsDelivered(deliveries, client, marker, coordKey) {
             })
             .in('id', deliveryIds);
 
-        if (error) throw error;
+        if (error) {
+            console.error('Erro ao atualizar Supabase:', error);
+            throw error;
+        }
+
+        console.log(`✅ ${deliveryIds.length} entrega(s) atualizada(s) no banco de dados`);
 
         // Remover marcador do mapa
         if (marker) {
@@ -3024,7 +3029,7 @@ async function markAsDelivered(deliveries, client, marker, coordKey) {
         console.error('Erro ao marcar entregas:', error);
         showToast(
             '❌ Erro ao marcar entrega',
-            'Não foi possível atualizar o status',
+            error.message || 'Não foi possível atualizar o status',
             'error',
             4000
         );
@@ -3126,11 +3131,13 @@ async function addDeliveryMarkers() {
     }
 
     // PASSO 3: Buscar dados da planilha (delivery_data) do Supabase
+    // Apenas entregas pendentes
     let deliveryData = [];
     try {
         const { data, error } = await supabase
             .from('delivery_data')
             .select('*')
+            .eq('status', 'pending') // Apenas entregas pendentes
             .order('sequence', { ascending: true });
 
         if (error) throw error;
@@ -7410,7 +7417,8 @@ async function processSpreadsheetData(jsonData) {
                 zipcode: zipcode,
                 latitude: latitude || null,
                 longitude: longitude || null,
-                sequence: sequence || null
+                sequence: sequence || null,
+                status: 'pending' // Status inicial
             });
         }
 
