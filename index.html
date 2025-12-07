@@ -3197,8 +3197,11 @@ async function addDeliveryMarkers() {
         const addressDiv = document.createElement('div');
         addressDiv.style.fontSize = '12px';
         addressDiv.style.color = '#333';
-        addressDiv.style.lineHeight = '1.4';
+        addressDiv.style.lineHeight = '1.5';
         addressDiv.style.marginBottom = '8px';
+        addressDiv.style.padding = '8px';
+        addressDiv.style.background = '#f5f5f5';
+        addressDiv.style.borderRadius = '4px';
         addressDiv.innerHTML = `📍 ${client.address.replace(/\n/g, '<br>')}`;
 
         infoWindowContent.appendChild(badgeDiv);
