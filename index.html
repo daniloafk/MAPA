@@ -181,6 +181,48 @@
         transform: none !important;
     }
 
+    /* Botão Parar Navegação */
+    .stop-navigation-btn {
+        position: fixed;
+        bottom: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 20px;
+        background: linear-gradient(135deg, #ea4335 0%, #c5221f 100%);
+        color: white;
+        border: none;
+        border-radius: 30px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(234, 67, 53, 0.4);
+        transition: all 0.3s ease;
+        animation: pulseNav 2s infinite;
+    }
+
+    .stop-navigation-btn:hover {
+        transform: translateX(-50%) scale(1.05);
+        box-shadow: 0 6px 20px rgba(234, 67, 53, 0.5);
+    }
+
+    .stop-navigation-btn:active {
+        transform: translateX(-50%) scale(0.98);
+    }
+
+    .stop-nav-icon {
+        font-size: 16px;
+        font-weight: bold;
+    }
+
+    @keyframes pulseNav {
+        0%, 100% { box-shadow: 0 4px 15px rgba(234, 67, 53, 0.4); }
+        50% { box-shadow: 0 4px 25px rgba(234, 67, 53, 0.6); }
+    }
+
     /* Indicador de carregamento no botão */
     .control-btn.loading::after {
         content: '';
@@ -1707,6 +1749,12 @@
     <button id="btnShowMatchedClients" class="control-btn" title="Mostrar clientes identificados na planilha">📍</button>
 </div>
 
+<!-- Botão Parar Navegação (flutuante) -->
+<button id="btnStopNavigation" class="stop-navigation-btn" style="display: none;">
+    <span class="stop-nav-icon">✕</span>
+    <span class="stop-nav-text">Parar Navegação</span>
+</button>
+
 <!-- Container de Notificações -->
 <div id="toast-container"></div>
 
@@ -2570,6 +2618,208 @@ let markerCoords = { lat: 0, lng: 0 };
 // IMPORTANTE: Inicializar array de polylines globalmente
 if (!window.routePolylines) {
     window.routePolylines = [];
+}
+
+// ===========================
+// MODO DE NAVEGAÇÃO EM TEMPO REAL
+// ===========================
+let navigationMode = {
+    active: false,
+    destination: null,
+    destinationName: '',
+    lastHeading: 0,
+    lastPosition: null,
+    followInterval: null
+};
+
+// Calcular heading (direção) entre duas posições
+function calculateHeading(from, to) {
+    const lat1 = from.lat * Math.PI / 180;
+    const lat2 = to.lat * Math.PI / 180;
+    const dLng = (to.lng - from.lng) * Math.PI / 180;
+
+    const y = Math.sin(dLng) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+
+    let heading = Math.atan2(y, x) * 180 / Math.PI;
+    heading = (heading + 360) % 360; // Normalizar para 0-360
+
+    return heading;
+}
+
+// Calcular distância entre duas posições em metros
+function calculateDistanceMeters(from, to) {
+    const R = 6371000; // Raio da Terra em metros
+    const lat1 = from.lat * Math.PI / 180;
+    const lat2 = to.lat * Math.PI / 180;
+    const dLat = (to.lat - from.lat) * Math.PI / 180;
+    const dLng = (to.lng - from.lng) * Math.PI / 180;
+
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1) * Math.cos(lat2) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c;
+}
+
+// Iniciar modo de navegação
+function startNavigationMode(destination, destinationName) {
+    navigationMode.active = true;
+    navigationMode.destination = destination;
+    navigationMode.destinationName = destinationName;
+    navigationMode.lastPosition = null;
+
+    console.log('🧭 Modo de navegação iniciado:', destinationName);
+
+    // Mostrar botão de parar navegação
+    const btnStopNav = document.getElementById('btnStopNavigation');
+    if (btnStopNav) {
+        btnStopNav.style.display = 'flex';
+    }
+
+    // Mostrar toast informativo
+    showToast(
+        '🧭 Navegação ativa',
+        'O mapa seguirá seu veículo automaticamente',
+        'info',
+        4000
+    );
+
+    // Iniciar acompanhamento
+    if (navigationMode.followInterval) {
+        clearInterval(navigationMode.followInterval);
+    }
+
+    navigationMode.followInterval = setInterval(() => {
+        updateNavigationView();
+    }, 500); // Atualizar a cada 500ms
+}
+
+// Parar modo de navegação
+function stopNavigationMode() {
+    navigationMode.active = false;
+    navigationMode.destination = null;
+    navigationMode.destinationName = '';
+
+    if (navigationMode.followInterval) {
+        clearInterval(navigationMode.followInterval);
+        navigationMode.followInterval = null;
+    }
+
+    // Esconder botão de parar navegação
+    const btnStopNav = document.getElementById('btnStopNavigation');
+    if (btnStopNav) {
+        btnStopNav.style.display = 'none';
+    }
+
+    // Resetar rotação e inclinação do mapa
+    if (map) {
+        if (map.setHeading) {
+            map.setHeading(0);
+        }
+        if (map.setTilt) {
+            map.setTilt(0);
+        }
+    }
+
+    console.log('🛑 Modo de navegação encerrado');
+
+    showToast(
+        '🛑 Navegação encerrada',
+        'Modo de acompanhamento desativado',
+        'info',
+        3000
+    );
+}
+
+// Atualizar visualização durante navegação
+function updateNavigationView() {
+    if (!navigationMode.active || !navigationMode.destination) return;
+
+    // Obter posição atual do GPS
+    let currentPos = null;
+    if (gpsTracker && gpsTracker.marker) {
+        const pos = gpsTracker.marker.position || (gpsTracker.marker.getPosition && gpsTracker.marker.getPosition());
+        if (pos) {
+            currentPos = { lat: pos.lat, lng: pos.lng };
+        }
+    } else if (userLocationMarker) {
+        const pos = userLocationMarker.position || (userLocationMarker.getPosition && userLocationMarker.getPosition());
+        if (pos) {
+            currentPos = { lat: pos.lat, lng: pos.lng };
+        }
+    }
+
+    if (!currentPos) return;
+
+    // Calcular distância até o destino
+    const distanceToDestination = calculateDistanceMeters(currentPos, navigationMode.destination);
+
+    // Verificar se chegou ao destino (< 30 metros)
+    if (distanceToDestination < 30) {
+        showToast(
+            '🎉 Você chegou!',
+            `Destino: ${navigationMode.destinationName}`,
+            'success',
+            5000
+        );
+        stopNavigationMode();
+        return;
+    }
+
+    // Calcular heading baseado na direção do movimento
+    let heading = navigationMode.lastHeading;
+
+    if (navigationMode.lastPosition) {
+        const movementDistance = calculateDistanceMeters(navigationMode.lastPosition, currentPos);
+
+        // Só atualizar heading se houve movimento significativo (> 3 metros)
+        if (movementDistance > 3) {
+            heading = calculateHeading(navigationMode.lastPosition, currentPos);
+            navigationMode.lastHeading = heading;
+        }
+    }
+
+    navigationMode.lastPosition = currentPos;
+
+    // Atualizar mapa: centralizar e rotacionar
+    if (map) {
+        // Centralizar no GPS com suavidade
+        map.panTo(currentPos);
+
+        // Rotacionar mapa na direção do movimento (heading)
+        // O mapa deve apontar na direção do destino a partir da posição atual
+        const headingToDestination = calculateHeading(currentPos, navigationMode.destination);
+
+        // Usar setHeading se disponível (requer tilt > 0 para funcionar)
+        if (map.setHeading) {
+            // Suavizar a rotação
+            const currentMapHeading = map.getHeading() || 0;
+            let diff = headingToDestination - currentMapHeading;
+
+            // Normalizar diferença para -180 a 180
+            if (diff > 180) diff -= 360;
+            if (diff < -180) diff += 360;
+
+            // Aplicar rotação suavizada
+            const newHeading = currentMapHeading + diff * 0.3;
+            map.setHeading(newHeading);
+        }
+
+        // Manter zoom apropriado para navegação
+        const currentZoom = map.getZoom();
+        if (currentZoom < 17) {
+            map.setZoom(17);
+        } else if (currentZoom > 19) {
+            map.setZoom(18);
+        }
+
+        // Inclinar mapa levemente para vista de navegação (se suportado)
+        if (map.setTilt && map.getTilt() === 0) {
+            map.setTilt(45);
+        }
+    }
 }
 
 // Loop de animação Tween.js (sincronizado com requestAnimationFrame)
@@ -4429,6 +4679,14 @@ document.getElementById("btnToggle3D").onclick = () => {
 };
 
 // ===========================
+// BOTÃO PARAR NAVEGAÇÃO
+// ===========================
+
+document.getElementById("btnStopNavigation").onclick = () => {
+    stopNavigationMode();
+};
+
+// ===========================
 // CENTRALIZAR LOCALIZAÇÃO
 // ===========================
 
@@ -6157,7 +6415,7 @@ async function navigateToClient(client) {
                 `🎯 Rota para ${client.name}`,
                 `📏 Distância: ${distance}\n⏱️ Tempo estimado: ${duration}`,
                 'success',
-                8000
+                5000
             );
 
             console.log('✅ Rota calculada:', {
@@ -6165,6 +6423,9 @@ async function navigateToClient(client) {
                 duration: leg.duration,
                 steps: leg.steps.length
             });
+
+            // Iniciar modo de navegação em tempo real
+            startNavigationMode(destination, client.name);
 
         } else {
             throw new Error(`Directions API retornou status: ${result.status}`);
