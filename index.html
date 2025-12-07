@@ -4890,12 +4890,8 @@ async function startCamera() {
     const constraints = {
         video: {
             facingMode: currentFacingMode,
-            width: { ideal: 1920, min: 1280 },
-            height: { ideal: 1080, min: 720 },
-            // Otimizações para leitura de QR Code
-            focusMode: { ideal: 'continuous' },
-            exposureMode: { ideal: 'continuous' },
-            whiteBalanceMode: { ideal: 'continuous' }
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
         }
     };
 
@@ -4981,133 +4977,48 @@ function stopCamera() {
     lastScannedCode = null;
 }
 
-// Variáveis para validação de leitura
-let consecutiveReads = 0;
-let lastReadData = null;
-const REQUIRED_CONSECUTIVE_READS = 2; // Precisa ler 2x consecutivo para confirmar
-
-// Validar se o código lido parece ser um código de pacote válido
-function isValidPackageCode(code) {
-    if (!code || typeof code !== 'string') return false;
-
-    // Remover espaços
-    const trimmed = code.trim();
-
-    // Verificar comprimento mínimo (códigos podem ter a partir de 4 caracteres)
-    if (trimmed.length < 4) return false;
-
-    // Rejeitar strings vazias ou apenas espaços
-    if (trimmed.length === 0) return false;
-
-    // Rejeitar URLs completas (falsos positivos de propagandas)
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return false;
-
-    // Rejeitar códigos extremamente longos (> 100 caracteres - provavelmente erro)
-    if (trimmed.length > 100) return false;
-
-    // Aceitar qualquer código alfanumérico com símbolos comuns de pacotes
-    // Inclui: letras, números, hífen, underscore, ponto, barra, dois pontos, espaços
-    const validPattern = /^[A-Za-z0-9\-_\.\/\:\s\#\@\+\=]+$/;
-    if (!validPattern.test(trimmed)) {
-        // Se falhar, ainda aceitar se tiver pelo menos 50% alfanumérico
-        const alphanumCount = (trimmed.match(/[A-Za-z0-9]/g) || []).length;
-        if (alphanumCount / trimmed.length < 0.5) return false;
-    }
-
-    return true;
-}
-
-// Iniciar loop de scanning otimizado
+// Iniciar loop de scanning
 function startScanning() {
     const canvasContext = qrCanvas.getContext('2d', { willReadFrequently: true });
-
-    // Resetar contadores
-    consecutiveReads = 0;
-    lastReadData = null;
 
     scanningInterval = setInterval(() => {
         if (qrVideo.readyState === qrVideo.HAVE_ENOUGH_DATA) {
             // Ajustar canvas para o tamanho do vídeo
-            const videoWidth = qrVideo.videoWidth;
-            const videoHeight = qrVideo.videoHeight;
-
-            // Usar resolução maior para melhor detecção
-            qrCanvas.width = videoWidth;
-            qrCanvas.height = videoHeight;
+            qrCanvas.width = qrVideo.videoWidth;
+            qrCanvas.height = qrVideo.videoHeight;
 
             // Desenhar frame atual do vídeo no canvas
-            canvasContext.drawImage(qrVideo, 0, 0, videoWidth, videoHeight);
+            canvasContext.drawImage(qrVideo, 0, 0, qrCanvas.width, qrCanvas.height);
 
             // Obter dados da imagem
-            const imageData = canvasContext.getImageData(0, 0, videoWidth, videoHeight);
+            const imageData = canvasContext.getImageData(0, 0, qrCanvas.width, qrCanvas.height);
 
-            // Tentar decodificar QR code com configurações otimizadas
-            // attemptBoth: tenta normal e invertido (suporta QR Model 1 e 2)
+            // Tentar decodificar QR code
             const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                inversionAttempts: "attemptBoth",
+                inversionAttempts: "dontInvert",
             });
 
-            if (code && code.data) {
-                const qrData = code.data.trim();
+            if (code && code.data !== lastScannedCode) {
+                lastScannedCode = code.data;
+                console.log('QR Code detectado:', code.data);
 
-                // Validar se parece um código de pacote válido
-                if (!isValidPackageCode(qrData)) {
-                    // Código inválido - ignorar silenciosamente
-                    consecutiveReads = 0;
-                    lastReadData = null;
-                    return;
-                }
+                // Feedback visual
+                qrStatus.textContent = '✓ QR Code detectado!';
+                qrStatus.classList.add('success');
 
-                // Verificar tamanho mínimo do QR code detectado (evitar falsos positivos)
-                const qrSize = Math.abs(code.location.bottomRightCorner.x - code.location.topLeftCorner.x);
-                if (qrSize < 20) {
-                    // QR code muito pequeno - pode ser ruído
-                    return;
-                }
+                // Som de beep (opcional)
+                playBeep();
 
-                // Sistema de confirmação: precisa ler o mesmo código 2x consecutivo
-                if (qrData === lastReadData) {
-                    consecutiveReads++;
-                } else {
-                    consecutiveReads = 1;
-                    lastReadData = qrData;
-                }
+                // Processar resultado
+                handleQRCodeResult(code.data);
 
-                // Atualizar status visual
-                qrStatus.textContent = `🔍 Lendo... (${consecutiveReads}/${REQUIRED_CONSECUTIVE_READS})`;
-
-                // Só processar após leituras consecutivas confirmadas
-                if (consecutiveReads >= REQUIRED_CONSECUTIVE_READS && qrData !== lastScannedCode) {
-                    lastScannedCode = qrData;
-                    consecutiveReads = 0;
-                    lastReadData = null;
-
-                    console.log('✅ QR Code confirmado:', qrData);
-
-                    // Feedback visual
-                    qrStatus.textContent = '✓ QR Code detectado!';
-                    qrStatus.classList.add('success');
-
-                    // Som de beep
-                    playBeep();
-
-                    // Processar resultado
-                    handleQRCodeResult(qrData);
-
-                    // Parar scanning após detectar
-                    setTimeout(() => {
-                        stopCamera();
-                    }, 800);
-                }
-            } else {
-                // Nenhum código detectado - resetar contador
-                if (consecutiveReads > 0) {
-                    consecutiveReads = 0;
-                    lastReadData = null;
-                }
+                // Parar scanning após detectar
+                setTimeout(() => {
+                    stopCamera();
+                }, 1000);
             }
         }
-    }, 50); // Scan a cada 50ms (20 fps) - mais rápido para detectar
+    }, 100); // Scan a cada 100ms (10 fps)
 }
 
 // Som de beep ao detectar QR code
@@ -7011,12 +6922,8 @@ async function startPackageCamera() {
     const constraints = {
         video: {
             facingMode: packageCurrentFacingMode,
-            width: { ideal: 1920, min: 1280 },
-            height: { ideal: 1080, min: 720 },
-            // Otimizações para leitura de QR Code
-            focusMode: { ideal: 'continuous' },
-            exposureMode: { ideal: 'continuous' },
-            whiteBalanceMode: { ideal: 'continuous' }
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
         }
     };
 
@@ -7084,81 +6991,35 @@ function stopPackageCamera() {
     packageLastScannedCode = null;
 }
 
-// Variáveis para validação de leitura do scanner de pacotes
-let packageConsecutiveReads = 0;
-let packageLastReadData = null;
-const PACKAGE_REQUIRED_READS = 2;
-
-// Iniciar loop de scanning do pacote (otimizado)
+// Iniciar loop de scanning do pacote
 function startPackageScanning() {
     const canvasContext = qrPackageCanvas.getContext('2d', { willReadFrequently: true });
 
-    // Resetar contadores
-    packageConsecutiveReads = 0;
-    packageLastReadData = null;
-
     packageScanningInterval = setInterval(() => {
         if (qrPackageVideo.readyState === qrPackageVideo.HAVE_ENOUGH_DATA) {
-            const videoWidth = qrPackageVideo.videoWidth;
-            const videoHeight = qrPackageVideo.videoHeight;
+            qrPackageCanvas.width = qrPackageVideo.videoWidth;
+            qrPackageCanvas.height = qrPackageVideo.videoHeight;
 
-            qrPackageCanvas.width = videoWidth;
-            qrPackageCanvas.height = videoHeight;
+            canvasContext.drawImage(qrPackageVideo, 0, 0, qrPackageCanvas.width, qrPackageCanvas.height);
 
-            canvasContext.drawImage(qrPackageVideo, 0, 0, videoWidth, videoHeight);
+            const imageData = canvasContext.getImageData(0, 0, qrPackageCanvas.width, qrPackageCanvas.height);
 
-            const imageData = canvasContext.getImageData(0, 0, videoWidth, videoHeight);
-
-            // Usar attemptBoth para suportar QR Model 1 e 2
             const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                inversionAttempts: "attemptBoth",
+                inversionAttempts: "dontInvert",
             });
 
-            if (code && code.data) {
-                const qrData = code.data.trim();
+            if (code && code.data !== packageLastScannedCode) {
+                packageLastScannedCode = code.data;
+                console.log('QR Code do pacote detectado:', code.data);
 
-                // Validar código
-                if (!isValidPackageCode(qrData)) {
-                    packageConsecutiveReads = 0;
-                    packageLastReadData = null;
-                    return;
-                }
+                qrPackageStatus.textContent = '✅ Código detectado!';
+                qrPackageStatus.classList.add('success');
 
-                // Verificar tamanho mínimo do QR
-                const qrSize = Math.abs(code.location.bottomRightCorner.x - code.location.topLeftCorner.x);
-                if (qrSize < 20) return;
-
-                // Sistema de confirmação
-                if (qrData === packageLastReadData) {
-                    packageConsecutiveReads++;
-                } else {
-                    packageConsecutiveReads = 1;
-                    packageLastReadData = qrData;
-                }
-
-                qrPackageStatus.textContent = `🔍 Lendo... (${packageConsecutiveReads}/${PACKAGE_REQUIRED_READS})`;
-
-                if (packageConsecutiveReads >= PACKAGE_REQUIRED_READS && qrData !== packageLastScannedCode) {
-                    packageLastScannedCode = qrData;
-                    packageConsecutiveReads = 0;
-                    packageLastReadData = null;
-
-                    console.log('✅ QR Code do pacote confirmado:', qrData);
-
-                    qrPackageStatus.textContent = '✅ Código detectado!';
-                    qrPackageStatus.classList.add('success');
-
-                    // Buscar cliente pelo código QR
-                    findClientByQRCode(qrData);
-                }
-            } else {
-                if (packageConsecutiveReads > 0) {
-                    packageConsecutiveReads = 0;
-                    packageLastReadData = null;
-                }
+                // Buscar cliente pelo código QR
+                findClientByQRCode(code.data);
             }
         }
-    }, 50); // 20 fps para leitura mais rápida
+    }, 100);
 }
 
 // Buscar cliente pelo código QR do pacote
