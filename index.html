@@ -4339,45 +4339,70 @@ let scannedAddress = '';
 let scannedQRCode = ''; // Armazena o código QR escaneado
 let scannedLatLng = null; // Armazena coordenadas do endereço escaneado
 
-// Popular lista de endereços da planilha no select
-function populateAddressSelect() {
+// Popular lista de endereços da planilha do dia (Supabase) no select
+async function populateAddressSelect() {
     if (!selectAddressManual) return;
 
     // Limpar opções anteriores (manter apenas a primeira)
     selectAddressManual.innerHTML = '<option value="">-- Escolha um endereço da planilha --</option>';
 
-    // Converter addressDatabase em array e ordenar por sequence
-    const addressList = Object.entries(addressDatabase)
-        .map(([qrCode, data]) => ({
-            qrCode,
-            sequence: data.sequence || 0,
-            address: data.address || '',
-            latitude: data.latitude,
-            longitude: data.longitude
-        }))
-        .filter(item => item.address) // Apenas com endereço válido
-        .sort((a, b) => a.sequence - b.sequence); // Ordenar por sequência
+    try {
+        // Buscar dados da planilha do dia no Supabase
+        const { data: deliveryData, error } = await supabase
+            .from('delivery_data')
+            .select('*')
+            .order('sequence', { ascending: true });
 
-    // Adicionar opções ao select
-    addressList.forEach(item => {
-        const option = document.createElement('option');
-        option.value = item.qrCode;
+        if (error) {
+            console.error('Erro ao buscar endereços da planilha:', error);
+            return;
+        }
 
-        // Pegar primeira linha do endereço (geralmente rua e número)
-        const addressFirstLine = item.address.split('\n')[0].trim();
-        const shortAddress = addressFirstLine.length > 50
-            ? addressFirstLine.substring(0, 47) + '...'
-            : addressFirstLine;
+        if (!deliveryData || deliveryData.length === 0) {
+            const optionEmpty = document.createElement('option');
+            optionEmpty.value = '';
+            optionEmpty.textContent = '⚠️ Nenhuma planilha carregada';
+            optionEmpty.disabled = true;
+            selectAddressManual.appendChild(optionEmpty);
+            return;
+        }
 
-        option.textContent = `${item.sequence}. ${shortAddress}`;
-        option.dataset.address = item.address;
-        option.dataset.lat = item.latitude;
-        option.dataset.lng = item.longitude;
+        // Adicionar opções ao select
+        deliveryData.forEach((item, index) => {
+            const option = document.createElement('option');
+            option.value = item.spx_tn || item.id; // Código QR ou ID
 
-        selectAddressManual.appendChild(option);
-    });
+            // Montar endereço completo
+            const fullAddress = [
+                item.destination_address,
+                item.bairro ? `Bairro: ${item.bairro}` : '',
+                item.city,
+                item.zipcode
+            ].filter(Boolean).join('\n');
 
-    console.log(`📋 ${addressList.length} endereços carregados no select`);
+            // Pegar primeira linha do endereço (geralmente rua e número)
+            const addressFirstLine = (item.destination_address || '').split('\n')[0].trim();
+            const shortAddress = addressFirstLine.length > 45
+                ? addressFirstLine.substring(0, 42) + '...'
+                : addressFirstLine;
+
+            // Usar sequence da planilha ou índice + 1
+            const seq = item.sequence || (index + 1);
+
+            option.textContent = `${seq}. ${shortAddress}`;
+            option.dataset.address = fullAddress;
+            option.dataset.lat = item.latitude || 0;
+            option.dataset.lng = item.longitude || 0;
+            option.dataset.spxTn = item.spx_tn || '';
+
+            selectAddressManual.appendChild(option);
+        });
+
+        console.log(`📋 ${deliveryData.length} endereços da planilha carregados no select`);
+
+    } catch (err) {
+        console.error('Erro ao popular select de endereços:', err);
+    }
 }
 
 // Evento de seleção manual de endereço
@@ -4390,15 +4415,18 @@ if (selectAddressManual) {
             return;
         }
 
-        const qrCode = this.value;
+        // Usar spxTn do dataset ou o value como fallback
+        const qrCode = selectedOption.dataset.spxTn || this.value;
         const address = selectedOption.dataset.address;
-        const lat = parseFloat(selectedOption.dataset.lat);
-        const lng = parseFloat(selectedOption.dataset.lng);
+        const lat = parseFloat(selectedOption.dataset.lat) || 0;
+        const lng = parseFloat(selectedOption.dataset.lng) || 0;
 
         // Atualizar variáveis como se tivesse escaneado o QR Code
         scannedQRCode = qrCode;
         scannedAddress = address;
-        scannedLatLng = { lat, lng };
+        if (lat && lng) {
+            scannedLatLng = { lat, lng };
+        }
 
         // Mostrar endereço selecionado
         addressDisplay.classList.add('active');
