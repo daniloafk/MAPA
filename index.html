@@ -8145,7 +8145,8 @@ async function showClientMarkers() {
 
             const infoWindow = new google.maps.InfoWindow({
                 content: infoWindowContent,
-                maxWidth: 280
+                maxWidth: 280,
+                disableAutoPan: true
             });
 
             try {
