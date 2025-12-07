@@ -4091,8 +4091,8 @@ async function addDeliveryMarkers() {
     // Mostrar toast com estatísticas
     const totalLocations = registeredMarkersCount + unregisteredMarkersCount;
     showToast(
-        `📍 ${totalLocations} local${totalLocations > 1 ? 'is' : ''} de entrega`,
-        `✅ ${registeredMarkersCount} cadastrado${registeredMarkersCount !== 1 ? 's' : ''} (verde)\n❌ ${unregisteredMarkersCount} não cadastrado${unregisteredMarkersCount !== 1 ? 's' : ''} (vermelho)`,
+        `📍 ${totalLocations} Locais de entrega`,
+        `✅ ${registeredMarkersCount} cadastrado${registeredMarkersCount !== 1 ? 's' : ''} ❌ ${unregisteredMarkersCount} não cadastrado${unregisteredMarkersCount !== 1 ? 's' : ''}`,
         'info',
         6000
     );
