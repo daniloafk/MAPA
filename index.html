@@ -3355,35 +3355,6 @@ async function addDeliveryMarkers() {
         infoWindowContent.style.maxHeight = '300px';
         infoWindowContent.style.overflowY = 'auto';
 
-        const headerDiv = document.createElement('div');
-        headerDiv.style.display = 'flex';
-        headerDiv.style.justifyContent = 'space-between';
-        headerDiv.style.alignItems = 'center';
-        headerDiv.style.marginBottom = '8px';
-
-        const titleDiv = document.createElement('div');
-        titleDiv.style.fontWeight = 'bold';
-        titleDiv.style.color = '#EA4335';
-        titleDiv.textContent = `📍 ${deliveryCount} entrega${deliveryCount > 1 ? 's' : ''}`;
-
-        const closeBtn = document.createElement('button');
-        closeBtn.innerHTML = '×';
-        closeBtn.style.background = 'none';
-        closeBtn.style.border = 'none';
-        closeBtn.style.fontSize = '20px';
-        closeBtn.style.color = '#666';
-        closeBtn.style.cursor = 'pointer';
-        closeBtn.style.padding = '0';
-        closeBtn.style.marginLeft = '12px';
-        closeBtn.style.lineHeight = '1';
-        closeBtn.style.fontWeight = 'normal';
-        closeBtn.title = 'Fechar';
-        closeBtn.addEventListener('click', () => { infoWindow.close(); currentInfoWindow = null; });
-
-        headerDiv.appendChild(titleDiv);
-        headerDiv.appendChild(closeBtn);
-        infoWindowContent.appendChild(headerDiv);
-
         // Badge de não cadastrado
         const statusBadge = document.createElement('div');
         statusBadge.style.background = '#FF9800';
