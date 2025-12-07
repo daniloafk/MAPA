@@ -2367,21 +2367,31 @@
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&loading=async&callback=initMap&v=beta&libraries=places,geometry,marker"></script>
 
 <script>
+'use strict';
+
+/* ===========================
+   GLOBAL VARIABLES
+   =========================== */
 let map;
 let is3D = false;
+let routeMode = false;
+let currentInfoWindow = null;
+
+// Legacy global variables (mantidas para compatibilidade)
 let userLocationMarker = null;
 let watchId = null;
 let _animating3D = false;
 let locationAccuracy = null;
-let positionHistory = []; // Histórico das últimas posições para suavização
-const maxHistorySize = 5; // Número de posições para calcular média
-let deliveryMarkers = {}; // Armazena marcadores de endereços de entrega
-let directionsService = null; // Serviço de rotas do Google Maps
-let directionsRenderer = null; // Renderizador de rotas
-
-// Variáveis para animação Tween.js
+let deliveryMarkers = {};
+let directionsService = null;
+let directionsRenderer = null;
 let currentTween = null;
-let markerCoords = { lat: 0, lng: 0 }; // Coordenadas atuais do marcador
+let markerCoords = { lat: 0, lng: 0 };
+
+// IMPORTANTE: Inicializar array de polylines globalmente
+if (!window.routePolylines) {
+    window.routePolylines = [];
+}
 
 // Loop de animação Tween.js (sincronizado com requestAnimationFrame)
 function animateTweens(time) {
@@ -2389,15 +2399,247 @@ function animateTweens(time) {
     TWEEN.update(time);
 }
 requestAnimationFrame(animateTweens);
-let routeMode = false; // Modo de planejamento de rota ativo/inativo
-let lastPositionUpdate = 0; // Timestamp da última atualização de posição
-let updateThrottle = 500; // Atualizar posição no máximo a cada 500ms (mais responsivo)
-let currentInfoWindow = null; // InfoWindow atualmente aberta
 
-// IMPORTANTE: Inicializar array de polylines globalmente
-if (!window.routePolylines) {
-    window.routePolylines = [];
+/* ===========================
+   MÓDULO: GPS TRACKER (HIGH PRECISION)
+   =========================== */
+class GPSTracker {
+    constructor() {
+        this.marker = null;
+        this.watchId = null;
+        this.accuracy = null;
+        this.positionHistory = [];
+        this.lastUpdate = 0;
+        this.currentTween = null;
+        this.markerCoords = { lat: 0, lng: 0 };
+
+        // Configurações
+        this.config = {
+            updateThrottle: 500,
+            maxAccuracyThreshold: 50,
+            historySize: 5,
+            highAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
+        };
+    }
+
+    async start() {
+        if (!navigator.geolocation) {
+            throw new Error('Geolocalização não suportada');
+        }
+
+        const options = {
+            enableHighAccuracy: this.config.highAccuracy,
+            timeout: this.config.timeout,
+            maximumAge: this.config.maximumAge
+        };
+
+        return new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    this.createMarker(position);
+                    this.startWatching(options);
+                    resolve(position);
+                },
+                (error) => reject(error),
+                options
+            );
+        });
+    }
+
+    createMarker(position) {
+        const coords = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+        };
+
+        this.accuracy = position.coords.accuracy;
+        this.markerCoords = coords;
+
+        const markerDiv = document.createElement('div');
+        markerDiv.className = 'location-marker active';
+
+        if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+            this.marker = new google.maps.marker.AdvancedMarkerElement({
+                map: map,
+                position: coords,
+                content: markerDiv,
+                title: "Sua Localização"
+            });
+        } else {
+            this.marker = new google.maps.Marker({
+                map: map,
+                position: coords,
+                title: "Sua Localização",
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 8,
+                    fillColor: "#4285f4",
+                    fillOpacity: 1,
+                    strokeColor: "white",
+                    strokeWeight: 3
+                }
+            });
+        }
+
+        // Atualizar referências globais (compatibilidade)
+        userLocationMarker = this.marker;
+        locationAccuracy = this.accuracy;
+        markerCoords = this.markerCoords;
+    }
+
+    startWatching(options) {
+        this.watchId = navigator.geolocation.watchPosition(
+            (position) => this.updatePosition(position),
+            (error) => this.handleError(error),
+            options
+        );
+        watchId = this.watchId; // Compatibilidade global
+    }
+
+    updatePosition(position) {
+        const now = Date.now();
+        if (now - this.lastUpdate < this.config.updateThrottle) {
+            return;
+        }
+        this.lastUpdate = now;
+
+        const accuracy = position.coords.accuracy;
+
+        // Filtro: Rejeitar leituras imprecisas
+        if (accuracy > this.config.maxAccuracyThreshold) {
+            console.warn(`GPS impreciso (${Math.round(accuracy)}m), ignorando...`);
+            return;
+        }
+
+        const rawPos = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: accuracy,
+            timestamp: now
+        };
+
+        // Adicionar ao histórico
+        this.positionHistory.push(rawPos);
+        if (this.positionHistory.length > this.config.historySize) {
+            this.positionHistory.shift();
+        }
+
+        // Calcular posição suavizada
+        const smoothedPos = this.calculateSmoothedPosition();
+
+        if (smoothedPos && this.marker) {
+            this.animateMarkerTo(smoothedPos);
+            this.accuracy = accuracy;
+            locationAccuracy = accuracy; // Atualizar global
+            updateStatus(`Precisão: ${Math.round(accuracy)}m`, true);
+        }
+    }
+
+    calculateSmoothedPosition() {
+        if (this.positionHistory.length === 0) return null;
+        if (this.positionHistory.length === 1) {
+            return {
+                lat: this.positionHistory[0].lat,
+                lng: this.positionHistory[0].lng
+            };
+        }
+
+        let totalWeight = 0;
+        let weightedLat = 0;
+        let weightedLng = 0;
+
+        this.positionHistory.forEach(pos => {
+            const weight = 1 / (pos.accuracy + 1);
+            weightedLat += pos.lat * weight;
+            weightedLng += pos.lng * weight;
+            totalWeight += weight;
+        });
+
+        return {
+            lat: weightedLat / totalWeight,
+            lng: weightedLng / totalWeight
+        };
+    }
+
+    animateMarkerTo(newPosition, duration = 600) {
+        if (!this.marker) return;
+
+        // Primeira posição - sem animação
+        if (this.markerCoords.lat === 0 && this.markerCoords.lng === 0) {
+            this.markerCoords = newPosition;
+            markerCoords = newPosition; // Atualizar global
+            if (this.marker.position !== undefined) {
+                this.marker.position = newPosition;
+            } else if (this.marker.setPosition) {
+                this.marker.setPosition(newPosition);
+            }
+            return;
+        }
+
+        // Parar animação anterior
+        if (this.currentTween) {
+            this.currentTween.stop();
+        }
+        if (currentTween) {
+            currentTween.stop();
+        }
+
+        // Animar com Tween.js
+        this.currentTween = new TWEEN.Tween(this.markerCoords)
+            .to(newPosition, duration)
+            .easing(TWEEN.Easing.Quadratic.Out)
+            .onUpdate(() => {
+                const pos = {
+                    lat: this.markerCoords.lat,
+                    lng: this.markerCoords.lng
+                };
+                if (this.marker.position !== undefined) {
+                    this.marker.position = pos;
+                } else if (this.marker.setPosition) {
+                    this.marker.setPosition(pos);
+                }
+                markerCoords = this.markerCoords; // Sync global
+            })
+            .start();
+
+        currentTween = this.currentTween; // Atualizar global
+    }
+
+    centerOnUser() {
+        if (this.marker) {
+            const position = this.marker.position || this.marker.getPosition();
+            if (position) {
+                map.panTo(position);
+            }
+        }
+    }
+
+    handleError(error) {
+        console.warn('GPS Error:', error);
+    }
+
+    stop() {
+        if (this.watchId) {
+            navigator.geolocation.clearWatch(this.watchId);
+            this.watchId = null;
+            watchId = null;
+        }
+    }
+
+    getPosition() {
+        if (!this.marker) return null;
+        return this.marker.position || this.marker.getPosition();
+    }
+
+    getAccuracy() {
+        return this.accuracy;
+    }
 }
+
+// Instância global do GPS Tracker
+let gpsTracker = null;
 
 const MAP_ID = "ebb7ca4503045feabc75b373";
 
@@ -2542,99 +2784,43 @@ window.initMap = function () {
 // RASTREAMENTO EM TEMPO REAL
 // ===========================
 
-function startLocationTracking() {
-    console.log('Iniciando rastreamento de localização...');
+async function startLocationTracking() {
+    console.log('✅ [MODULAR] Iniciando GPS Tracker...');
 
-    if (!navigator.geolocation) {
-        console.error('Geolocalização não suportada');
+    try {
+        // Criar instância do GPS Tracker modular
+        gpsTracker = new GPSTracker();
+
+        // Iniciar rastreamento
+        const position = await gpsTracker.start();
+
+        console.log('✅ Posição obtida:', position.coords.latitude, position.coords.longitude);
+
+        // Centralizar mapa na posição
+        map.setCenter({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+        });
+        map.setZoom(17);
+
+        // Esconder loading screen
         hideLoadingScreen();
-        showToast('GPS não suportado', 'Seu navegador não suporta geolocalização', 'error', 6000);
-        updateStatus('GPS indisponível', false);
-        return;
+        showAddClientButton();
+
+        showToast(
+            'Localização obtida!',
+            `Precisão: ${Math.round(position.coords.accuracy)}m`,
+            'success',
+            3000
+        );
+
+        console.log('✅ GPS Tracker iniciado com sucesso!');
+
+    } catch (error) {
+        console.error('❌ Erro ao iniciar GPS:', error);
+        hideLoadingScreen();
+        handleGeoError(error, true);
     }
-
-    const markerDiv = document.createElement('div');
-    markerDiv.className = 'location-marker active';
-
-    const geoOptions = {
-        enableHighAccuracy: true, // Força uso de GPS (não WiFi/célula)
-        timeout: 15000, // Tempo máximo para obter posição (15s)
-        maximumAge: 0 // NUNCA usar cache - sempre obter posição nova
-    };
-
-    console.log('Solicitando posição do GPS...');
-    navigator.geolocation.getCurrentPosition(
-        pos => {
-            try {
-                console.log('Posição obtida:', pos.coords.latitude, pos.coords.longitude);
-                const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                locationAccuracy = pos.coords.accuracy;
-
-                map.setCenter(c);
-                map.setZoom(17);
-
-                // Tenta usar AdvancedMarkerElement (recomendado pelo Google desde 2024)
-                if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
-                    console.log('Criando AdvancedMarkerElement...');
-                    userLocationMarker = new google.maps.marker.AdvancedMarkerElement({
-                        map,
-                        position: c,
-                        content: markerDiv,
-                        title: "Sua Localização"
-                    });
-                    console.log('AdvancedMarkerElement criado com sucesso');
-                } else {
-                    // Fallback para Marker clássico se AdvancedMarker não estiver disponível
-                    console.warn('AdvancedMarkerElement não disponível, usando Marker clássico');
-                    userLocationMarker = new google.maps.Marker({
-                        map,
-                        position: c,
-                        title: "Sua Localização",
-                        icon: {
-                            path: google.maps.SymbolPath.CIRCLE,
-                            scale: 8,
-                            fillColor: "#4285f4",
-                            fillOpacity: 1,
-                            strokeColor: "white",
-                            strokeWeight: 3
-                        }
-                    });
-                    console.log('Marker clássico criado com sucesso');
-                }
-
-                console.log('Escondendo loading screen...');
-                hideLoadingScreen();
-                showAddClientButton(); // Mostrar botão adicionar cliente
-
-                // NÃO adicionar marcadores automaticamente
-                // Eles serão adicionados apenas quando o usuário ativar o modo de rota
-            } catch (error) {
-                console.error('Erro ao criar marcador:', error);
-                hideLoadingScreen();
-                showToast('Erro ao criar marcador', error.message, 'error', 6000);
-            }
-
-            showToast(
-                'Localização obtida!',
-                `Precisão: ${Math.round(locationAccuracy)}m`,
-                'success',
-                3000
-            );
-
-            updateStatus(`Precisão: ${Math.round(locationAccuracy)}m`, true);
-
-            watchId = navigator.geolocation.watchPosition(
-                updateUserLocation,
-                handleGeoError,
-                geoOptions
-            );
-        },
-        error => {
-            hideLoadingScreen();
-            handleGeoError(error, true);
-        },
-        geoOptions
-    );
 }
 
 // Função para animar o marcador com Tween.js (100% fluido)
@@ -3271,6 +3457,14 @@ document.getElementById("btnToggle3D").onclick = () => {
 document.getElementById("btnCenterLocation").onclick = () => {
     const btn = document.getElementById("btnCenterLocation");
 
+    // Usar GPS Tracker modular se disponível
+    if (gpsTracker) {
+        gpsTracker.centerOnUser();
+        showToast('Centralizado', 'Mapa centralizado na sua localização', 'info', 2000);
+        return;
+    }
+
+    // Fallback para código legado
     if (!userLocationMarker) {
         showToast('Localização não disponível', 'Aguarde obter sua posição GPS', 'warning', 3000);
         return;
