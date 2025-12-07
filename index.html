@@ -2709,7 +2709,7 @@ function startNavigationMode(destination, destinationName, marker = null, infoWi
 
     navigationMode.followInterval = setInterval(() => {
         updateNavigationView();
-    }, 500); // Atualizar a cada 500ms
+    }, 200); // Atualizar a cada 200ms para acompanhar em tempo real
 }
 
 // Parar modo de navegação
@@ -2901,20 +2901,20 @@ class GPSTracker {
             lng: null,
             variance: null // Incerteza estimada
         };
-        this.kalmanQ = 0.0001; // Ruído do processo aumentado para rastreamento de veículo (mais responsivo)
+        this.kalmanQ = 0.1; // MUITO ALTO - confiar quase totalmente nas novas leituras
         this.lastGoodPosition = null;
         this.consecutiveGoodReadings = 0;
 
-        // Configurações otimizadas para rastreamento em tempo real (veículo em movimento)
+        // Configurações ULTRA AGRESSIVAS para rastreamento instantâneo de veículo
         this.config = {
-            updateThrottle: 100,        // Atualizar a cada 100ms para tempo real
-            maxAccuracyThreshold: 50,   // Aceitar leituras até 50m (veículo em movimento precisa disso)
-            targetAccuracy: 10,         // Meta: 10 metros (realista para veículo)
-            historySize: 3,             // Histórico menor = responde mais rápido
+            updateThrottle: 0,          // SEM throttle - atualizar IMEDIATAMENTE
+            maxAccuracyThreshold: 500,  // Aceitar qualquer leitura até 500m
+            targetAccuracy: 50,         // Meta relaxada para veículo
+            historySize: 1,             // Sem histórico - usar última leitura
             highAccuracy: true,
-            timeout: 10000,             // Timeout 10s
+            timeout: 30000,             // Timeout 30s para não perder leituras
             maximumAge: 0,              // Sempre dados frescos
-            minReadingsForStable: 2     // Apenas 2 leituras para confirmar (mais rápido)
+            minReadingsForStable: 1     // 1 leitura é suficiente
         };
     }
 
@@ -2993,62 +2993,41 @@ class GPSTracker {
     }
 
     updatePosition(position) {
-        const now = Date.now();
-        if (now - this.lastUpdate < this.config.updateThrottle) {
-            return;
-        }
-        this.lastUpdate = now;
-
         const accuracy = position.coords.accuracy;
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
 
-        // Filtro rigoroso: Rejeitar leituras imprecisas (> 10m)
-        if (accuracy > this.config.maxAccuracyThreshold) {
-            console.warn(`⚠️ GPS impreciso (${Math.round(accuracy)}m > ${this.config.maxAccuracyThreshold}m), ignorando...`);
-            this.consecutiveGoodReadings = 0;
-            return;
-        }
+        // Log para debug
+        console.log(`📍 GPS Update: ${lat.toFixed(6)}, ${lng.toFixed(6)} (±${Math.round(accuracy)}m)`);
 
-        // Aplicar Filtro de Kalman para suavização
-        const filteredPos = this.applyKalmanFilter(lat, lng, accuracy);
+        // Usar posição DIRETA - sem filtro Kalman para máxima responsividade
+        const newPos = { lat, lng };
 
-        // Verificar se é uma leitura boa (≤ 2m)
-        if (accuracy <= this.config.targetAccuracy) {
-            this.consecutiveGoodReadings++;
-            if (this.consecutiveGoodReadings >= this.config.minReadingsForStable) {
-                // Posição estável com alta precisão - usar diretamente
-                this.lastGoodPosition = { lat, lng, accuracy };
-                console.log(`✅ GPS estável: ${accuracy.toFixed(1)}m`);
-            }
-        } else {
-            this.consecutiveGoodReadings = Math.max(0, this.consecutiveGoodReadings - 1);
-        }
-
-        // Adicionar ao histórico (apenas leituras boas)
-        const rawPos = {
-            lat: filteredPos.lat,
-            lng: filteredPos.lng,
-            accuracy: accuracy,
-            timestamp: now
-        };
-
-        this.positionHistory.push(rawPos);
-        if (this.positionHistory.length > this.config.historySize) {
-            this.positionHistory.shift();
-        }
-
-        // Usar posição filtrada pelo Kalman
+        // Atualizar marcador IMEDIATAMENTE sem animação
         if (this.marker) {
-            // Animação muito rápida para rastreamento em tempo real de veículo
-            const animDuration = accuracy <= this.config.targetAccuracy ? 50 : 100;
-            this.animateMarkerTo(filteredPos, animDuration);
+            this.setMarkerPositionInstant(newPos);
             this.accuracy = accuracy;
             locationAccuracy = accuracy;
+            this.markerCoords = newPos;
+            markerCoords = newPos; // Atualizar global
 
             // Indicador visual de qualidade do sinal
-            const qualityIcon = accuracy <= 10 ? '🎯' : accuracy <= 20 ? '📍' : '📡';
-            updateStatus(`${qualityIcon} Precisão: ${accuracy.toFixed(1)}m`, true);
+            const qualityIcon = accuracy <= 10 ? '🎯' : accuracy <= 30 ? '📍' : '📡';
+            updateStatus(`${qualityIcon} GPS: ${accuracy.toFixed(0)}m`, true);
+        }
+    }
+
+    // Nova função para atualização INSTANTÂNEA (sem animação)
+    setMarkerPositionInstant(newPosition) {
+        if (!this.marker) return;
+
+        // Atualizar posição diretamente sem animação
+        if (this.marker.position !== undefined) {
+            // AdvancedMarkerElement
+            this.marker.position = newPosition;
+        } else if (this.marker.setPosition) {
+            // Marker clássico
+            this.marker.setPosition(newPosition);
         }
     }
 
