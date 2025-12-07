@@ -3230,10 +3230,9 @@ async function navigateToNextMarker(currentPosition = null) {
 
     // Se temos posição atual, encontrar o marcador com menor tempo de viagem REAL
     if (currentPosition) {
-        console.log('🚗 Calculando rotas reais de tráfego para encontrar o próximo destino...');
+        console.log('🚗 Calculando rotas reais de tráfego para TODOS os marcadores...');
 
-        // Preparar destinos para a Distance Matrix API
-        const destinations = [];
+        // PASSO 1: Preparar lista de marcadores com suas posições
         const markersList = [];
 
         remainingMarkers.forEach(marker => {
@@ -3246,81 +3245,110 @@ async function navigateToNextMarker(currentPosition = null) {
             }
 
             if (markerPosition) {
-                destinations.push(new google.maps.LatLng(markerPosition.lat, markerPosition.lng));
-                markersList.push({ marker, position: markerPosition });
+                markersList.push({
+                    marker,
+                    position: markerPosition
+                });
             }
         });
 
-        if (destinations.length === 0) {
+        if (markersList.length === 0) {
             console.warn('Nenhum marcador com posição válida encontrado');
             return;
         }
 
+        console.log(`📊 Calculando rotas para ${markersList.length} destinos...`);
+
         try {
-            // Usar Distance Matrix Service para calcular rotas reais
+            // PASSO 2: Dividir em lotes de 25 (limite da Distance Matrix API)
+            const MAX_DESTINATIONS = 25;
+            const batches = [];
+            for (let i = 0; i < markersList.length; i += MAX_DESTINATIONS) {
+                batches.push(markersList.slice(i, i + MAX_DESTINATIONS));
+            }
+
+            console.log(`📦 Dividido em ${batches.length} lote(s) de até ${MAX_DESTINATIONS} destinos`);
+
+            // PASSO 3: Processar todos os lotes em paralelo
             const service = new google.maps.DistanceMatrixService();
             const origin = new google.maps.LatLng(currentPosition.lat, currentPosition.lng);
 
-            const request = {
-                origins: [origin],
-                destinations: destinations,
-                travelMode: google.maps.TravelMode.DRIVING,
-                unitSystem: google.maps.UnitSystem.METRIC,
-                avoidHighways: false,
-                avoidTolls: false,
-                drivingOptions: {
-                    departureTime: new Date(), // Para considerar tráfego atual
-                    trafficModel: google.maps.TrafficModel.BEST_GUESS
-                }
-            };
+            const batchPromises = batches.map((batch, batchIndex) => {
+                const destinations = batch.map(item =>
+                    new google.maps.LatLng(item.position.lat, item.position.lng)
+                );
 
-            const response = await new Promise((resolve, reject) => {
-                service.getDistanceMatrix(request, (response, status) => {
-                    if (status === 'OK') {
-                        resolve(response);
-                    } else {
-                        reject(new Error(`Distance Matrix falhou: ${status}`));
+                const request = {
+                    origins: [origin],
+                    destinations: destinations,
+                    travelMode: google.maps.TravelMode.DRIVING,
+                    unitSystem: google.maps.UnitSystem.METRIC,
+                    avoidHighways: false,
+                    avoidTolls: false,
+                    drivingOptions: {
+                        departureTime: new Date(),
+                        trafficModel: google.maps.TrafficModel.BEST_GUESS
+                    }
+                };
+
+                return new Promise((resolve, reject) => {
+                    // Delay entre requisições para evitar rate limiting
+                    setTimeout(() => {
+                        service.getDistanceMatrix(request, (response, status) => {
+                            if (status === 'OK') {
+                                resolve({ response, batch, batchIndex });
+                            } else {
+                                reject(new Error(`Lote ${batchIndex + 1} falhou: ${status}`));
+                            }
+                        });
+                    }, batchIndex * 200); // 200ms entre cada lote
+                });
+            });
+
+            // Aguardar todos os lotes
+            const batchResults = await Promise.all(batchPromises);
+
+            // PASSO 4: Encontrar o destino com MENOR DISTÂNCIA REAL (não tempo)
+            let minDistance = Infinity;
+            let bestMarker = null;
+            let bestPosition = null;
+            let bestDistanceText = null;
+            let bestDurationText = null;
+
+            batchResults.forEach(({ response, batch, batchIndex }) => {
+                response.rows[0].elements.forEach((element, index) => {
+                    if (element.status === 'OK') {
+                        const duration = element.duration.value; // Tempo em segundos (apenas para mostrar)
+                        const distance = element.distance.value; // Distância em metros
+
+                        console.log(`📍 Lote ${batchIndex + 1}, Destino ${index + 1}: ${Math.round(distance)}m (${Math.round(duration / 60)} min)`);
+
+                        // Escolher pela MENOR DISTÂNCIA, não pelo menor tempo
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            bestMarker = batch[index].marker;
+                            bestPosition = batch[index].position;
+                            bestDistanceText = element.distance.text;
+                            bestDurationText = element.duration.text;
+                        }
                     }
                 });
             });
 
-            // Encontrar o destino com menor tempo de viagem
-            let minDuration = Infinity;
-            let bestIndex = -1;
+            if (bestMarker) {
+                nextMarker = bestMarker;
+                nextPosition = bestPosition;
 
-            response.rows[0].elements.forEach((element, index) => {
-                if (element.status === 'OK') {
-                    const duration = element.duration.value; // Tempo em segundos
-                    const distance = element.distance.value; // Distância em metros
-
-                    console.log(`📍 Destino ${index + 1}: ${Math.round(distance)}m, ${Math.round(duration / 60)} min`);
-
-                    if (duration < minDuration) {
-                        minDuration = duration;
-                        bestIndex = index;
-                    }
-                }
-            });
-
-            if (bestIndex !== -1) {
-                nextMarker = markersList[bestIndex].marker;
-                nextPosition = markersList[bestIndex].position;
-
-                const bestElement = response.rows[0].elements[bestIndex];
-                const distanceText = bestElement.distance.text;
-                const durationText = bestElement.duration.text;
-
-                console.log(`✅ Melhor rota encontrada: ${distanceText}, ${durationText}`);
+                console.log(`✅ Rota mais curta (de ${markersList.length} destinos): ${bestDistanceText} (tempo estimado: ${bestDurationText})`);
 
                 showToast(
-                    '🚗 Próxima entrega',
-                    `${distanceText} - ${durationText} de viagem`,
+                    '📏 Próxima entrega',
+                    `${bestDistanceText} de distância`,
                     'info',
                     3000
                 );
             } else {
-                console.warn('Nenhuma rota válida encontrada, usando fallback');
-                // Fallback: usar distância em linha reta
+                console.warn('Nenhuma rota válida encontrada');
                 nextMarker = markersList[0].marker;
                 nextPosition = markersList[0].position;
             }
