@@ -2678,6 +2678,12 @@ function startNavigationMode(destination, destinationName) {
         btnStopNav.style.display = 'flex';
     }
 
+    // Ocultar botão adicionar cliente
+    const btnAddClient = document.getElementById('btn-add-client');
+    if (btnAddClient) {
+        btnAddClient.style.display = 'none';
+    }
+
     // Mostrar toast informativo
     showToast(
         '🧭 Navegação ativa',
@@ -2711,6 +2717,12 @@ function stopNavigationMode() {
     const btnStopNav = document.getElementById('btnStopNavigation');
     if (btnStopNav) {
         btnStopNav.style.display = 'none';
+    }
+
+    // Mostrar botão adicionar cliente novamente
+    const btnAddClient = document.getElementById('btn-add-client');
+    if (btnAddClient) {
+        btnAddClient.style.display = 'flex';
     }
 
     // Resetar rotação e inclinação do mapa
