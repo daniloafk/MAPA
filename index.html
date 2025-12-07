@@ -1662,6 +1662,16 @@
                         maxlength="16"
                     >
                 </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="select-address-manual">📋 Selecionar Endereço Manualmente</label>
+                    <select class="form-input" id="select-address-manual" style="height: auto; padding: 10px; font-size: 14px;">
+                        <option value="">-- Escolha um endereço da planilha --</option>
+                    </select>
+                    <div class="address-list-hint" style="font-size: 11px; color: #666; margin-top: 4px;">
+                        💡 Use quando não for possível ler o QR Code
+                    </div>
+                </div>
             </form>
         </div>
 
@@ -4323,10 +4333,95 @@ const addressText = document.getElementById('address-text');
 
 const inputName = document.getElementById('input-name');
 const inputPhone = document.getElementById('input-phone');
+const selectAddressManual = document.getElementById('select-address-manual');
 
 let scannedAddress = '';
 let scannedQRCode = ''; // Armazena o código QR escaneado
 let scannedLatLng = null; // Armazena coordenadas do endereço escaneado
+
+// Popular lista de endereços da planilha no select
+function populateAddressSelect() {
+    if (!selectAddressManual) return;
+
+    // Limpar opções anteriores (manter apenas a primeira)
+    selectAddressManual.innerHTML = '<option value="">-- Escolha um endereço da planilha --</option>';
+
+    // Converter addressDatabase em array e ordenar por sequence
+    const addressList = Object.entries(addressDatabase)
+        .map(([qrCode, data]) => ({
+            qrCode,
+            sequence: data.sequence || 0,
+            address: data.address || '',
+            latitude: data.latitude,
+            longitude: data.longitude
+        }))
+        .filter(item => item.address) // Apenas com endereço válido
+        .sort((a, b) => a.sequence - b.sequence); // Ordenar por sequência
+
+    // Adicionar opções ao select
+    addressList.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item.qrCode;
+
+        // Pegar primeira linha do endereço (geralmente rua e número)
+        const addressFirstLine = item.address.split('\n')[0].trim();
+        const shortAddress = addressFirstLine.length > 50
+            ? addressFirstLine.substring(0, 47) + '...'
+            : addressFirstLine;
+
+        option.textContent = `${item.sequence}. ${shortAddress}`;
+        option.dataset.address = item.address;
+        option.dataset.lat = item.latitude;
+        option.dataset.lng = item.longitude;
+
+        selectAddressManual.appendChild(option);
+    });
+
+    console.log(`📋 ${addressList.length} endereços carregados no select`);
+}
+
+// Evento de seleção manual de endereço
+if (selectAddressManual) {
+    selectAddressManual.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+
+        if (!this.value) {
+            // Resetar se selecionou a opção vazia
+            return;
+        }
+
+        const qrCode = this.value;
+        const address = selectedOption.dataset.address;
+        const lat = parseFloat(selectedOption.dataset.lat);
+        const lng = parseFloat(selectedOption.dataset.lng);
+
+        // Atualizar variáveis como se tivesse escaneado o QR Code
+        scannedQRCode = qrCode;
+        scannedAddress = address;
+        scannedLatLng = { lat, lng };
+
+        // Mostrar endereço selecionado
+        addressDisplay.classList.add('active');
+        addressText.textContent = address;
+
+        // Parar câmera (não precisa mais escanear)
+        stopCamera();
+
+        // Focar no campo nome para preenchimento
+        setTimeout(() => {
+            inputName.focus();
+        }, 100);
+
+        showToast(
+            '📍 Endereço selecionado',
+            'Preencha os dados do cliente',
+            'info',
+            3000
+        );
+
+        console.log(`✅ Endereço selecionado manualmente: ${qrCode}`);
+    });
+}
 
 // Mostrar botão após carregar o mapa
 function showAddClientButton() {
@@ -4339,6 +4434,9 @@ function showAddClientButton() {
 async function openModal() {
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
+
+    // Popular lista de endereços da planilha
+    populateAddressSelect();
 
     // Verificar se câmera está disponível
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -4397,6 +4495,11 @@ function resetForm() {
     scannedQRCode = '';
     scannedLatLng = null;
     stopCamera(); // Parar câmera ao fechar modal
+
+    // Resetar select de endereço manual
+    if (selectAddressManual) {
+        selectAddressManual.value = '';
+    }
 
     // Resetar modo de edição
     isEditMode = false;
