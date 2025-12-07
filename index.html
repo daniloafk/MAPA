@@ -461,6 +461,167 @@
         padding: 24px;
     }
 
+    /* Custom Dropdown para Seleção de Endereço */
+    .custom-dropdown {
+        position: relative;
+        width: 100%;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .custom-dropdown-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 14px;
+        background: #fff;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 14px;
+        color: #333;
+    }
+
+    .dark .custom-dropdown-header {
+        background: #2d2d2d;
+        border-color: #444;
+        color: #e0e0e0;
+    }
+
+    .custom-dropdown-header:hover {
+        border-color: #4285f4;
+    }
+
+    .custom-dropdown.open .custom-dropdown-header {
+        border-color: #4285f4;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+
+    .dropdown-placeholder {
+        color: #888;
+    }
+
+    .dropdown-arrow {
+        font-size: 10px;
+        color: #666;
+        transition: transform 0.2s ease;
+    }
+
+    .custom-dropdown.open .dropdown-arrow {
+        transform: rotate(180deg);
+    }
+
+    .custom-dropdown-list {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        max-height: 250px;
+        overflow-y: auto;
+        background: #fff;
+        border: 2px solid #4285f4;
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        display: none;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .dark .custom-dropdown-list {
+        background: #2d2d2d;
+        border-color: #4285f4;
+    }
+
+    .custom-dropdown.open .custom-dropdown-list {
+        display: block;
+    }
+
+    .dropdown-item {
+        display: flex;
+        align-items: flex-start;
+        padding: 10px 14px;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+        transition: background 0.15s ease;
+        gap: 10px;
+    }
+
+    .dark .dropdown-item {
+        border-bottom-color: #3d3d3d;
+    }
+
+    .dropdown-item:last-child {
+        border-bottom: none;
+    }
+
+    .dropdown-item:hover {
+        background: #f5f8ff;
+    }
+
+    .dark .dropdown-item:hover {
+        background: #3a3a4a;
+    }
+
+    .dropdown-item-number {
+        font-weight: 700;
+        color: #EA4335;
+        font-size: 14px;
+        min-width: 28px;
+        flex-shrink: 0;
+    }
+
+    .dropdown-item-address {
+        flex: 1;
+        font-size: 13px;
+        color: #333;
+        line-height: 1.4;
+    }
+
+    .dark .dropdown-item-address {
+        color: #e0e0e0;
+    }
+
+    .dropdown-item-empty {
+        padding: 16px 14px;
+        text-align: center;
+        color: #888;
+        font-style: italic;
+        font-size: 13px;
+    }
+
+    .dropdown-item-success {
+        color: #34A853;
+        font-weight: 500;
+    }
+
+    /* Scrollbar customizada para a lista */
+    .custom-dropdown-list::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .custom-dropdown-list::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 3px;
+    }
+
+    .custom-dropdown-list::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 3px;
+    }
+
+    .custom-dropdown-list::-webkit-scrollbar-thumb:hover {
+        background: #a1a1a1;
+    }
+
+    .dark .custom-dropdown-list::-webkit-scrollbar-track {
+        background: #3d3d3d;
+    }
+
+    .dark .custom-dropdown-list::-webkit-scrollbar-thumb {
+        background: #666;
+    }
+
     /* QR Code Scanner */
     .qr-scanner-section {
         margin-bottom: 24px;
@@ -1664,10 +1825,19 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="select-address-manual">📋 Selecionar Endereço Manualmente</label>
-                    <select class="form-input" id="select-address-manual" style="height: auto; padding: 10px; font-size: 14px;">
-                        <option value="">-- Escolha um endereço da planilha --</option>
-                    </select>
+                    <label class="form-label">📋 Selecionar Endereço Manualmente</label>
+
+                    <!-- Dropdown Customizado -->
+                    <div class="custom-dropdown" id="address-dropdown">
+                        <div class="custom-dropdown-header" id="dropdown-header">
+                            <span class="dropdown-placeholder">-- Escolha um endereço da planilha --</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </div>
+                        <div class="custom-dropdown-list" id="dropdown-list">
+                            <!-- Itens serão inseridos via JS -->
+                        </div>
+                    </div>
+
                     <div class="address-list-hint" style="font-size: 11px; color: #666; margin-top: 4px;">
                         💡 Use quando não for possível ler o QR Code
                     </div>
@@ -4333,19 +4503,23 @@ const addressText = document.getElementById('address-text');
 
 const inputName = document.getElementById('input-name');
 const inputPhone = document.getElementById('input-phone');
-const selectAddressManual = document.getElementById('select-address-manual');
+
+// Elementos do dropdown customizado
+const addressDropdown = document.getElementById('address-dropdown');
+const dropdownHeader = document.getElementById('dropdown-header');
+const dropdownList = document.getElementById('dropdown-list');
 
 let scannedAddress = '';
 let scannedQRCode = ''; // Armazena o código QR escaneado
 let scannedLatLng = null; // Armazena coordenadas do endereço escaneado
 
-// Popular lista de endereços da planilha do dia (Supabase) no select
+// Popular lista de endereços da planilha do dia (Supabase) no dropdown customizado
 // Exibe apenas endereços NÃO cadastrados
 async function populateAddressSelect() {
-    if (!selectAddressManual) return;
+    if (!dropdownList) return;
 
-    // Limpar opções anteriores (manter apenas a primeira)
-    selectAddressManual.innerHTML = '<option value="">-- Escolha um endereço da planilha --</option>';
+    // Limpar itens anteriores
+    dropdownList.innerHTML = '';
 
     try {
         // Buscar dados da planilha do dia no Supabase
@@ -4360,11 +4534,10 @@ async function populateAddressSelect() {
         }
 
         if (!deliveryData || deliveryData.length === 0) {
-            const optionEmpty = document.createElement('option');
-            optionEmpty.value = '';
-            optionEmpty.textContent = '⚠️ Nenhuma planilha carregada';
-            optionEmpty.disabled = true;
-            selectAddressManual.appendChild(optionEmpty);
+            const emptyItem = document.createElement('div');
+            emptyItem.className = 'dropdown-item-empty';
+            emptyItem.textContent = '⚠️ Nenhuma planilha carregada';
+            dropdownList.appendChild(emptyItem);
             return;
         }
 
@@ -4400,9 +4573,6 @@ async function populateAddressSelect() {
                 return;
             }
 
-            const option = document.createElement('option');
-            option.value = item.spx_tn || item.id; // Código QR ou ID
-
             // Montar endereço completo
             const fullAddress = [
                 item.destination_address,
@@ -4413,94 +4583,116 @@ async function populateAddressSelect() {
 
             // Pegar primeira linha do endereço para exibição
             const displayAddress = (item.destination_address || '').split('\n')[0].trim();
-            const shortAddress = displayAddress.length > 45
-                ? displayAddress.substring(0, 42) + '...'
-                : displayAddress;
 
             // Usar sequence da planilha ou índice + 1
             const seq = item.sequence || (index + 1);
 
-            option.textContent = `${seq}. ${shortAddress}`;
-            option.dataset.address = fullAddress;
-            option.dataset.lat = item.latitude || 0;
-            option.dataset.lng = item.longitude || 0;
-            option.dataset.spxTn = item.spx_tn || '';
+            // Criar item do dropdown
+            const dropdownItem = document.createElement('div');
+            dropdownItem.className = 'dropdown-item';
+            dropdownItem.dataset.value = item.spx_tn || item.id;
+            dropdownItem.dataset.address = fullAddress;
+            dropdownItem.dataset.lat = item.latitude || 0;
+            dropdownItem.dataset.lng = item.longitude || 0;
+            dropdownItem.dataset.spxTn = item.spx_tn || '';
 
-            selectAddressManual.appendChild(option);
+            dropdownItem.innerHTML = `
+                <span class="dropdown-item-number">${seq}.</span>
+                <span class="dropdown-item-address">${escapeHtml(displayAddress)}</span>
+            `;
+
+            // Evento de clique no item
+            dropdownItem.addEventListener('click', () => selectDropdownItem(dropdownItem));
+
+            dropdownList.appendChild(dropdownItem);
             addedCount++;
         });
 
         // Se todos já estão cadastrados
         if (addedCount === 0) {
-            const optionAll = document.createElement('option');
-            optionAll.value = '';
-            optionAll.textContent = '✅ Todos os endereços já cadastrados';
-            optionAll.disabled = true;
-            selectAddressManual.appendChild(optionAll);
+            const successItem = document.createElement('div');
+            successItem.className = 'dropdown-item-empty dropdown-item-success';
+            successItem.textContent = '✅ Todos os endereços já cadastrados';
+            dropdownList.appendChild(successItem);
         }
 
         console.log(`📋 ${addedCount} endereços não cadastrados disponíveis (${deliveryData.length - addedCount} já cadastrados)`);
 
     } catch (err) {
-        console.error('Erro ao popular select de endereços:', err);
+        console.error('Erro ao popular dropdown de endereços:', err);
     }
 }
 
-// Evento de seleção manual de endereço
-if (selectAddressManual) {
-    // Ao clicar/focar no select, parar a câmera
-    selectAddressManual.addEventListener('focus', function() {
-        stopCamera();
-        const qrStatus = document.getElementById('qr-status');
-        if (qrStatus) {
-            qrStatus.textContent = '⏸️ Aguardando seleção manual...';
+// Função para selecionar item do dropdown
+function selectDropdownItem(item) {
+    const qrCode = item.dataset.spxTn || item.dataset.value;
+    const address = item.dataset.address;
+    const lat = parseFloat(item.dataset.lat) || 0;
+    const lng = parseFloat(item.dataset.lng) || 0;
+
+    // Atualizar variáveis como se tivesse escaneado o QR Code
+    scannedQRCode = qrCode;
+    scannedAddress = address;
+    if (lat && lng) {
+        scannedLatLng = { lat, lng };
+    }
+
+    // Atualizar header do dropdown com o item selecionado
+    const numberSpan = item.querySelector('.dropdown-item-number');
+    const addressSpan = item.querySelector('.dropdown-item-address');
+    dropdownHeader.innerHTML = `
+        <span><span style="color: #EA4335; font-weight: 700;">${numberSpan.textContent}</span> ${addressSpan.textContent}</span>
+        <span class="dropdown-arrow">▼</span>
+    `;
+
+    // Fechar dropdown
+    addressDropdown.classList.remove('open');
+
+    // Mostrar endereço selecionado
+    addressDisplay.classList.add('active');
+    addressText.textContent = address;
+
+    // Parar câmera (não precisa mais escanear)
+    stopCamera();
+
+    // Focar no campo nome para preenchimento
+    setTimeout(() => {
+        inputName.focus();
+    }, 100);
+
+    showToast(
+        '📍 Endereço selecionado',
+        'Preencha os dados do cliente',
+        'info',
+        3000
+    );
+
+    console.log(`✅ Endereço selecionado manualmente: ${qrCode}`);
+}
+
+// Evento de toggle do dropdown customizado
+if (dropdownHeader) {
+    dropdownHeader.addEventListener('click', function() {
+        const isOpen = addressDropdown.classList.toggle('open');
+
+        if (isOpen) {
+            // Parar câmera ao abrir dropdown
+            stopCamera();
+            const qrStatus = document.getElementById('qr-status');
+            if (qrStatus) {
+                qrStatus.textContent = '⏸️ Aguardando seleção manual...';
+            }
+            console.log('📋 Modo seleção manual ativado - câmera pausada');
         }
-        console.log('📋 Modo seleção manual ativado - câmera pausada');
-    });
-
-    selectAddressManual.addEventListener('change', function() {
-        const selectedOption = this.options[this.selectedIndex];
-
-        if (!this.value) {
-            // Resetar se selecionou a opção vazia
-            return;
-        }
-
-        // Usar spxTn do dataset ou o value como fallback
-        const qrCode = selectedOption.dataset.spxTn || this.value;
-        const address = selectedOption.dataset.address;
-        const lat = parseFloat(selectedOption.dataset.lat) || 0;
-        const lng = parseFloat(selectedOption.dataset.lng) || 0;
-
-        // Atualizar variáveis como se tivesse escaneado o QR Code
-        scannedQRCode = qrCode;
-        scannedAddress = address;
-        if (lat && lng) {
-            scannedLatLng = { lat, lng };
-        }
-
-        // Mostrar endereço selecionado
-        addressDisplay.classList.add('active');
-        addressText.textContent = address;
-
-        // Parar câmera (não precisa mais escanear)
-        stopCamera();
-
-        // Focar no campo nome para preenchimento
-        setTimeout(() => {
-            inputName.focus();
-        }, 100);
-
-        showToast(
-            '📍 Endereço selecionado',
-            'Preencha os dados do cliente',
-            'info',
-            3000
-        );
-
-        console.log(`✅ Endereço selecionado manualmente: ${qrCode}`);
     });
 }
+
+// Fechar dropdown ao clicar fora
+document.addEventListener('click', function(e) {
+    if (addressDropdown && !addressDropdown.contains(e.target)) {
+        addressDropdown.classList.remove('open');
+    }
+});
 
 // Mostrar botão após carregar o mapa
 function showAddClientButton() {
@@ -4575,9 +4767,15 @@ function resetForm() {
     scannedLatLng = null;
     stopCamera(); // Parar câmera ao fechar modal
 
-    // Resetar select de endereço manual
-    if (selectAddressManual) {
-        selectAddressManual.value = '';
+    // Resetar dropdown customizado de endereço manual
+    if (addressDropdown) {
+        addressDropdown.classList.remove('open');
+        if (dropdownHeader) {
+            dropdownHeader.innerHTML = `
+                <span class="dropdown-placeholder">-- Escolha um endereço da planilha --</span>
+                <span class="dropdown-arrow">▼</span>
+            `;
+        }
     }
 
     // Resetar modo de edição
