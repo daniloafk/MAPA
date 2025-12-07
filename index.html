@@ -5630,16 +5630,16 @@ function createClientInfoBanner(client) {
         gap: 12px;
     `;
 
-    // Formatar endereço (primeira linha apenas)
-    const shortAddress = client.address.split('\n')[0];
+    // Formatar endereço completo
+    const fullAddress = client.address.replace(/\n/g, ' • ');
 
     banner.innerHTML = `
         <div style="flex: 1; min-width: 0;">
-            <div style="font-size: 14px; font-weight: 700; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px;">
                 👤 ${client.name}
             </div>
-            <div style="font-size: 12px; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                📍 ${shortAddress}
+            <div style="font-size: 12px; opacity: 0.9; line-height: 1.3;">
+                📍 ${fullAddress}
             </div>
         </div>
         <button id="btn-cancel-location-update" style="
@@ -5651,6 +5651,7 @@ function createClientInfoBanner(client) {
             font-size: 12px;
             cursor: pointer;
             white-space: nowrap;
+            flex-shrink: 0;
         ">
             ✕ Cancelar
         </button>
