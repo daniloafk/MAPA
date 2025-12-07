@@ -2725,6 +2725,16 @@ function stopNavigationMode() {
         btnAddClient.style.display = 'flex';
     }
 
+    // Limpar linha azul do trajeto
+    if (window.routePolylines && window.routePolylines.length > 0) {
+        window.routePolylines.forEach(polyline => {
+            if (polyline && polyline.setMap) {
+                polyline.setMap(null);
+            }
+        });
+        window.routePolylines = [];
+    }
+
     // Resetar rotação e inclinação do mapa
     if (map) {
         if (map.setHeading) {
