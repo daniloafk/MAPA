@@ -3056,6 +3056,16 @@ async function markAsDelivered(deliveries, client, marker, coordKey, deliveredBt
             deliveredBtn.addEventListener('mouseleave', deliveredBtn._hoverOut);
         }
 
+        // Obter posição do marcador atual para encontrar o mais próximo
+        let currentMarkerPosition = null;
+        if (marker) {
+            if (marker.position) {
+                currentMarkerPosition = marker.position;
+            } else if (marker.getPosition) {
+                currentMarkerPosition = marker.getPosition();
+            }
+        }
+
         // Fechar InfoWindow
         if (currentInfoWindow) {
             currentInfoWindow.close();
@@ -3070,8 +3080,8 @@ async function markAsDelivered(deliveries, client, marker, coordKey, deliveredBt
             3000
         );
 
-        // Navegar para o próximo marcador
-        await navigateToNextMarker();
+        // Navegar para o próximo marcador mais próximo
+        await navigateToNextMarker(currentMarkerPosition);
 
     } catch (error) {
         console.error('Erro ao marcar entregas:', error);
@@ -3184,8 +3194,24 @@ async function undoDelivery(marker, deliveredBtn) {
     }
 }
 
-// Função para navegar para o próximo marcador
-async function navigateToNextMarker() {
+// Função para calcular distância entre dois pontos (em metros)
+function calculateDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371000; // Raio da Terra em metros
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lng2 - lng1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+}
+
+// Função para navegar para o próximo marcador mais próximo
+async function navigateToNextMarker(currentPosition = null) {
     // Filtrar apenas marcadores não entregues
     const remainingMarkers = Object.values(deliveryMarkers).filter(m => m !== null && !m.isDelivered);
 
@@ -3199,15 +3225,51 @@ async function navigateToNextMarker() {
         return;
     }
 
-    // Pegar o primeiro marcador restante (não entregue)
-    const nextMarker = remainingMarkers[0];
+    let nextMarker = null;
     let nextPosition = null;
 
-    // Obter posição do próximo marcador
-    if (nextMarker.position) {
-        nextPosition = nextMarker.position;
-    } else if (nextMarker.getPosition) {
-        nextPosition = nextMarker.getPosition();
+    // Se temos posição atual, encontrar o marcador mais próximo
+    if (currentPosition) {
+        let minDistance = Infinity;
+
+        remainingMarkers.forEach(marker => {
+            let markerPosition = null;
+
+            // Obter posição do marcador
+            if (marker.position) {
+                markerPosition = marker.position;
+            } else if (marker.getPosition) {
+                markerPosition = marker.getPosition();
+            }
+
+            if (markerPosition) {
+                // Calcular distância
+                const distance = calculateDistance(
+                    currentPosition.lat,
+                    currentPosition.lng,
+                    markerPosition.lat,
+                    markerPosition.lng
+                );
+
+                // Se é o mais próximo até agora, salvar
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nextMarker = marker;
+                    nextPosition = markerPosition;
+                }
+            }
+        });
+
+        console.log(`📍 Marcador mais próximo encontrado a ${Math.round(minDistance)}m de distância`);
+    } else {
+        // Se não temos posição atual, pegar o primeiro marcador
+        nextMarker = remainingMarkers[0];
+
+        if (nextMarker.position) {
+            nextPosition = nextMarker.position;
+        } else if (nextMarker.getPosition) {
+            nextPosition = nextMarker.getPosition();
+        }
     }
 
     if (nextPosition) {
@@ -3222,7 +3284,7 @@ async function navigateToNextMarker() {
 
         showToast(
             '➡️ Próxima entrega',
-            'Navegando para o próximo local',
+            'Navegando para o local mais próximo',
             'info',
             2000
         );
