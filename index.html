@@ -2924,12 +2924,9 @@ function handleGeoError(error, isInitial = false) {
 // ===========================
 
 // Função auxiliar para criar SVG de pin do Google Maps com número (suporta 1-99)
-function createPinSVG(number, color = '#EA4335') {
+function createPinSVG(number) {
     // Ajustar tamanho da fonte baseado no número de dígitos
     const fontSize = number >= 10 ? '11' : '13';
-
-    // Definir cor mais escura para o gradiente (10% mais escuro)
-    const darkerColor = color === '#4CAF50' ? '#388E3C' : '#C5221F';
 
     // SVG do pin do Google Maps (formato teardrop/gota invertida)
     const svg = `
@@ -2937,15 +2934,15 @@ function createPinSVG(number, color = '#EA4335') {
             <!-- Sombra -->
             <ellipse cx="16" cy="42" rx="6.5" ry="2" fill="rgba(0,0,0,0.35)"/>
 
-            <!-- Pin com gradiente sutil -->
+            <!-- Pin vermelho com gradiente sutil -->
             <defs>
-                <linearGradient id="pinGradient${number}_${color.replace('#', '')}" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style="stop-color:${color};stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:${darkerColor};stop-opacity:1" />
+                <linearGradient id="pinGradient${number}" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#EA4335;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#C5221F;stop-opacity:1" />
                 </linearGradient>
             </defs>
             <path d="M16 0 C7.164 0 0 7.164 0 16 C0 28 16 44 16 44 S32 28 32 16 C32 7.164 24.836 0 16 0 Z"
-                  fill="url(#pinGradient${number}_${color.replace('#', '')})"
+                  fill="url(#pinGradient${number})"
                   stroke="#FFFFFF"
                   stroke-width="2"/>
 
@@ -2962,7 +2959,7 @@ function createPinSVG(number, color = '#EA4335') {
                   font-family="'Arial Black', Arial, sans-serif"
                   font-size="${fontSize}"
                   font-weight="900"
-                  fill="${color}"
+                  fill="#EA4335"
                   stroke="#FFFFFF"
                   stroke-width="0.8"
                   paint-order="stroke">${number}</text>
@@ -3016,34 +3013,6 @@ async function addDeliveryMarkers() {
         return;
     }
 
-    // PASSO 3.5: Buscar todos os clientes cadastrados para verificar quais endereços já existem
-    let registeredClients = [];
-    try {
-        const { data: clients, error: clientsError } = await supabase
-            .from('clients')
-            .select('*');
-
-        if (clientsError) throw clientsError;
-        registeredClients = clients || [];
-        console.log(`📋 ${registeredClients.length} clientes cadastrados encontrados`);
-    } catch (error) {
-        console.warn('Aviso: Não foi possível buscar clientes cadastrados:', error);
-        // Continuar mesmo se não conseguir buscar clientes (todos serão vermelhos)
-    }
-
-    // Criar Set de endereços cadastrados (normalizados) para comparação rápida
-    const registeredAddresses = new Set();
-    registeredClients.forEach(client => {
-        const clientAddress = client.address || '';
-        const clientAddressFirstLine = clientAddress.split('\n')[0];
-        const normalized = normalizeAddressForComparison(clientAddressFirstLine);
-        if (normalized) {
-            registeredAddresses.add(normalized);
-        }
-    });
-
-    console.log(`✅ ${registeredAddresses.size} endereços únicos cadastrados`);
-
     if (deliveryData.length === 0) {
         console.log('⚠️ Nenhum dado encontrado na planilha');
         showToast(
@@ -3088,37 +3057,20 @@ async function addDeliveryMarkers() {
 
     let markerNumber = 1; // Contador para numeração sequencial
     const bounds = new google.maps.LatLngBounds();
-    let registeredCount = 0;
-    let unregisteredCount = 0;
 
     // Criar um marcador para cada local único
     Object.entries(groupedByLocation).forEach(([coordKey, locationData]) => {
         const position = locationData.position;
         const deliveryCount = locationData.deliveries.length;
 
-        // Verificar se este endereço já está cadastrado
-        const deliveryAddress = locationData.address || '';
-        const normalizedDeliveryAddress = normalizeAddressForComparison(deliveryAddress);
-        const isRegistered = registeredAddresses.has(normalizedDeliveryAddress);
-
-        // Contar cadastrados vs não cadastrados
-        if (isRegistered) {
-            registeredCount++;
-        } else {
-            unregisteredCount++;
-        }
-
-        // Definir cor do marcador
-        const markerColor = isRegistered ? '#4CAF50' : '#EA4335'; // Verde se cadastrado, vermelho se não
-
         // Criar elemento do marcador com pin estilo Google Maps
         const markerDiv = document.createElement('div');
         markerDiv.style.cursor = 'pointer';
         markerDiv.style.transition = 'transform 0.2s';
 
-        // Criar imagem do pin com número de entregas (com cor dinâmica)
+        // Criar imagem do pin com número de entregas
         const pinImg = document.createElement('img');
-        pinImg.src = createPinSVG(deliveryCount, markerColor);
+        pinImg.src = createPinSVG(deliveryCount);
         pinImg.style.width = '32px';
         pinImg.style.height = '44px';
         pinImg.style.display = 'block';
@@ -3148,7 +3100,7 @@ async function addDeliveryMarkers() {
 
         const titleDiv = document.createElement('div');
         titleDiv.style.fontWeight = 'bold';
-        titleDiv.style.color = markerColor;
+        titleDiv.style.color = '#EA4335';
         titleDiv.textContent = `📍 ${deliveryCount} entrega${deliveryCount > 1 ? 's' : ''}`;
 
         const closeBtn = document.createElement('button');
@@ -3171,19 +3123,6 @@ async function addDeliveryMarkers() {
         headerDiv.appendChild(titleDiv);
         headerDiv.appendChild(closeBtn);
         infoWindowContent.appendChild(headerDiv);
-
-        // Badge de status de cadastro
-        const statusBadge = document.createElement('div');
-        statusBadge.style.background = isRegistered ? '#4CAF50' : '#FF9800';
-        statusBadge.style.color = 'white';
-        statusBadge.style.padding = '4px 8px';
-        statusBadge.style.borderRadius = '4px';
-        statusBadge.style.fontSize = '11px';
-        statusBadge.style.fontWeight = 'bold';
-        statusBadge.style.marginBottom = '8px';
-        statusBadge.style.display = 'inline-block';
-        statusBadge.textContent = isRegistered ? '✓ CLIENTE CADASTRADO' : '⚠ CLIENTE NÃO CADASTRADO';
-        infoWindowContent.appendChild(statusBadge);
 
         // Adicionar informações do endereço (parada)
         const addressInfoDiv = document.createElement('div');
@@ -3348,7 +3287,7 @@ async function addDeliveryMarkers() {
                     position,
                     title: `${deliveryCount} entrega${deliveryCount > 1 ? 's' : ''} neste local`,
                     icon: {
-                        url: createPinSVG(deliveryCount, markerColor),
+                        url: createPinSVG(deliveryCount),
                         scaledSize: new google.maps.Size(32, 44),
                         anchor: new google.maps.Point(16, 44) // Ancorar na ponta do pin
                     }
@@ -3406,7 +3345,6 @@ async function addDeliveryMarkers() {
     });
 
     console.log(`✅ Total: ${Object.keys(deliveryMarkers).length} marcadores criados para ${Object.keys(addressDatabase).length} entregas`);
-    console.log(`✅ Cadastrados: ${registeredCount} (verde) | Não cadastrados: ${unregisteredCount} (vermelho)`);
 
     // Ajustar mapa para mostrar todos os marcadores
     if (!bounds.isEmpty()) {
@@ -3415,15 +3353,6 @@ async function addDeliveryMarkers() {
         });
         console.log('🗺️ Mapa ajustado para mostrar todos os marcadores');
     }
-
-    // Mostrar toast com estatísticas
-    const totalLocations = registeredCount + unregisteredCount;
-    showToast(
-        `📍 ${totalLocations} local${totalLocations > 1 ? 'is' : ''} de entrega`,
-        `✅ ${registeredCount} cadastrado${registeredCount !== 1 ? 's' : ''} (verde)\n⚠️ ${unregisteredCount} não cadastrado${unregisteredCount !== 1 ? 's' : ''} (vermelho)`,
-        'info',
-        6000
-    );
 }
 
 // ===========================
