@@ -1765,8 +1765,7 @@
 <!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- jsQR - Biblioteca de leitura de QR Code -->
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<!-- jsQR - Carregado sob demanda via Lazy Loading -->
 
 <script>
     const SUPABASE_URL = "https://dctlgztkqtktxnmiuqgr.supabase.co";
@@ -2640,6 +2639,67 @@ class GPSTracker {
 
 // Instância global do GPS Tracker
 let gpsTracker = null;
+
+/* ===========================
+   MÓDULO: LAZY LOADER
+   =========================== */
+class LazyLoader {
+    constructor() {
+        this.loadedScripts = new Set();
+        this.loadingPromises = new Map();
+    }
+
+    async loadScript(url, name) {
+        // Se já foi carregado, retornar imediatamente
+        if (this.loadedScripts.has(name)) {
+            return Promise.resolve();
+        }
+
+        // Se está sendo carregado, retornar a promise existente
+        if (this.loadingPromises.has(name)) {
+            return this.loadingPromises.get(name);
+        }
+
+        // Criar nova promise de carregamento
+        const loadingPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = url;
+            script.async = true;
+
+            script.onload = () => {
+                this.loadedScripts.add(name);
+                this.loadingPromises.delete(name);
+                console.log(`✅ [LAZY] ${name} carregado (economizou tempo de inicialização)`);
+                resolve();
+            };
+
+            script.onerror = () => {
+                this.loadingPromises.delete(name);
+                console.error(`❌ [LAZY] Erro ao carregar ${name}`);
+                reject(new Error(`Failed to load ${name}`));
+            };
+
+            document.head.appendChild(script);
+        });
+
+        this.loadingPromises.set(name, loadingPromise);
+        return loadingPromise;
+    }
+
+    async loadJsQR() {
+        return this.loadScript(
+            'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js',
+            'jsQR'
+        );
+    }
+
+    isLoaded(name) {
+        return this.loadedScripts.has(name);
+    }
+}
+
+// Instância global do Lazy Loader
+const lazyLoader = new LazyLoader();
 
 const MAP_ID = "ebb7ca4503045feabc75b373";
 
@@ -3578,6 +3638,17 @@ btnSwitchCamera.addEventListener('click', async () => {
 async function startCamera() {
     // Parar câmera existente antes de iniciar nova
     stopCamera();
+
+    // 🚀 LAZY LOADING: Carregar jsQR apenas quando necessário
+    if (!lazyLoader.isLoaded('jsQR')) {
+        console.log('📦 [LAZY] Carregando jsQR pela primeira vez...');
+        try {
+            await lazyLoader.loadJsQR();
+        } catch (error) {
+            showToast('Erro ao carregar scanner', 'Não foi possível carregar a biblioteca QR', 'error', 4000);
+            return;
+        }
+    }
 
     const constraints = {
         video: {
@@ -5637,6 +5708,17 @@ function closePackageScanner() {
 async function startPackageCamera() {
     stopPackageCamera();
 
+    // 🚀 LAZY LOADING: Carregar jsQR apenas quando necessário
+    if (!lazyLoader.isLoaded('jsQR')) {
+        console.log('📦 [LAZY] Carregando jsQR pela primeira vez...');
+        try {
+            await lazyLoader.loadJsQR();
+        } catch (error) {
+            showToast('Erro ao carregar scanner', 'Não foi possível carregar a biblioteca QR', 'error', 4000);
+            return;
+        }
+    }
+
     const constraints = {
         video: {
             facingMode: packageCurrentFacingMode,
@@ -7014,6 +7096,85 @@ window.addEventListener('error', (e) => {
         );
     }
 }, true);
+
+/* ===========================
+   SERVICE WORKER REGISTRATION
+   =========================== */
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        // Service Worker inline para cache
+        const swCode = `
+// Service Worker - Cache Offline v1.2
+const CACHE_NAME = 'mapa-clientes-v1.2';
+
+self.addEventListener('install', (event) => {
+    console.log('[SW] Instalando Service Worker...');
+    event.waitUntil(
+        caches.open(CACHE_NAME).then(() => self.skipWaiting())
+    );
+});
+
+self.addEventListener('activate', (event) => {
+    console.log('[SW] Ativando Service Worker...');
+    event.waitUntil(
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames.map((cacheName) => {
+                    if (cacheName !== CACHE_NAME) {
+                        return caches.delete(cacheName);
+                    }
+                })
+            );
+        }).then(() => self.clients.claim())
+    );
+});
+
+self.addEventListener('fetch', (event) => {
+    if (event.request.method !== 'GET') return;
+
+    // Ignorar APIs externas
+    const url = event.request.url;
+    if (url.includes('googleapis.com') ||
+        url.includes('supabase.co') ||
+        url.includes('cdn.jsdelivr.net')) {
+        return;
+    }
+
+    event.respondWith(
+        fetch(event.request)
+            .then((response) => {
+                if (response && response.status === 200) {
+                    const responseClone = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => {
+                        cache.put(event.request, responseClone);
+                    });
+                }
+                return response;
+            })
+            .catch(() => {
+                return caches.match(event.request).then((cached) => {
+                    if (cached) {
+                        console.log('[SW] Cache:', event.request.url);
+                        return cached;
+                    }
+                    return new Response('Offline', { status: 503 });
+                });
+            })
+    );
+});
+`;
+
+        const blob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(blob);
+
+        navigator.serviceWorker.register(swUrl)
+            .then((reg) => {
+                console.log('✅ Service Worker registrado');
+                console.log('📦 Cache offline ativo');
+            })
+            .catch((err) => console.warn('⚠️ SW falhou:', err));
+    });
+}
 </script>
 
 </body>
