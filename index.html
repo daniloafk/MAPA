@@ -2598,20 +2598,20 @@ class GPSTracker {
             lng: null,
             variance: null // Incerteza estimada
         };
-        this.kalmanQ = 0.00001; // Ruído do processo (menor = mais suave)
+        this.kalmanQ = 0.0001; // Ruído do processo aumentado para rastreamento de veículo (mais responsivo)
         this.lastGoodPosition = null;
         this.consecutiveGoodReadings = 0;
 
-        // Configurações otimizadas para alta precisão
+        // Configurações otimizadas para rastreamento em tempo real (veículo em movimento)
         this.config = {
-            updateThrottle: 200,        // Atualizar a cada 200ms (era 500ms)
-            maxAccuracyThreshold: 10,   // Rejeitar leituras > 10m (era 50m)
-            targetAccuracy: 2,          // Meta: 2 metros
-            historySize: 8,             // Histórico maior para suavização
+            updateThrottle: 100,        // Atualizar a cada 100ms para tempo real
+            maxAccuracyThreshold: 50,   // Aceitar leituras até 50m (veículo em movimento precisa disso)
+            targetAccuracy: 10,         // Meta: 10 metros (realista para veículo)
+            historySize: 3,             // Histórico menor = responde mais rápido
             highAccuracy: true,
-            timeout: 5000,              // Timeout 5s (era 15s)
+            timeout: 10000,             // Timeout 10s
             maximumAge: 0,              // Sempre dados frescos
-            minReadingsForStable: 3     // Leituras boas antes de considerar estável
+            minReadingsForStable: 2     // Apenas 2 leituras para confirmar (mais rápido)
         };
     }
 
@@ -2737,14 +2737,14 @@ class GPSTracker {
 
         // Usar posição filtrada pelo Kalman
         if (this.marker) {
-            // Animação mais rápida para precisão alta
-            const animDuration = accuracy <= this.config.targetAccuracy ? 150 : 400;
+            // Animação muito rápida para rastreamento em tempo real de veículo
+            const animDuration = accuracy <= this.config.targetAccuracy ? 50 : 100;
             this.animateMarkerTo(filteredPos, animDuration);
             this.accuracy = accuracy;
             locationAccuracy = accuracy;
 
             // Indicador visual de qualidade do sinal
-            const qualityIcon = accuracy <= 2 ? '🎯' : accuracy <= 5 ? '📍' : '📡';
+            const qualityIcon = accuracy <= 10 ? '🎯' : accuracy <= 20 ? '📍' : '📡';
             updateStatus(`${qualityIcon} Precisão: ${accuracy.toFixed(1)}m`, true);
         }
     }
@@ -2844,10 +2844,10 @@ class GPSTracker {
             currentTween.stop();
         }
 
-        // Animar com Tween.js
+        // Animar com Tween.js - Linear para movimento mais direto
         this.currentTween = new TWEEN.Tween(this.markerCoords)
             .to(newPosition, duration)
-            .easing(TWEEN.Easing.Quadratic.Out)
+            .easing(TWEEN.Easing.Linear.None) // Linear para movimento mais natural de veículo
             .onUpdate(() => {
                 const pos = {
                     lat: this.markerCoords.lat,
