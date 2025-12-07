@@ -3399,6 +3399,7 @@ async function addDeliveryMarkers() {
         deliveredBtn.addEventListener('mouseenter', () => { deliveredBtn.style.background = '#2d8e47'; });
         deliveredBtn.addEventListener('mouseleave', () => { deliveredBtn.style.background = '#34A853'; });
         deliveredBtn.addEventListener('click', async () => {
+            console.log('🔘 Botão Entregue clicado (marcador verde)');
             await markAsDelivered(deliveries, client, marker);
         });
 
@@ -3612,6 +3613,7 @@ async function addDeliveryMarkers() {
         deliveredBtn.addEventListener('mouseenter', () => { deliveredBtn.style.background = '#2d8e47'; });
         deliveredBtn.addEventListener('mouseleave', () => { deliveredBtn.style.background = '#34A853'; });
         deliveredBtn.addEventListener('click', async () => {
+            console.log('🔘 Botão Entregue clicado (marcador vermelho)');
             await markAsDelivered(locationData.deliveries, null, marker, coordKey);
         });
 
