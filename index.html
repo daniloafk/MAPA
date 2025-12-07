@@ -2970,7 +2970,7 @@ function createPinSVG(number) {
 }
 
 // Função para marcar entregas como concluídas
-async function markAsDelivered(deliveries, client, marker, coordKey) {
+async function markAsDelivered(deliveries, client, marker, coordKey, deliveredBtn) {
     try {
         console.log('📦 Marcando entregas como concluídas:', deliveries);
 
@@ -2995,6 +2995,16 @@ async function markAsDelivered(deliveries, client, marker, coordKey) {
         // Marcar como entregue (tornar cinza e semi-transparente)
         if (marker) {
             marker.isDelivered = true; // Flag para identificar marcadores entregues
+
+            // Salvar informações originais para poder desfazer
+            if (!marker.originalState) {
+                marker.originalState = {
+                    deliveries: deliveries,
+                    client: client,
+                    coordKey: coordKey,
+                    isGreen: !!client // Se tem client, é verde
+                };
+            }
 
             // Tornar o marcador cinza e semi-transparente
             if (marker.content) {
@@ -3034,6 +3044,18 @@ async function markAsDelivered(deliveries, client, marker, coordKey) {
             }
         }
 
+        // Atualizar o botão para "Desfazer"
+        if (deliveredBtn) {
+            deliveredBtn.innerHTML = '↩ Desfazer';
+            deliveredBtn.style.background = '#FF9800'; // Laranja
+            deliveredBtn.removeEventListener('mouseenter', deliveredBtn._hoverIn);
+            deliveredBtn.removeEventListener('mouseleave', deliveredBtn._hoverOut);
+            deliveredBtn._hoverIn = () => { deliveredBtn.style.background = '#F57C00'; };
+            deliveredBtn._hoverOut = () => { deliveredBtn.style.background = '#FF9800'; };
+            deliveredBtn.addEventListener('mouseenter', deliveredBtn._hoverIn);
+            deliveredBtn.addEventListener('mouseleave', deliveredBtn._hoverOut);
+        }
+
         // Fechar InfoWindow
         if (currentInfoWindow) {
             currentInfoWindow.close();
@@ -3056,6 +3078,106 @@ async function markAsDelivered(deliveries, client, marker, coordKey) {
         showToast(
             '❌ Erro ao marcar entrega',
             error.message || 'Não foi possível atualizar o status',
+            'error',
+            4000
+        );
+    }
+}
+
+// Função para desfazer a marcação de entrega
+async function undoDelivery(marker, deliveredBtn) {
+    try {
+        if (!marker.originalState) {
+            console.error('Estado original não encontrado');
+            return;
+        }
+
+        const { deliveries, client, coordKey, isGreen } = marker.originalState;
+        console.log('↩ Desfazendo marcação de entrega:', deliveries);
+
+        // Atualizar status no Supabase de volta para pending
+        const deliveryIds = deliveries.map(d => d.id);
+
+        const { error } = await supabase
+            .from('delivery_data')
+            .update({
+                status: 'pending',
+                delivered_at: null
+            })
+            .in('id', deliveryIds);
+
+        if (error) {
+            console.error('Erro ao atualizar Supabase:', error);
+            throw error;
+        }
+
+        console.log(`✅ ${deliveryIds.length} entrega(s) revertida(s) para pendente`);
+
+        // Restaurar aparência original do marcador
+        marker.isDelivered = false;
+
+        if (marker.content) {
+            // AdvancedMarkerElement - restaurar opacidade e cor
+            const markerElement = marker.content;
+            markerElement.style.opacity = '1';
+            markerElement.style.filter = 'none';
+
+            // Restaurar cor original
+            const pinDiv = markerElement.querySelector('div');
+            if (pinDiv) {
+                pinDiv.style.background = isGreen ? '#4CAF50' : '#EA4335'; // Verde ou Vermelho
+                const innerCircle = pinDiv.querySelector('div');
+                if (innerCircle) {
+                    innerCircle.style.color = isGreen ? '#4CAF50' : '#EA4335';
+                }
+            }
+        } else if (marker.setIcon) {
+            // Marker clássico - restaurar ícone original
+            const deliveryCount = deliveries.length;
+            const originalColor = isGreen ? '#4CAF50' : '#EA4335';
+
+            const currentIcon = marker.getIcon();
+            if (currentIcon && currentIcon.path) {
+                marker.setIcon({
+                    ...currentIcon,
+                    fillColor: originalColor,
+                    strokeColor: 'white'
+                });
+            } else {
+                marker.setIcon({
+                    url: createPinSVG(deliveryCount, originalColor),
+                    scaledSize: new google.maps.Size(32, 44),
+                    anchor: new google.maps.Point(16, 44)
+                });
+            }
+            marker.setOpacity(1);
+        }
+
+        // Restaurar botão para "Entregue"
+        if (deliveredBtn) {
+            deliveredBtn.innerHTML = '✓ Entregue';
+            deliveredBtn.style.background = '#34A853'; // Verde
+            deliveredBtn.removeEventListener('mouseenter', deliveredBtn._hoverIn);
+            deliveredBtn.removeEventListener('mouseleave', deliveredBtn._hoverOut);
+            deliveredBtn._hoverIn = () => { deliveredBtn.style.background = '#2d8e47'; };
+            deliveredBtn._hoverOut = () => { deliveredBtn.style.background = '#34A853'; };
+            deliveredBtn.addEventListener('mouseenter', deliveredBtn._hoverIn);
+            deliveredBtn.addEventListener('mouseleave', deliveredBtn._hoverOut);
+        }
+
+        // Toast de sucesso
+        showToast(
+            '↩ Entrega revertida!',
+            `${deliveries.length} pacote${deliveries.length > 1 ? 's' : ''} marcado${deliveries.length > 1 ? 's' : ''} como pendente novamente`,
+            'info',
+            3000
+        );
+
+    } catch (error) {
+        console.error('Erro ao desfazer entrega:', error);
+        showToast(
+            '❌ Erro ao desfazer',
+            error.message || 'Não foi possível reverter o status',
             'error',
             4000
         );
@@ -3473,7 +3595,7 @@ async function addDeliveryMarkers() {
             navigateBtn.addEventListener('mouseleave', () => { navigateBtn.style.background = '#4285f4'; });
             navigateBtn.addEventListener('click', () => { navigateToClient(client); });
 
-            // Botão marcar como entregue
+            // Botão marcar como entregue / desfazer
             const deliveredBtn = document.createElement('button');
             deliveredBtn.style.flex = '1';
             deliveredBtn.style.padding = '6px 10px';
@@ -3487,11 +3609,22 @@ async function addDeliveryMarkers() {
             deliveredBtn.style.transition = 'background 0.2s';
             deliveredBtn.style.whiteSpace = 'nowrap';
             deliveredBtn.innerHTML = '✓ Entregue';
-            deliveredBtn.addEventListener('mouseenter', () => { deliveredBtn.style.background = '#2d8e47'; });
-            deliveredBtn.addEventListener('mouseleave', () => { deliveredBtn.style.background = '#34A853'; });
+
+            // Armazenar funções de hover para poder removê-las depois
+            deliveredBtn._hoverIn = () => { deliveredBtn.style.background = '#2d8e47'; };
+            deliveredBtn._hoverOut = () => { deliveredBtn.style.background = '#34A853'; };
+            deliveredBtn.addEventListener('mouseenter', deliveredBtn._hoverIn);
+            deliveredBtn.addEventListener('mouseleave', deliveredBtn._hoverOut);
+
+            // Handler do clique - alterna entre entregar e desfazer
             deliveredBtn.addEventListener('click', async () => {
-                console.log('🔘 Botão Entregue clicado (marcador verde)');
-                await markAsDelivered(deliveries, client, marker);
+                if (marker.isDelivered) {
+                    console.log('↩ Botão Desfazer clicado (marcador verde)');
+                    await undoDelivery(marker, deliveredBtn);
+                } else {
+                    console.log('🔘 Botão Entregue clicado (marcador verde)');
+                    await markAsDelivered(deliveries, client, marker, null, deliveredBtn);
+                }
             });
 
             buttonsContainer.appendChild(navigateBtn);
@@ -3714,7 +3847,7 @@ async function addDeliveryMarkers() {
                 navigateToClient(clientData);
             });
 
-            // Botão marcar como entregue
+            // Botão marcar como entregue / desfazer
             const deliveredBtn = document.createElement('button');
             deliveredBtn.style.flex = '1';
             deliveredBtn.style.padding = '6px 10px';
@@ -3728,11 +3861,22 @@ async function addDeliveryMarkers() {
             deliveredBtn.style.transition = 'background 0.2s';
             deliveredBtn.style.whiteSpace = 'nowrap';
             deliveredBtn.innerHTML = '✓ Entregue';
-            deliveredBtn.addEventListener('mouseenter', () => { deliveredBtn.style.background = '#2d8e47'; });
-            deliveredBtn.addEventListener('mouseleave', () => { deliveredBtn.style.background = '#34A853'; });
+
+            // Armazenar funções de hover para poder removê-las depois
+            deliveredBtn._hoverIn = () => { deliveredBtn.style.background = '#2d8e47'; };
+            deliveredBtn._hoverOut = () => { deliveredBtn.style.background = '#34A853'; };
+            deliveredBtn.addEventListener('mouseenter', deliveredBtn._hoverIn);
+            deliveredBtn.addEventListener('mouseleave', deliveredBtn._hoverOut);
+
+            // Handler do clique - alterna entre entregar e desfazer
             deliveredBtn.addEventListener('click', async () => {
-                console.log('🔘 Botão Entregue clicado (marcador vermelho)');
-                await markAsDelivered(locationData.deliveries, null, marker, coordKey);
+                if (marker.isDelivered) {
+                    console.log('↩ Botão Desfazer clicado (marcador vermelho)');
+                    await undoDelivery(marker, deliveredBtn);
+                } else {
+                    console.log('🔘 Botão Entregue clicado (marcador vermelho)');
+                    await markAsDelivered(locationData.deliveries, null, marker, coordKey, deliveredBtn);
+                }
             });
 
             buttonsContainer.appendChild(navigateBtn);
