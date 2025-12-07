@@ -3210,7 +3210,7 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
     return R * c;
 }
 
-// Função para navegar para o próximo marcador mais próximo
+// Função para navegar para o próximo marcador usando rota real de tráfego
 async function navigateToNextMarker(currentPosition = null) {
     // Filtrar apenas marcadores não entregues
     const remainingMarkers = Object.values(deliveryMarkers).filter(m => m !== null && !m.isDelivered);
@@ -3228,14 +3228,17 @@ async function navigateToNextMarker(currentPosition = null) {
     let nextMarker = null;
     let nextPosition = null;
 
-    // Se temos posição atual, encontrar o marcador mais próximo
+    // Se temos posição atual, encontrar o marcador com menor tempo de viagem REAL
     if (currentPosition) {
-        let minDistance = Infinity;
+        console.log('🚗 Calculando rotas reais de tráfego para encontrar o próximo destino...');
+
+        // Preparar destinos para a Distance Matrix API
+        const destinations = [];
+        const markersList = [];
 
         remainingMarkers.forEach(marker => {
             let markerPosition = null;
 
-            // Obter posição do marcador
             if (marker.position) {
                 markerPosition = marker.position;
             } else if (marker.getPosition) {
@@ -3243,24 +3246,103 @@ async function navigateToNextMarker(currentPosition = null) {
             }
 
             if (markerPosition) {
-                // Calcular distância
-                const distance = calculateDistance(
-                    currentPosition.lat,
-                    currentPosition.lng,
-                    markerPosition.lat,
-                    markerPosition.lng
-                );
-
-                // Se é o mais próximo até agora, salvar
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    nextMarker = marker;
-                    nextPosition = markerPosition;
-                }
+                destinations.push(new google.maps.LatLng(markerPosition.lat, markerPosition.lng));
+                markersList.push({ marker, position: markerPosition });
             }
         });
 
-        console.log(`📍 Marcador mais próximo encontrado a ${Math.round(minDistance)}m de distância`);
+        if (destinations.length === 0) {
+            console.warn('Nenhum marcador com posição válida encontrado');
+            return;
+        }
+
+        try {
+            // Usar Distance Matrix Service para calcular rotas reais
+            const service = new google.maps.DistanceMatrixService();
+            const origin = new google.maps.LatLng(currentPosition.lat, currentPosition.lng);
+
+            const request = {
+                origins: [origin],
+                destinations: destinations,
+                travelMode: google.maps.TravelMode.DRIVING,
+                unitSystem: google.maps.UnitSystem.METRIC,
+                avoidHighways: false,
+                avoidTolls: false,
+                drivingOptions: {
+                    departureTime: new Date(), // Para considerar tráfego atual
+                    trafficModel: google.maps.TrafficModel.BEST_GUESS
+                }
+            };
+
+            const response = await new Promise((resolve, reject) => {
+                service.getDistanceMatrix(request, (response, status) => {
+                    if (status === 'OK') {
+                        resolve(response);
+                    } else {
+                        reject(new Error(`Distance Matrix falhou: ${status}`));
+                    }
+                });
+            });
+
+            // Encontrar o destino com menor tempo de viagem
+            let minDuration = Infinity;
+            let bestIndex = -1;
+
+            response.rows[0].elements.forEach((element, index) => {
+                if (element.status === 'OK') {
+                    const duration = element.duration.value; // Tempo em segundos
+                    const distance = element.distance.value; // Distância em metros
+
+                    console.log(`📍 Destino ${index + 1}: ${Math.round(distance)}m, ${Math.round(duration / 60)} min`);
+
+                    if (duration < minDuration) {
+                        minDuration = duration;
+                        bestIndex = index;
+                    }
+                }
+            });
+
+            if (bestIndex !== -1) {
+                nextMarker = markersList[bestIndex].marker;
+                nextPosition = markersList[bestIndex].position;
+
+                const bestElement = response.rows[0].elements[bestIndex];
+                const distanceText = bestElement.distance.text;
+                const durationText = bestElement.duration.text;
+
+                console.log(`✅ Melhor rota encontrada: ${distanceText}, ${durationText}`);
+
+                showToast(
+                    '🚗 Próxima entrega',
+                    `${distanceText} - ${durationText} de viagem`,
+                    'info',
+                    3000
+                );
+            } else {
+                console.warn('Nenhuma rota válida encontrada, usando fallback');
+                // Fallback: usar distância em linha reta
+                nextMarker = markersList[0].marker;
+                nextPosition = markersList[0].position;
+            }
+
+        } catch (error) {
+            console.error('Erro ao calcular rotas:', error);
+            // Fallback: pegar o primeiro marcador
+            nextMarker = remainingMarkers[0];
+
+            if (nextMarker.position) {
+                nextPosition = nextMarker.position;
+            } else if (nextMarker.getPosition) {
+                nextPosition = nextMarker.getPosition();
+            }
+
+            showToast(
+                '⚠️ Usando próximo disponível',
+                'Não foi possível calcular rota de tráfego',
+                'warning',
+                3000
+            );
+        }
     } else {
         // Se não temos posição atual, pegar o primeiro marcador
         nextMarker = remainingMarkers[0];
@@ -3281,13 +3363,6 @@ async function navigateToNextMarker(currentPosition = null) {
         if (currentZoom < 16) {
             map.setZoom(16);
         }
-
-        showToast(
-            '➡️ Próxima entrega',
-            'Navegando para o local mais próximo',
-            'info',
-            2000
-        );
     }
 }
 
