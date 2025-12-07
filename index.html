@@ -3705,19 +3705,43 @@ async function addDeliveryMarkers() {
 
         console.log(`❌ Criando marcador vermelho para local não cadastrado: ${locationData.address} (${deliveryCount} entregas)`);
 
-        // Criar marcador vermelho
+        // Criar marcador vermelho (mesmo estilo do verde)
         const markerDiv = document.createElement('div');
         markerDiv.style.cursor = 'pointer';
         markerDiv.style.transition = 'transform 0.2s';
 
-        const pinImg = document.createElement('img');
-        pinImg.src = createPinSVG(deliveryCount, '#EA4335');
+        // Pin vermelho
+        const pinImg = document.createElement('div');
         pinImg.style.width = '32px';
-        pinImg.style.height = '44px';
-        pinImg.style.display = 'block';
+        pinImg.style.height = '32px';
+        pinImg.style.background = '#EA4335'; // Vermelho
+        pinImg.style.border = '3px solid white';
+        pinImg.style.borderRadius = '50% 50% 50% 0';
+        pinImg.style.transform = 'rotate(-45deg)';
+        pinImg.style.boxShadow = '0 3px 6px rgba(0,0,0,0.4)';
+        pinImg.style.display = 'flex';
+        pinImg.style.alignItems = 'center';
+        pinImg.style.justifyContent = 'center';
+
+        const innerCircle = document.createElement('div');
+        innerCircle.style.width = '18px';
+        innerCircle.style.height = '18px';
+        innerCircle.style.background = 'white';
+        innerCircle.style.borderRadius = '50%';
+        innerCircle.style.transform = 'rotate(45deg)';
+        innerCircle.style.fontSize = '11px';
+        innerCircle.style.fontWeight = 'bold';
+        innerCircle.style.color = '#EA4335'; // Vermelho
+        innerCircle.style.display = 'flex';
+        innerCircle.style.alignItems = 'center';
+        innerCircle.style.justifyContent = 'center';
+        innerCircle.textContent = deliveryCount;
+
+        pinImg.appendChild(innerCircle);
         markerDiv.appendChild(pinImg);
 
-        markerDiv.addEventListener('mouseenter', () => { markerDiv.style.transform = 'scale(1.15)'; });
+        // Efeito hover (mesmo do verde)
+        markerDiv.addEventListener('mouseenter', () => { markerDiv.style.transform = 'scale(1.2)'; });
         markerDiv.addEventListener('mouseleave', () => { markerDiv.style.transform = 'scale(1)'; });
 
         // Criar InfoWindow
