@@ -3189,6 +3189,41 @@ async function addDeliveryMarkers() {
             infoWindowContent.appendChild(deliveryDiv);
         });
 
+        // Botão de navegação
+        const navigateBtn = document.createElement('button');
+        navigateBtn.style.width = '100%';
+        navigateBtn.style.padding = '8px 12px';
+        navigateBtn.style.marginTop = '12px';
+        navigateBtn.style.background = '#4285f4';
+        navigateBtn.style.color = 'white';
+        navigateBtn.style.border = 'none';
+        navigateBtn.style.borderRadius = '6px';
+        navigateBtn.style.fontSize = '13px';
+        navigateBtn.style.fontWeight = 'bold';
+        navigateBtn.style.cursor = 'pointer';
+        navigateBtn.style.transition = 'background 0.2s';
+        navigateBtn.innerHTML = '🧭 Navegar até este local';
+
+        navigateBtn.addEventListener('mouseenter', () => {
+            navigateBtn.style.background = '#3367d6';
+        });
+        navigateBtn.addEventListener('mouseleave', () => {
+            navigateBtn.style.background = '#4285f4';
+        });
+
+        navigateBtn.addEventListener('click', () => {
+            // Criar objeto cliente compatível com navigateToClient
+            const clientData = {
+                name: locationData.address || 'Cliente',
+                latitude: position.lat,
+                longitude: position.lng,
+                address: fullAddress
+            };
+            navigateToClient(clientData);
+        });
+
+        infoWindowContent.appendChild(navigateBtn);
+
         const infoWindow = new google.maps.InfoWindow({
             content: infoWindowContent,
             maxWidth: 280,
@@ -4822,36 +4857,6 @@ async function navigateToClient(client) {
             bounds.extend(userPosition);
             bounds.extend(destination);
             map.fitBounds(bounds);
-
-            // Criar marcador no destino
-            const destinationMarkerDiv = document.createElement('div');
-            destinationMarkerDiv.style.width = '40px';
-            destinationMarkerDiv.style.height = '40px';
-            destinationMarkerDiv.style.background = '#34a853';
-            destinationMarkerDiv.style.border = '3px solid white';
-            destinationMarkerDiv.style.borderRadius = '50%';
-            destinationMarkerDiv.style.display = 'flex';
-            destinationMarkerDiv.style.alignItems = 'center';
-            destinationMarkerDiv.style.justifyContent = 'center';
-            destinationMarkerDiv.style.fontSize = '20px';
-            destinationMarkerDiv.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4)';
-            destinationMarkerDiv.innerHTML = '🎯';
-
-            const destinationMarker = new google.maps.marker.AdvancedMarkerElement({
-                position: destination,
-                map: map,
-                content: destinationMarkerDiv,
-                title: client.name
-            });
-
-            // Remover marcador após 10 segundos
-            setTimeout(() => {
-                if (destinationMarker.map !== undefined) {
-                    destinationMarker.map = null;
-                } else if (destinationMarker.setMap) {
-                    destinationMarker.setMap(null);
-                }
-            }, 10000);
 
             // Formatar distância e duração
             const distance = leg.distance.text;
