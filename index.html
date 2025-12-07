@@ -4407,6 +4407,16 @@ async function populateAddressSelect() {
 
 // Evento de seleção manual de endereço
 if (selectAddressManual) {
+    // Ao clicar/focar no select, parar a câmera
+    selectAddressManual.addEventListener('focus', function() {
+        stopCamera();
+        const qrStatus = document.getElementById('qr-status');
+        if (qrStatus) {
+            qrStatus.textContent = '⏸️ Aguardando seleção manual...';
+        }
+        console.log('📋 Modo seleção manual ativado - câmera pausada');
+    });
+
     selectAddressManual.addEventListener('change', function() {
         const selectedOption = this.options[this.selectedIndex];
 
