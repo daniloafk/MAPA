@@ -3212,32 +3212,24 @@ async function addDeliveryMarkers() {
                         currentInfoWindow.close();
                     }
 
-                    // ✅ SOLUÇÃO DEFINITIVA: Desabilitar rotação temporariamente
-                    const savedHeading = map.getHeading() || 0;
-                    const savedTilt = map.getTilt() || 0;
+                    // ✅ SOLUÇÃO DEFINITIVA: setCenter ao invés de panTo (SEM animação = SEM rotação)
+                    const currentHeading = map.getHeading() || 0;
+                    const currentTilt = map.getTilt() || 0;
 
-                    // Desabilitar controles de rotação
-                    map.setOptions({
-                        rotateControl: false,
-                        tilt: 0,
-                        heading: savedHeading
-                    });
+                    // Centralizar instantaneamente (sem animação)
+                    map.setCenter(position);
 
-                    // Centralizar suavemente no marcador
-                    map.panTo(position);
+                    // Garantir que heading/tilt não mudaram
+                    if (map.getHeading() !== currentHeading) {
+                        map.setHeading(currentHeading);
+                    }
+                    if (map.getTilt() !== currentTilt) {
+                        map.setTilt(currentTilt);
+                    }
 
                     // Abrir InfoWindow
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
-
-                    // Reabilitar rotação após 600ms
-                    setTimeout(() => {
-                        map.setOptions({
-                            rotateControl: true,
-                            tilt: savedTilt,
-                            heading: savedHeading
-                        });
-                    }, 600);
                 });
 
                 // Armazenar o marcador com a chave da coordenada
@@ -3262,32 +3254,24 @@ async function addDeliveryMarkers() {
                         currentInfoWindow.close();
                     }
 
-                    // ✅ SOLUÇÃO DEFINITIVA: Desabilitar rotação temporariamente
-                    const savedHeading = map.getHeading() || 0;
-                    const savedTilt = map.getTilt() || 0;
+                    // ✅ SOLUÇÃO DEFINITIVA: setCenter ao invés de panTo (SEM animação = SEM rotação)
+                    const currentHeading = map.getHeading() || 0;
+                    const currentTilt = map.getTilt() || 0;
 
-                    // Desabilitar controles de rotação
-                    map.setOptions({
-                        rotateControl: false,
-                        tilt: 0,
-                        heading: savedHeading
-                    });
+                    // Centralizar instantaneamente (sem animação)
+                    map.setCenter(position);
 
-                    // Centralizar suavemente no marcador
-                    map.panTo(position);
+                    // Garantir que heading/tilt não mudaram
+                    if (map.getHeading() !== currentHeading) {
+                        map.setHeading(currentHeading);
+                    }
+                    if (map.getTilt() !== currentTilt) {
+                        map.setTilt(currentTilt);
+                    }
 
                     // Abrir InfoWindow
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
-
-                    // Reabilitar rotação após 600ms
-                    setTimeout(() => {
-                        map.setOptions({
-                            rotateControl: true,
-                            tilt: savedTilt,
-                            heading: savedHeading
-                        });
-                    }, 600);
                 });
 
                 // Armazenar o marcador com a chave da coordenada
@@ -6458,28 +6442,20 @@ async function showMatchedClientMarkers() {
                         infoWindow.open(map, marker);
                         currentInfoWindow = infoWindow;
 
-                        // ✅ SOLUÇÃO DEFINITIVA: Desabilitar rotação temporariamente
-                        const savedHeading = map.getHeading() || 0;
-                        const savedTilt = map.getTilt() || 0;
+                        // ✅ SOLUÇÃO DEFINITIVA: setCenter ao invés de panTo (SEM animação = SEM rotação)
+                        const currentHeading = map.getHeading() || 0;
+                        const currentTilt = map.getTilt() || 0;
 
-                        // Desabilitar controles de rotação
-                        map.setOptions({
-                            rotateControl: false,
-                            tilt: 0,
-                            heading: savedHeading
-                        });
+                        // Centralizar instantaneamente (sem animação)
+                        map.setCenter(position);
 
-                        // Centralizar
-                        map.panTo(position);
-
-                        // Reabilitar rotação após 600ms
-                        setTimeout(() => {
-                            map.setOptions({
-                                rotateControl: true,
-                                tilt: savedTilt,
-                                heading: savedHeading
-                            });
-                        }, 600);
+                        // Garantir que heading/tilt não mudaram
+                        if (map.getHeading() !== currentHeading) {
+                            map.setHeading(currentHeading);
+                        }
+                        if (map.getTilt() !== currentTilt) {
+                            map.setTilt(currentTilt);
+                        }
                     });
 
                     matchedClientMarkers[client.id] = marker;
@@ -6506,28 +6482,20 @@ async function showMatchedClientMarkers() {
                         infoWindow.open(map, marker);
                         currentInfoWindow = infoWindow;
 
-                        // ✅ SOLUÇÃO DEFINITIVA: Desabilitar rotação temporariamente
-                        const savedHeading = map.getHeading() || 0;
-                        const savedTilt = map.getTilt() || 0;
+                        // ✅ SOLUÇÃO DEFINITIVA: setCenter ao invés de panTo (SEM animação = SEM rotação)
+                        const currentHeading = map.getHeading() || 0;
+                        const currentTilt = map.getTilt() || 0;
 
-                        // Desabilitar controles de rotação
-                        map.setOptions({
-                            rotateControl: false,
-                            tilt: 0,
-                            heading: savedHeading
-                        });
+                        // Centralizar instantaneamente (sem animação)
+                        map.setCenter(position);
 
-                        // Centralizar
-                        map.panTo(position);
-
-                        // Reabilitar rotação após 600ms
-                        setTimeout(() => {
-                            map.setOptions({
-                                rotateControl: true,
-                                tilt: savedTilt,
-                                heading: savedHeading
-                            });
-                        }, 600);
+                        // Garantir que heading/tilt não mudaram
+                        if (map.getHeading() !== currentHeading) {
+                            map.setHeading(currentHeading);
+                        }
+                        if (map.getTilt() !== currentTilt) {
+                            map.setTilt(currentTilt);
+                        }
                     });
 
                     matchedClientMarkers[client.id] = marker;
