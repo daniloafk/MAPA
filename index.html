@@ -6366,6 +6366,18 @@ async function showMatchedClientMarkers() {
 
             const position = { lat: client.latitude, lng: client.longitude };
 
+            // Buscar pacotes/entregas deste cliente na planilha
+            const clientAddressFirstLine = (client.address || '').split('\n')[0];
+            const normalizedClientAddress = normalizeAddressForComparison(clientAddressFirstLine);
+
+            const clientDeliveries = deliveryData.filter(delivery => {
+                const deliveryAddr = delivery.destination_address || '';
+                const normalizedDeliveryAddr = normalizeAddressForComparison(deliveryAddr);
+                return normalizedDeliveryAddr === normalizedClientAddress;
+            });
+
+            const deliveryCount = clientDeliveries.length;
+
             // Criar elemento do marcador com pin VERDE (para diferenciar)
             const markerDiv = document.createElement('div');
             markerDiv.style.cursor = 'pointer';
@@ -6440,8 +6452,67 @@ async function showMatchedClientMarkers() {
             addressDiv.style.fontSize = '12px';
             addressDiv.style.color = '#333';
             addressDiv.style.lineHeight = '1.4';
-            addressDiv.style.marginBottom = '10px';
+            addressDiv.style.marginBottom = '8px';
             addressDiv.innerHTML = `📍 ${client.address.replace(/\n/g, '<br>')}`;
+
+            infoWindowContent.appendChild(badgeDiv);
+            infoWindowContent.appendChild(nameDiv);
+            infoWindowContent.appendChild(phoneDiv);
+            infoWindowContent.appendChild(addressDiv);
+
+            // Adicionar informações de pacotes se houver entregas
+            if (clientDeliveries.length > 0) {
+                // Título da lista de pacotes
+                const packagesTitle = document.createElement('div');
+                packagesTitle.style.fontWeight = 'bold';
+                packagesTitle.style.fontSize = '11px';
+                packagesTitle.style.color = '#666';
+                packagesTitle.style.marginTop = '8px';
+                packagesTitle.style.marginBottom = '6px';
+                packagesTitle.style.borderTop = '1px solid #eee';
+                packagesTitle.style.paddingTop = '8px';
+                packagesTitle.textContent = `📦 ${deliveryCount} pacote${deliveryCount > 1 ? 's' : ''} para entrega:`;
+                infoWindowContent.appendChild(packagesTitle);
+
+                // Adicionar cada pacote
+                clientDeliveries.forEach((delivery, index) => {
+                    const deliveryDiv = document.createElement('div');
+                    deliveryDiv.style.fontSize = '11px';
+                    deliveryDiv.style.color = '#333';
+                    deliveryDiv.style.lineHeight = '1.4';
+                    deliveryDiv.style.marginBottom = '4px';
+                    deliveryDiv.style.paddingBottom = '4px';
+                    deliveryDiv.style.paddingLeft = '8px';
+
+                    if (index < clientDeliveries.length - 1) {
+                        deliveryDiv.style.borderBottom = '1px solid #eee';
+                    }
+
+                    // Linha com Ordem e Código QR
+                    const qrDiv = document.createElement('div');
+                    qrDiv.style.display = 'flex';
+                    qrDiv.style.justifyContent = 'space-between';
+                    qrDiv.style.alignItems = 'center';
+                    qrDiv.style.gap = '8px';
+
+                    const sequenceSpan = document.createElement('span');
+                    sequenceSpan.style.color = '#4CAF50';
+                    sequenceSpan.style.fontWeight = 'bold';
+                    sequenceSpan.textContent = `Ordem: ${delivery.sequence || (index + 1)}`;
+
+                    const qrSpan = document.createElement('span');
+                    qrSpan.style.fontSize = '10px';
+                    qrSpan.style.color = '#666';
+                    qrSpan.style.fontFamily = 'monospace';
+                    qrSpan.textContent = delivery.spx_tn || 'N/A';
+
+                    qrDiv.appendChild(sequenceSpan);
+                    qrDiv.appendChild(qrSpan);
+
+                    deliveryDiv.appendChild(qrDiv);
+                    infoWindowContent.appendChild(deliveryDiv);
+                });
+            }
 
             // Botão de navegação
             const navigateBtn = document.createElement('button');
@@ -6469,10 +6540,6 @@ async function showMatchedClientMarkers() {
                 navigateToClient(client);
             });
 
-            infoWindowContent.appendChild(badgeDiv);
-            infoWindowContent.appendChild(nameDiv);
-            infoWindowContent.appendChild(phoneDiv);
-            infoWindowContent.appendChild(addressDiv);
             infoWindowContent.appendChild(navigateBtn);
 
             const infoWindow = new google.maps.InfoWindow({
