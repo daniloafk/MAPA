@@ -6463,7 +6463,32 @@ async function showMatchedClientMarkers() {
                         }
                         infoWindow.open(map, marker);
                         currentInfoWindow = infoWindow;
+
+                        // Centralizar SEM rotação - salvar e restaurar orientação
+                        const savedHeading = map.getHeading() || 0;
+                        const savedTilt = map.getTilt() || 0;
+
+                        // Criar listeners temporários para travar rotação
+                        const headingListener = map.addListener('heading_changed', () => {
+                            if (map.getHeading() !== savedHeading) {
+                                map.setHeading(savedHeading);
+                            }
+                        });
+
+                        const tiltListener = map.addListener('tilt_changed', () => {
+                            if (map.getTilt() !== savedTilt) {
+                                map.setTilt(savedTilt);
+                            }
+                        });
+
+                        // Centralizar
                         map.panTo(position);
+
+                        // Remover listeners após animação
+                        setTimeout(() => {
+                            google.maps.event.removeListener(headingListener);
+                            google.maps.event.removeListener(tiltListener);
+                        }, 500);
                     });
 
                     matchedClientMarkers[client.id] = marker;
@@ -6489,7 +6514,32 @@ async function showMatchedClientMarkers() {
                         }
                         infoWindow.open(map, marker);
                         currentInfoWindow = infoWindow;
+
+                        // Centralizar SEM rotação - salvar e restaurar orientação
+                        const savedHeading = map.getHeading() || 0;
+                        const savedTilt = map.getTilt() || 0;
+
+                        // Criar listeners temporários para travar rotação
+                        const headingListener = map.addListener('heading_changed', () => {
+                            if (map.getHeading() !== savedHeading) {
+                                map.setHeading(savedHeading);
+                            }
+                        });
+
+                        const tiltListener = map.addListener('tilt_changed', () => {
+                            if (map.getTilt() !== savedTilt) {
+                                map.setTilt(savedTilt);
+                            }
+                        });
+
+                        // Centralizar
                         map.panTo(position);
+
+                        // Remover listeners após animação
+                        setTimeout(() => {
+                            google.maps.event.removeListener(headingListener);
+                            google.maps.event.removeListener(tiltListener);
+                        }, 500);
                     });
 
                     matchedClientMarkers[client.id] = marker;
