@@ -2969,6 +2969,112 @@ function createPinSVG(number) {
     return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
 }
 
+// Função para marcar entregas como concluídas
+async function markAsDelivered(deliveries, client, marker, coordKey) {
+    try {
+        console.log('📦 Marcando entregas como concluídas:', deliveries);
+
+        // Atualizar status no Supabase para cada entrega
+        const deliveryIds = deliveries.map(d => d.id);
+
+        const { error } = await supabase
+            .from('delivery_data')
+            .update({
+                status: 'delivered',
+                delivered_at: new Date().toISOString()
+            })
+            .in('id', deliveryIds);
+
+        if (error) throw error;
+
+        // Remover marcador do mapa
+        if (marker) {
+            if (marker.map !== undefined) {
+                marker.map = null; // AdvancedMarkerElement
+            } else if (marker.setMap) {
+                marker.setMap(null); // Marker clássico
+            }
+        }
+
+        // Remover do objeto de marcadores
+        if (coordKey) {
+            delete deliveryMarkers[coordKey];
+        } else if (client) {
+            delete deliveryMarkers[`registered_${client.id}`];
+        }
+
+        // Fechar InfoWindow
+        if (currentInfoWindow) {
+            currentInfoWindow.close();
+            currentInfoWindow = null;
+        }
+
+        // Toast de sucesso
+        showToast(
+            '✅ Entrega concluída!',
+            `${deliveries.length} pacote${deliveries.length > 1 ? 's' : ''} marcado${deliveries.length > 1 ? 's' : ''} como entregue${deliveries.length > 1 ? 's' : ''}`,
+            'success',
+            3000
+        );
+
+        // Navegar para o próximo marcador
+        await navigateToNextMarker();
+
+    } catch (error) {
+        console.error('Erro ao marcar entregas:', error);
+        showToast(
+            '❌ Erro ao marcar entrega',
+            'Não foi possível atualizar o status',
+            'error',
+            4000
+        );
+    }
+}
+
+// Função para navegar para o próximo marcador
+async function navigateToNextMarker() {
+    const remainingMarkers = Object.values(deliveryMarkers).filter(m => m !== null);
+
+    if (remainingMarkers.length === 0) {
+        showToast(
+            '🎉 Todas entregas concluídas!',
+            'Não há mais entregas pendentes',
+            'success',
+            5000
+        );
+        return;
+    }
+
+    // Pegar o primeiro marcador restante
+    const nextMarker = remainingMarkers[0];
+    let nextPosition = null;
+
+    // Obter posição do próximo marcador
+    if (nextMarker.position) {
+        nextPosition = nextMarker.position;
+    } else if (nextMarker.getPosition) {
+        nextPosition = nextMarker.getPosition();
+    }
+
+    if (nextPosition) {
+        // Centralizar no próximo marcador
+        map.panTo(nextPosition);
+
+        // Dar zoom se estiver muito longe
+        const currentZoom = map.getZoom();
+        if (currentZoom < 16) {
+            map.setZoom(16);
+        }
+
+        showToast(
+            '➡️ Próxima entrega',
+            'Navegando para o próximo local',
+            'info',
+            2000
+        );
+    }
+}
+
 async function addDeliveryMarkers() {
     console.log('🔵 Adicionando marcadores de entrega...');
 
@@ -3254,11 +3360,16 @@ async function addDeliveryMarkers() {
             infoWindowContent.appendChild(deliveryDiv);
         });
 
+        // Container de botões
+        const buttonsContainer = document.createElement('div');
+        buttonsContainer.style.display = 'flex';
+        buttonsContainer.style.gap = '8px';
+        buttonsContainer.style.marginTop = '8px';
+
         // Botão de navegação
         const navigateBtn = document.createElement('button');
-        navigateBtn.style.width = '100%';
+        navigateBtn.style.flex = '1';
         navigateBtn.style.padding = '8px 12px';
-        navigateBtn.style.marginTop = '8px';
         navigateBtn.style.background = '#4285f4';
         navigateBtn.style.color = 'white';
         navigateBtn.style.border = 'none';
@@ -3267,11 +3378,33 @@ async function addDeliveryMarkers() {
         navigateBtn.style.fontWeight = 'bold';
         navigateBtn.style.cursor = 'pointer';
         navigateBtn.style.transition = 'background 0.2s';
-        navigateBtn.innerHTML = '🧭 Navegar até cliente';
+        navigateBtn.innerHTML = '🧭 Navegar';
         navigateBtn.addEventListener('mouseenter', () => { navigateBtn.style.background = '#3367d6'; });
         navigateBtn.addEventListener('mouseleave', () => { navigateBtn.style.background = '#4285f4'; });
         navigateBtn.addEventListener('click', () => { navigateToClient(client); });
-        infoWindowContent.appendChild(navigateBtn);
+
+        // Botão marcar como entregue
+        const deliveredBtn = document.createElement('button');
+        deliveredBtn.style.flex = '1';
+        deliveredBtn.style.padding = '8px 12px';
+        deliveredBtn.style.background = '#34A853';
+        deliveredBtn.style.color = 'white';
+        deliveredBtn.style.border = 'none';
+        deliveredBtn.style.borderRadius = '6px';
+        deliveredBtn.style.fontSize = '13px';
+        deliveredBtn.style.fontWeight = 'bold';
+        deliveredBtn.style.cursor = 'pointer';
+        deliveredBtn.style.transition = 'background 0.2s';
+        deliveredBtn.innerHTML = '✓ Entregue';
+        deliveredBtn.addEventListener('mouseenter', () => { deliveredBtn.style.background = '#2d8e47'; });
+        deliveredBtn.addEventListener('mouseleave', () => { deliveredBtn.style.background = '#34A853'; });
+        deliveredBtn.addEventListener('click', async () => {
+            await markAsDelivered(deliveries, client, marker);
+        });
+
+        buttonsContainer.appendChild(navigateBtn);
+        buttonsContainer.appendChild(deliveredBtn);
+        infoWindowContent.appendChild(buttonsContainer);
 
         const infoWindow = new google.maps.InfoWindow({
             content: infoWindowContent,
@@ -3432,11 +3565,16 @@ async function addDeliveryMarkers() {
             infoWindowContent.appendChild(deliveryDiv);
         });
 
+        // Container de botões
+        const buttonsContainer = document.createElement('div');
+        buttonsContainer.style.display = 'flex';
+        buttonsContainer.style.gap = '8px';
+        buttonsContainer.style.marginTop = '12px';
+
         // Botão de navegação
         const navigateBtn = document.createElement('button');
-        navigateBtn.style.width = '100%';
+        navigateBtn.style.flex = '1';
         navigateBtn.style.padding = '8px 12px';
-        navigateBtn.style.marginTop = '12px';
         navigateBtn.style.background = '#4285f4';
         navigateBtn.style.color = 'white';
         navigateBtn.style.border = 'none';
@@ -3445,7 +3583,7 @@ async function addDeliveryMarkers() {
         navigateBtn.style.fontWeight = 'bold';
         navigateBtn.style.cursor = 'pointer';
         navigateBtn.style.transition = 'background 0.2s';
-        navigateBtn.innerHTML = '🧭 Navegar até este local';
+        navigateBtn.innerHTML = '🧭 Navegar';
         navigateBtn.addEventListener('mouseenter', () => { navigateBtn.style.background = '#3367d6'; });
         navigateBtn.addEventListener('mouseleave', () => { navigateBtn.style.background = '#4285f4'; });
         navigateBtn.addEventListener('click', () => {
@@ -3457,7 +3595,29 @@ async function addDeliveryMarkers() {
             };
             navigateToClient(clientData);
         });
-        infoWindowContent.appendChild(navigateBtn);
+
+        // Botão marcar como entregue
+        const deliveredBtn = document.createElement('button');
+        deliveredBtn.style.flex = '1';
+        deliveredBtn.style.padding = '8px 12px';
+        deliveredBtn.style.background = '#34A853';
+        deliveredBtn.style.color = 'white';
+        deliveredBtn.style.border = 'none';
+        deliveredBtn.style.borderRadius = '6px';
+        deliveredBtn.style.fontSize = '13px';
+        deliveredBtn.style.fontWeight = 'bold';
+        deliveredBtn.style.cursor = 'pointer';
+        deliveredBtn.style.transition = 'background 0.2s';
+        deliveredBtn.innerHTML = '✓ Entregue';
+        deliveredBtn.addEventListener('mouseenter', () => { deliveredBtn.style.background = '#2d8e47'; });
+        deliveredBtn.addEventListener('mouseleave', () => { deliveredBtn.style.background = '#34A853'; });
+        deliveredBtn.addEventListener('click', async () => {
+            await markAsDelivered(locationData.deliveries, null, marker, coordKey);
+        });
+
+        buttonsContainer.appendChild(navigateBtn);
+        buttonsContainer.appendChild(deliveredBtn);
+        infoWindowContent.appendChild(buttonsContainer);
 
         const infoWindow = new google.maps.InfoWindow({
             content: infoWindowContent,
