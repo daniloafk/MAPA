@@ -5095,6 +5095,8 @@ function closeModal() {
     modal.classList.remove('active');
     document.body.style.overflow = '';
     resetForm();
+    // Restaurar formulário normal (caso esteja mostrando painel de atualização)
+    showNormalRegistrationForm();
 }
 
 // Resetar formulário
@@ -5473,17 +5475,29 @@ function playBeep() {
 async function handleQRCodeResult(qrData) {
     console.log('Processando QR Code:', qrData);
 
-    // Buscar endereço no banco de dados
+    // Buscar endereço no banco de dados (delivery_data)
     const addressData = await lookupAddressData(qrData);
 
     if (addressData) {
-        // Endereço encontrado - armazenar dados completos
+        // Verificar se o endereço JÁ ESTÁ CADASTRADO na tabela clients
+        const existingClient = await checkClientByAddress(addressData.address);
+
+        if (existingClient) {
+            // Cliente já cadastrado - mostrar opção de atualizar localização
+            showUpdateLocationPanel(existingClient, addressData);
+            return;
+        }
+
+        // Cliente NÃO cadastrado - fluxo normal de cadastro
         scannedAddress = addressData.address;
         scannedQRCode = qrData;
         scannedLatLng = {
             latitude: addressData.latitude,
             longitude: addressData.longitude
         };
+
+        // Mostrar formulário normal
+        showNormalRegistrationForm();
 
         addressText.textContent = addressData.address;
         addressDisplay.classList.add('active');
@@ -5494,11 +5508,19 @@ async function handleQRCodeResult(qrData) {
             'success',
             3000
         );
+
+        // Focar automaticamente no campo de nome
+        setTimeout(() => {
+            inputName.focus();
+        }, 500);
     } else {
         // Endereço não encontrado - mostrar código
         scannedAddress = `Código QR: ${qrData} (Endereço não cadastrado)`;
         scannedQRCode = qrData;
         scannedLatLng = null; // Sem coordenadas
+
+        // Mostrar formulário normal
+        showNormalRegistrationForm();
 
         addressText.textContent = scannedAddress;
         addressDisplay.classList.add('active');
@@ -5509,13 +5531,246 @@ async function handleQRCodeResult(qrData) {
             'warning',
             4000
         );
+
+        // Focar automaticamente no campo de nome
+        setTimeout(() => {
+            inputName.focus();
+        }, 500);
+    }
+}
+
+// Verificar se já existe cliente cadastrado com o endereço
+async function checkClientByAddress(address) {
+    try {
+        // Extrair a primeira linha do endereço (rua e número) para busca
+        const addressFirstLine = address.split('\n')[0].trim();
+
+        const { data, error } = await supabase
+            .from('clients')
+            .select('*')
+            .ilike('address', `%${addressFirstLine}%`)
+            .limit(1);
+
+        if (error) {
+            console.error('Erro ao verificar cliente:', error);
+            return null;
+        }
+
+        return data && data.length > 0 ? data[0] : null;
+    } catch (error) {
+        console.error('Erro ao verificar cliente:', error);
+        return null;
+    }
+}
+
+// Mostrar painel de atualização de localização (cliente já cadastrado)
+function showUpdateLocationPanel(client, addressData) {
+    // Esconder formulário de cadastro
+    const form = document.getElementById('form-add-client');
+    const formFooter = document.querySelector('#modal-add-client .form-footer');
+
+    if (form) form.style.display = 'none';
+    if (formFooter) formFooter.style.display = 'none';
+
+    // Remover painel anterior se existir
+    const existingPanel = document.getElementById('update-location-panel');
+    if (existingPanel) existingPanel.remove();
+
+    // Criar painel de atualização
+    const panel = document.createElement('div');
+    panel.id = 'update-location-panel';
+    panel.style.cssText = `
+        padding: 16px;
+        background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+        border-radius: 12px;
+        margin: 12px 0;
+        border: 2px solid #4CAF50;
+    `;
+
+    panel.innerHTML = `
+        <div style="text-align: center; margin-bottom: 16px;">
+            <div style="font-size: 48px; margin-bottom: 8px;">✅</div>
+            <div style="font-size: 18px; font-weight: 700; color: #2e7d32;">Cliente Já Cadastrado!</div>
+        </div>
+
+        <div style="background: white; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+            <div style="font-size: 12px; color: #666; margin-bottom: 4px;">👤 Nome</div>
+            <div style="font-size: 16px; font-weight: 600; color: #333;">${client.name}</div>
+        </div>
+
+        <div style="background: white; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+            <div style="font-size: 12px; color: #666; margin-bottom: 4px;">📍 Endereço</div>
+            <div style="font-size: 14px; color: #333; line-height: 1.4;">${client.address.replace(/\n/g, '<br>')}</div>
+        </div>
+
+        <div style="background: #fff3e0; padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #ff9800;">
+            <div style="font-size: 12px; color: #e65100; margin-bottom: 4px;">📌 Localização Atual no Mapa</div>
+            <div style="font-size: 13px; color: #333;">
+                Lat: ${client.latitude ? client.latitude.toFixed(6) : 'N/A'}<br>
+                Lng: ${client.longitude ? client.longitude.toFixed(6) : 'N/A'}
+            </div>
+        </div>
+
+        <button id="btn-update-location" style="
+            width: 100%;
+            padding: 14px 20px;
+            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+        ">
+            <span style="font-size: 20px;">🔄</span>
+            Atualizar Localização no Mapa
+        </button>
+
+        <p style="font-size: 11px; color: #666; text-align: center; margin-top: 12px;">
+            Isso vai atualizar as coordenadas do marcador para sua posição GPS atual
+        </p>
+
+        <button id="btn-cancel-update" style="
+            width: 100%;
+            margin-top: 12px;
+            padding: 10px;
+            background: transparent;
+            color: #666;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        ">
+            Cancelar
+        </button>
+    `;
+
+    // Inserir após o display do endereço
+    const addressDisplay = document.getElementById('address-display');
+    if (addressDisplay) {
+        addressDisplay.after(panel);
     }
 
-    // Focar automaticamente no campo de nome
-    setTimeout(() => {
-        inputName.focus();
-    }, 500);
+    // Mostrar endereço no display
+    const addressText = document.getElementById('address-text');
+    if (addressText) {
+        addressText.textContent = addressData.address;
+    }
+    if (addressDisplay) {
+        addressDisplay.classList.add('active');
+    }
+
+    // Event listener para atualizar localização
+    document.getElementById('btn-update-location').addEventListener('click', async () => {
+        await updateClientLocation(client.id, client.name);
+    });
+
+    // Event listener para cancelar
+    document.getElementById('btn-cancel-update').addEventListener('click', () => {
+        closeModal();
+    });
+
+    // Efeito hover no botão
+    const updateBtn = document.getElementById('btn-update-location');
+    updateBtn.addEventListener('mouseenter', () => {
+        updateBtn.style.transform = 'scale(1.02)';
+        updateBtn.style.boxShadow = '0 6px 16px rgba(255, 152, 0, 0.4)';
+    });
+    updateBtn.addEventListener('mouseleave', () => {
+        updateBtn.style.transform = 'scale(1)';
+        updateBtn.style.boxShadow = '0 4px 12px rgba(255, 152, 0, 0.3)';
+    });
 }
+
+// Atualizar localização do cliente no banco de dados
+async function updateClientLocation(clientId, clientName) {
+    // Obter posição GPS atual
+    let currentPosition = null;
+
+    if (gpsTracker && gpsTracker.markerCoords) {
+        currentPosition = gpsTracker.markerCoords;
+    } else if (userLocationMarker) {
+        if (userLocationMarker.position) {
+            currentPosition = userLocationMarker.position;
+        } else if (userLocationMarker.getPosition) {
+            const pos = userLocationMarker.getPosition();
+            currentPosition = { lat: pos.lat(), lng: pos.lng() };
+        }
+    }
+
+    if (!currentPosition || !currentPosition.lat || !currentPosition.lng) {
+        showToast(
+            '❌ Erro de GPS',
+            'Não foi possível obter sua localização atual',
+            'error',
+            4000
+        );
+        return;
+    }
+
+    try {
+        // Atualizar no banco de dados
+        const { error } = await supabase
+            .from('clients')
+            .update({
+                latitude: currentPosition.lat,
+                longitude: currentPosition.lng
+            })
+            .eq('id', clientId);
+
+        if (error) {
+            throw error;
+        }
+
+        showToast(
+            '✅ Localização Atualizada!',
+            `${clientName} - Nova posição salva no mapa`,
+            'success',
+            5000
+        );
+
+        // Fechar modal
+        closeModal();
+
+        // Recarregar marcadores para refletir a mudança
+        if (typeof toggleClientsOnMap === 'function') {
+            // Desligar e ligar novamente para atualizar
+            if (clientsVisible) {
+                await toggleClientsOnMap();
+                await toggleClientsOnMap();
+            }
+        }
+
+    } catch (error) {
+        console.error('Erro ao atualizar localização:', error);
+        showToast(
+            '❌ Erro ao atualizar',
+            'Não foi possível salvar a nova localização',
+            'error',
+            4000
+        );
+    }
+}
+
+// Mostrar formulário normal de cadastro
+function showNormalRegistrationForm() {
+    const form = document.getElementById('form-add-client');
+    const formFooter = document.querySelector('#modal-add-client .form-footer');
+
+    if (form) form.style.display = 'block';
+    if (formFooter) formFooter.style.display = 'flex';
+
+    // Remover painel de atualização se existir
+    const updatePanel = document.getElementById('update-location-panel');
+    if (updatePanel) updatePanel.remove();
+}
+
 
 // Buscar dados completos do endereço no banco de dados (delivery_data)
 async function lookupAddressData(qrCode) {
