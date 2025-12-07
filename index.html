@@ -3360,51 +3360,11 @@ async function addDeliveryMarkers() {
             infoWindowContent.appendChild(deliveryDiv);
         });
 
-        // Container de botões
+        // Container de botões (será preenchido após criar o marker)
         const buttonsContainer = document.createElement('div');
         buttonsContainer.style.display = 'flex';
         buttonsContainer.style.gap = '8px';
         buttonsContainer.style.marginTop = '8px';
-
-        // Botão de navegação
-        const navigateBtn = document.createElement('button');
-        navigateBtn.style.flex = '1';
-        navigateBtn.style.padding = '8px 12px';
-        navigateBtn.style.background = '#4285f4';
-        navigateBtn.style.color = 'white';
-        navigateBtn.style.border = 'none';
-        navigateBtn.style.borderRadius = '6px';
-        navigateBtn.style.fontSize = '13px';
-        navigateBtn.style.fontWeight = 'bold';
-        navigateBtn.style.cursor = 'pointer';
-        navigateBtn.style.transition = 'background 0.2s';
-        navigateBtn.innerHTML = '🧭 Navegar';
-        navigateBtn.addEventListener('mouseenter', () => { navigateBtn.style.background = '#3367d6'; });
-        navigateBtn.addEventListener('mouseleave', () => { navigateBtn.style.background = '#4285f4'; });
-        navigateBtn.addEventListener('click', () => { navigateToClient(client); });
-
-        // Botão marcar como entregue
-        const deliveredBtn = document.createElement('button');
-        deliveredBtn.style.flex = '1';
-        deliveredBtn.style.padding = '8px 12px';
-        deliveredBtn.style.background = '#34A853';
-        deliveredBtn.style.color = 'white';
-        deliveredBtn.style.border = 'none';
-        deliveredBtn.style.borderRadius = '6px';
-        deliveredBtn.style.fontSize = '13px';
-        deliveredBtn.style.fontWeight = 'bold';
-        deliveredBtn.style.cursor = 'pointer';
-        deliveredBtn.style.transition = 'background 0.2s';
-        deliveredBtn.innerHTML = '✓ Entregue';
-        deliveredBtn.addEventListener('mouseenter', () => { deliveredBtn.style.background = '#2d8e47'; });
-        deliveredBtn.addEventListener('mouseleave', () => { deliveredBtn.style.background = '#34A853'; });
-        deliveredBtn.addEventListener('click', async () => {
-            console.log('🔘 Botão Entregue clicado (marcador verde)');
-            await markAsDelivered(deliveries, client, marker);
-        });
-
-        buttonsContainer.appendChild(navigateBtn);
-        buttonsContainer.appendChild(deliveredBtn);
         infoWindowContent.appendChild(buttonsContainer);
 
         const infoWindow = new google.maps.InfoWindow({
@@ -3413,9 +3373,12 @@ async function addDeliveryMarkers() {
             disableAutoPan: true
         });
 
+        // Variável para armazenar o marker
+        let marker;
+
         try {
             if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
-                const marker = new google.maps.marker.AdvancedMarkerElement({
+                marker = new google.maps.marker.AdvancedMarkerElement({
                     map,
                     position,
                     content: markerDiv,
@@ -3432,7 +3395,7 @@ async function addDeliveryMarkers() {
                 deliveryMarkers[`registered_${clientId}`] = marker;
                 registeredMarkersCount++;
             } else {
-                const marker = new google.maps.Marker({
+                marker = new google.maps.Marker({
                     map,
                     position,
                     title: client.name,
@@ -3456,6 +3419,47 @@ async function addDeliveryMarkers() {
                 deliveryMarkers[`registered_${clientId}`] = marker;
                 registeredMarkersCount++;
             }
+
+            // Adicionar botões ao container (agora que o marker foi criado)
+            // Botão de navegação
+            const navigateBtn = document.createElement('button');
+            navigateBtn.style.flex = '1';
+            navigateBtn.style.padding = '8px 12px';
+            navigateBtn.style.background = '#4285f4';
+            navigateBtn.style.color = 'white';
+            navigateBtn.style.border = 'none';
+            navigateBtn.style.borderRadius = '6px';
+            navigateBtn.style.fontSize = '13px';
+            navigateBtn.style.fontWeight = 'bold';
+            navigateBtn.style.cursor = 'pointer';
+            navigateBtn.style.transition = 'background 0.2s';
+            navigateBtn.innerHTML = '🧭 Navegar';
+            navigateBtn.addEventListener('mouseenter', () => { navigateBtn.style.background = '#3367d6'; });
+            navigateBtn.addEventListener('mouseleave', () => { navigateBtn.style.background = '#4285f4'; });
+            navigateBtn.addEventListener('click', () => { navigateToClient(client); });
+
+            // Botão marcar como entregue
+            const deliveredBtn = document.createElement('button');
+            deliveredBtn.style.flex = '1';
+            deliveredBtn.style.padding = '8px 12px';
+            deliveredBtn.style.background = '#34A853';
+            deliveredBtn.style.color = 'white';
+            deliveredBtn.style.border = 'none';
+            deliveredBtn.style.borderRadius = '6px';
+            deliveredBtn.style.fontSize = '13px';
+            deliveredBtn.style.fontWeight = 'bold';
+            deliveredBtn.style.cursor = 'pointer';
+            deliveredBtn.style.transition = 'background 0.2s';
+            deliveredBtn.innerHTML = '✓ Entregue';
+            deliveredBtn.addEventListener('mouseenter', () => { deliveredBtn.style.background = '#2d8e47'; });
+            deliveredBtn.addEventListener('mouseleave', () => { deliveredBtn.style.background = '#34A853'; });
+            deliveredBtn.addEventListener('click', async () => {
+                console.log('🔘 Botão Entregue clicado (marcador verde)');
+                await markAsDelivered(deliveries, client, marker);
+            });
+
+            buttonsContainer.appendChild(navigateBtn);
+            buttonsContainer.appendChild(deliveredBtn);
 
             bounds.extend(position);
         } catch (error) {
@@ -3566,59 +3570,11 @@ async function addDeliveryMarkers() {
             infoWindowContent.appendChild(deliveryDiv);
         });
 
-        // Container de botões
+        // Container de botões (será preenchido após criar o marker)
         const buttonsContainer = document.createElement('div');
         buttonsContainer.style.display = 'flex';
         buttonsContainer.style.gap = '8px';
         buttonsContainer.style.marginTop = '12px';
-
-        // Botão de navegação
-        const navigateBtn = document.createElement('button');
-        navigateBtn.style.flex = '1';
-        navigateBtn.style.padding = '8px 12px';
-        navigateBtn.style.background = '#4285f4';
-        navigateBtn.style.color = 'white';
-        navigateBtn.style.border = 'none';
-        navigateBtn.style.borderRadius = '6px';
-        navigateBtn.style.fontSize = '13px';
-        navigateBtn.style.fontWeight = 'bold';
-        navigateBtn.style.cursor = 'pointer';
-        navigateBtn.style.transition = 'background 0.2s';
-        navigateBtn.innerHTML = '🧭 Navegar';
-        navigateBtn.addEventListener('mouseenter', () => { navigateBtn.style.background = '#3367d6'; });
-        navigateBtn.addEventListener('mouseleave', () => { navigateBtn.style.background = '#4285f4'; });
-        navigateBtn.addEventListener('click', () => {
-            const clientData = {
-                name: locationData.address || 'Cliente',
-                latitude: position.lat,
-                longitude: position.lng,
-                address: fullAddress
-            };
-            navigateToClient(clientData);
-        });
-
-        // Botão marcar como entregue
-        const deliveredBtn = document.createElement('button');
-        deliveredBtn.style.flex = '1';
-        deliveredBtn.style.padding = '8px 12px';
-        deliveredBtn.style.background = '#34A853';
-        deliveredBtn.style.color = 'white';
-        deliveredBtn.style.border = 'none';
-        deliveredBtn.style.borderRadius = '6px';
-        deliveredBtn.style.fontSize = '13px';
-        deliveredBtn.style.fontWeight = 'bold';
-        deliveredBtn.style.cursor = 'pointer';
-        deliveredBtn.style.transition = 'background 0.2s';
-        deliveredBtn.innerHTML = '✓ Entregue';
-        deliveredBtn.addEventListener('mouseenter', () => { deliveredBtn.style.background = '#2d8e47'; });
-        deliveredBtn.addEventListener('mouseleave', () => { deliveredBtn.style.background = '#34A853'; });
-        deliveredBtn.addEventListener('click', async () => {
-            console.log('🔘 Botão Entregue clicado (marcador vermelho)');
-            await markAsDelivered(locationData.deliveries, null, marker, coordKey);
-        });
-
-        buttonsContainer.appendChild(navigateBtn);
-        buttonsContainer.appendChild(deliveredBtn);
         infoWindowContent.appendChild(buttonsContainer);
 
         const infoWindow = new google.maps.InfoWindow({
@@ -3627,9 +3583,12 @@ async function addDeliveryMarkers() {
             disableAutoPan: true
         });
 
+        // Variável para armazenar o marker
+        let marker;
+
         try {
             if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
-                const marker = new google.maps.marker.AdvancedMarkerElement({
+                marker = new google.maps.marker.AdvancedMarkerElement({
                     map,
                     position,
                     content: markerDiv,
@@ -3658,7 +3617,7 @@ async function addDeliveryMarkers() {
                 deliveryMarkers[coordKey] = marker;
                 unregisteredMarkersCount++;
             } else {
-                const marker = new google.maps.Marker({
+                marker = new google.maps.Marker({
                     map,
                     position,
                     title: `${deliveryCount} entrega${deliveryCount > 1 ? 's' : ''} neste local`,
@@ -3691,6 +3650,55 @@ async function addDeliveryMarkers() {
                 deliveryMarkers[coordKey] = marker;
                 unregisteredMarkersCount++;
             }
+
+            // Adicionar botões ao container (agora que o marker foi criado)
+            // Botão de navegação
+            const navigateBtn = document.createElement('button');
+            navigateBtn.style.flex = '1';
+            navigateBtn.style.padding = '8px 12px';
+            navigateBtn.style.background = '#4285f4';
+            navigateBtn.style.color = 'white';
+            navigateBtn.style.border = 'none';
+            navigateBtn.style.borderRadius = '6px';
+            navigateBtn.style.fontSize = '13px';
+            navigateBtn.style.fontWeight = 'bold';
+            navigateBtn.style.cursor = 'pointer';
+            navigateBtn.style.transition = 'background 0.2s';
+            navigateBtn.innerHTML = '🧭 Navegar';
+            navigateBtn.addEventListener('mouseenter', () => { navigateBtn.style.background = '#3367d6'; });
+            navigateBtn.addEventListener('mouseleave', () => { navigateBtn.style.background = '#4285f4'; });
+            navigateBtn.addEventListener('click', () => {
+                const clientData = {
+                    name: locationData.address || 'Cliente',
+                    latitude: position.lat,
+                    longitude: position.lng,
+                    address: fullAddress
+                };
+                navigateToClient(clientData);
+            });
+
+            // Botão marcar como entregue
+            const deliveredBtn = document.createElement('button');
+            deliveredBtn.style.flex = '1';
+            deliveredBtn.style.padding = '8px 12px';
+            deliveredBtn.style.background = '#34A853';
+            deliveredBtn.style.color = 'white';
+            deliveredBtn.style.border = 'none';
+            deliveredBtn.style.borderRadius = '6px';
+            deliveredBtn.style.fontSize = '13px';
+            deliveredBtn.style.fontWeight = 'bold';
+            deliveredBtn.style.cursor = 'pointer';
+            deliveredBtn.style.transition = 'background 0.2s';
+            deliveredBtn.innerHTML = '✓ Entregue';
+            deliveredBtn.addEventListener('mouseenter', () => { deliveredBtn.style.background = '#2d8e47'; });
+            deliveredBtn.addEventListener('mouseleave', () => { deliveredBtn.style.background = '#34A853'; });
+            deliveredBtn.addEventListener('click', async () => {
+                console.log('🔘 Botão Entregue clicado (marcador vermelho)');
+                await markAsDelivered(locationData.deliveries, null, marker, coordKey);
+            });
+
+            buttonsContainer.appendChild(navigateBtn);
+            buttonsContainer.appendChild(deliveredBtn);
 
             bounds.extend(position);
         } catch (error) {
