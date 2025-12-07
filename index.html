@@ -3215,7 +3215,7 @@ async function addDeliveryMarkers() {
         packagesTitle.style.marginBottom = '6px';
         packagesTitle.style.borderTop = '1px solid #eee';
         packagesTitle.style.paddingTop = '8px';
-        packagesTitle.textContent = `📦 ${deliveryCount} pacote${deliveryCount > 1 ? 's' : ''} para entrega:`;
+        packagesTitle.textContent = `📦 ${deliveryCount} pacote${deliveryCount > 1 ? 's' : ''}:`;
         infoWindowContent.appendChild(packagesTitle);
 
         deliveries.forEach((delivery, index) => {
@@ -3389,8 +3389,11 @@ async function addDeliveryMarkers() {
         packagesTitle.style.fontWeight = 'bold';
         packagesTitle.style.fontSize = '11px';
         packagesTitle.style.color = '#666';
+        packagesTitle.style.marginTop = '8px';
         packagesTitle.style.marginBottom = '6px';
-        packagesTitle.textContent = `${deliveryCount} pacote${deliveryCount > 1 ? 's' : ''} nesta parada:`;
+        packagesTitle.style.borderTop = '1px solid #eee';
+        packagesTitle.style.paddingTop = '8px';
+        packagesTitle.textContent = `📦 ${deliveryCount} pacote${deliveryCount > 1 ? 's' : ''}:`;
         infoWindowContent.appendChild(packagesTitle);
 
         locationData.deliveries.forEach((delivery, index) => {
@@ -6667,7 +6670,7 @@ async function showMatchedClientMarkers() {
                 packagesTitle.style.marginBottom = '6px';
                 packagesTitle.style.borderTop = '1px solid #eee';
                 packagesTitle.style.paddingTop = '8px';
-                packagesTitle.textContent = `📦 ${deliveryCount} pacote${deliveryCount > 1 ? 's' : ''} para entrega:`;
+                packagesTitle.textContent = `📦 ${deliveryCount} pacote${deliveryCount > 1 ? 's' : ''}:`;
                 infoWindowContent.appendChild(packagesTitle);
 
                 // Adicionar cada pacote
