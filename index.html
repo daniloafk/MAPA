@@ -2992,20 +2992,46 @@ async function markAsDelivered(deliveries, client, marker, coordKey) {
 
         console.log(`✅ ${deliveryIds.length} entrega(s) atualizada(s) no banco de dados`);
 
-        // Remover marcador do mapa
+        // Marcar como entregue (tornar cinza e semi-transparente)
         if (marker) {
-            if (marker.map !== undefined) {
-                marker.map = null; // AdvancedMarkerElement
-            } else if (marker.setMap) {
-                marker.setMap(null); // Marker clássico
-            }
-        }
+            marker.isDelivered = true; // Flag para identificar marcadores entregues
 
-        // Remover do objeto de marcadores
-        if (coordKey) {
-            delete deliveryMarkers[coordKey];
-        } else if (client) {
-            delete deliveryMarkers[`registered_${client.id}`];
+            // Tornar o marcador cinza e semi-transparente
+            if (marker.content) {
+                // AdvancedMarkerElement com conteúdo personalizado
+                const markerElement = marker.content;
+                markerElement.style.opacity = '0.4';
+                markerElement.style.filter = 'grayscale(100%)';
+
+                // Se for marcador verde (pin customizado), mudar cor para cinza
+                const pinDiv = markerElement.querySelector('div');
+                if (pinDiv) {
+                    pinDiv.style.background = '#9E9E9E'; // Cinza
+                    const innerCircle = pinDiv.querySelector('div');
+                    if (innerCircle) {
+                        innerCircle.style.color = '#9E9E9E';
+                    }
+                }
+            } else if (marker.setIcon) {
+                // Marker clássico - mudar para ícone cinza
+                const currentIcon = marker.getIcon();
+                if (currentIcon && currentIcon.path) {
+                    marker.setIcon({
+                        ...currentIcon,
+                        fillColor: '#9E9E9E',
+                        strokeColor: '#757575'
+                    });
+                } else if (currentIcon && currentIcon.url) {
+                    // Marcador vermelho com SVG - recriar em cinza
+                    const deliveryCount = deliveries.length;
+                    marker.setIcon({
+                        url: createPinSVG(deliveryCount, '#9E9E9E'),
+                        scaledSize: new google.maps.Size(32, 44),
+                        anchor: new google.maps.Point(16, 44)
+                    });
+                }
+                marker.setOpacity(0.4);
+            }
         }
 
         // Fechar InfoWindow
@@ -3038,7 +3064,8 @@ async function markAsDelivered(deliveries, client, marker, coordKey) {
 
 // Função para navegar para o próximo marcador
 async function navigateToNextMarker() {
-    const remainingMarkers = Object.values(deliveryMarkers).filter(m => m !== null);
+    // Filtrar apenas marcadores não entregues
+    const remainingMarkers = Object.values(deliveryMarkers).filter(m => m !== null && !m.isDelivered);
 
     if (remainingMarkers.length === 0) {
         showToast(
@@ -3050,7 +3077,7 @@ async function navigateToNextMarker() {
         return;
     }
 
-    // Pegar o primeiro marcador restante
+    // Pegar o primeiro marcador restante (não entregue)
     const nextMarker = remainingMarkers[0];
     let nextPosition = null;
 
