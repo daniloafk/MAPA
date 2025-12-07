@@ -5133,7 +5133,14 @@ function resetForm() {
 }
 
 // Event listeners do modal
-btnAddClient.addEventListener('click', openModal);
+btnAddClient.addEventListener('click', async () => {
+    // Verificar se está em modo de atualização de localização
+    if (btnAddClient.dataset.updateMode === 'true' && pendingLocationUpdate) {
+        await updateClientLocation(pendingLocationUpdate.clientId, pendingLocationUpdate.clientName);
+    } else {
+        openModal();
+    }
+});
 btnModalClose.addEventListener('click', closeModal);
 btnCancel.addEventListener('click', closeModal);
 
@@ -5563,129 +5570,169 @@ async function checkClientByAddress(address) {
     }
 }
 
-// Mostrar painel de atualização de localização (cliente já cadastrado)
+// Variável global para armazenar dados do cliente a ser atualizado
+let pendingLocationUpdate = null;
+
+// Mostrar modo de atualização de localização (cliente já cadastrado)
 function showUpdateLocationPanel(client, addressData) {
-    // Esconder formulário de cadastro
-    const form = document.getElementById('form-add-client');
-    const formFooter = document.querySelector('#modal-add-client .form-footer');
+    // Fechar o modal do QR code
+    closeModal();
 
-    if (form) form.style.display = 'none';
-    if (formFooter) formFooter.style.display = 'none';
+    // Armazenar dados do cliente para atualização
+    pendingLocationUpdate = {
+        clientId: client.id,
+        clientName: client.name,
+        clientAddress: client.address
+    };
 
-    // Remover painel anterior se existir
-    const existingPanel = document.getElementById('update-location-panel');
-    if (existingPanel) existingPanel.remove();
+    // Criar banner no topo da tela com info do cliente
+    createClientInfoBanner(client);
 
-    // Criar painel de atualização
-    const panel = document.createElement('div');
-    panel.id = 'update-location-panel';
-    panel.style.cssText = `
-        padding: 16px;
-        background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
-        border-radius: 12px;
-        margin: 12px 0;
-        border: 2px solid #4CAF50;
+    // Transformar botão "Adicionar Cliente" em "Atualizar Localização"
+    transformAddButtonToUpdate();
+
+    // Centralizar no marcador do cliente se existir
+    if (client.latitude && client.longitude) {
+        const clientPos = { lat: client.latitude, lng: client.longitude };
+        map.panTo(clientPos);
+        map.setZoom(18);
+    }
+
+    showToast(
+        '✅ Cliente já cadastrado!',
+        'Clique no botão para atualizar a localização',
+        'info',
+        4000
+    );
+}
+
+// Criar banner no topo da tela com informações do cliente
+function createClientInfoBanner(client) {
+    // Remover banner anterior se existir
+    const existingBanner = document.getElementById('client-info-banner');
+    if (existingBanner) existingBanner.remove();
+
+    const banner = document.createElement('div');
+    banner.id = 'client-info-banner';
+    banner.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+        color: white;
+        padding: 12px 16px;
+        z-index: 9999;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
     `;
 
-    panel.innerHTML = `
-        <div style="text-align: center; margin-bottom: 16px;">
-            <div style="font-size: 48px; margin-bottom: 8px;">✅</div>
-            <div style="font-size: 18px; font-weight: 700; color: #2e7d32;">Cliente Já Cadastrado!</div>
-        </div>
+    // Formatar endereço (primeira linha apenas)
+    const shortAddress = client.address.split('\n')[0];
 
-        <div style="background: white; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
-            <div style="font-size: 12px; color: #666; margin-bottom: 4px;">👤 Nome</div>
-            <div style="font-size: 16px; font-weight: 600; color: #333;">${client.name}</div>
-        </div>
-
-        <div style="background: white; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
-            <div style="font-size: 12px; color: #666; margin-bottom: 4px;">📍 Endereço</div>
-            <div style="font-size: 14px; color: #333; line-height: 1.4;">${client.address.replace(/\n/g, '<br>')}</div>
-        </div>
-
-        <div style="background: #fff3e0; padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #ff9800;">
-            <div style="font-size: 12px; color: #e65100; margin-bottom: 4px;">📌 Localização Atual no Mapa</div>
-            <div style="font-size: 13px; color: #333;">
-                Lat: ${client.latitude ? client.latitude.toFixed(6) : 'N/A'}<br>
-                Lng: ${client.longitude ? client.longitude.toFixed(6) : 'N/A'}
+    banner.innerHTML = `
+        <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 14px; font-weight: 700; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                👤 ${client.name}
+            </div>
+            <div style="font-size: 12px; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                📍 ${shortAddress}
             </div>
         </div>
-
-        <button id="btn-update-location" style="
-            width: 100%;
-            padding: 14px 20px;
-            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
-            color: white;
+        <button id="btn-cancel-location-update" style="
+            background: rgba(255,255,255,0.2);
             border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 700;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            transition: transform 0.2s, box-shadow 0.2s;
-            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+            white-space: nowrap;
         ">
-            <span style="font-size: 20px;">🔄</span>
-            Atualizar Localização no Mapa
-        </button>
-
-        <p style="font-size: 11px; color: #666; text-align: center; margin-top: 12px;">
-            Isso vai atualizar as coordenadas do marcador para sua posição GPS atual
-        </p>
-
-        <button id="btn-cancel-update" style="
-            width: 100%;
-            margin-top: 12px;
-            padding: 10px;
-            background: transparent;
-            color: #666;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            font-size: 14px;
-            cursor: pointer;
-        ">
-            Cancelar
+            ✕ Cancelar
         </button>
     `;
 
-    // Inserir após o display do endereço
-    const addressDisplay = document.getElementById('address-display');
-    if (addressDisplay) {
-        addressDisplay.after(panel);
-    }
-
-    // Mostrar endereço no display
-    const addressText = document.getElementById('address-text');
-    if (addressText) {
-        addressText.textContent = addressData.address;
-    }
-    if (addressDisplay) {
-        addressDisplay.classList.add('active');
-    }
-
-    // Event listener para atualizar localização
-    document.getElementById('btn-update-location').addEventListener('click', async () => {
-        await updateClientLocation(client.id, client.name);
-    });
+    document.body.appendChild(banner);
 
     // Event listener para cancelar
-    document.getElementById('btn-cancel-update').addEventListener('click', () => {
-        closeModal();
+    document.getElementById('btn-cancel-location-update').addEventListener('click', () => {
+        cancelLocationUpdate();
     });
+}
 
-    // Efeito hover no botão
-    const updateBtn = document.getElementById('btn-update-location');
-    updateBtn.addEventListener('mouseenter', () => {
-        updateBtn.style.transform = 'scale(1.02)';
-        updateBtn.style.boxShadow = '0 6px 16px rgba(255, 152, 0, 0.4)';
-    });
-    updateBtn.addEventListener('mouseleave', () => {
-        updateBtn.style.transform = 'scale(1)';
-        updateBtn.style.boxShadow = '0 4px 12px rgba(255, 152, 0, 0.3)';
-    });
+// Transformar botão "Adicionar Cliente" em "Atualizar Localização"
+function transformAddButtonToUpdate() {
+    const btnAddClient = document.getElementById('btn-add-client');
+    if (!btnAddClient) return;
+
+    // Salvar estado original
+    btnAddClient.dataset.originalHtml = btnAddClient.innerHTML;
+    btnAddClient.dataset.originalBackground = btnAddClient.style.background || '';
+
+    // Transformar em botão de atualização
+    btnAddClient.innerHTML = '🔄 Atualizar Localização';
+    btnAddClient.style.background = 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)';
+    btnAddClient.style.animation = 'pulse-update 1.5s infinite';
+
+    // Adicionar animação CSS se não existir
+    if (!document.getElementById('update-button-animation')) {
+        const style = document.createElement('style');
+        style.id = 'update-button-animation';
+        style.textContent = `
+            @keyframes pulse-update {
+                0%, 100% { transform: scale(1); box-shadow: 0 4px 15px rgba(255, 152, 0, 0.4); }
+                50% { transform: scale(1.05); box-shadow: 0 6px 20px rgba(255, 152, 0, 0.6); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Marcar como modo de atualização
+    btnAddClient.dataset.updateMode = 'true';
+}
+
+// Restaurar botão "Adicionar Cliente" ao estado original
+function restoreAddButton() {
+    const btnAddClient = document.getElementById('btn-add-client');
+    if (!btnAddClient) return;
+
+    // Restaurar estado original
+    if (btnAddClient.dataset.originalHtml) {
+        btnAddClient.innerHTML = btnAddClient.dataset.originalHtml;
+    } else {
+        btnAddClient.innerHTML = '+ Adicionar Cliente';
+    }
+
+    btnAddClient.style.background = btnAddClient.dataset.originalBackground || '';
+    btnAddClient.style.animation = '';
+
+    // Remover marcação de modo de atualização
+    delete btnAddClient.dataset.updateMode;
+    delete btnAddClient.dataset.originalHtml;
+    delete btnAddClient.dataset.originalBackground;
+}
+
+// Cancelar modo de atualização de localização
+function cancelLocationUpdate() {
+    pendingLocationUpdate = null;
+
+    // Remover banner
+    const banner = document.getElementById('client-info-banner');
+    if (banner) banner.remove();
+
+    // Restaurar botão
+    restoreAddButton();
+
+    showToast(
+        'Atualização cancelada',
+        'O botão voltou ao estado original',
+        'info',
+        2000
+    );
 }
 
 // Atualizar localização do cliente no banco de dados
@@ -5735,8 +5782,15 @@ async function updateClientLocation(clientId, clientName) {
             5000
         );
 
-        // Fechar modal
-        closeModal();
+        // Limpar modo de atualização
+        pendingLocationUpdate = null;
+
+        // Remover banner do topo
+        const banner = document.getElementById('client-info-banner');
+        if (banner) banner.remove();
+
+        // Restaurar botão ao estado original
+        restoreAddButton();
 
         // Recarregar marcadores para refletir a mudança
         if (typeof toggleClientsOnMap === 'function') {
