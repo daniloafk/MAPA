@@ -5684,8 +5684,8 @@ function transformAddButtonToUpdate() {
         style.id = 'update-button-animation';
         style.textContent = `
             @keyframes pulse-update {
-                0%, 100% { transform: scale(1); box-shadow: 0 4px 15px rgba(255, 152, 0, 0.4); }
-                50% { transform: scale(1.05); box-shadow: 0 6px 20px rgba(255, 152, 0, 0.6); }
+                0%, 100% { transform: translateX(-50%) scale(1); box-shadow: 0 4px 15px rgba(255, 152, 0, 0.4); }
+                50% { transform: translateX(-50%) scale(1.05); box-shadow: 0 6px 20px rgba(255, 152, 0, 0.6); }
             }
         `;
         document.head.appendChild(style);
