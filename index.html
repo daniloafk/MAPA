@@ -6435,12 +6435,40 @@ async function showMatchedClientMarkers() {
             addressDiv.style.fontSize = '12px';
             addressDiv.style.color = '#333';
             addressDiv.style.lineHeight = '1.4';
+            addressDiv.style.marginBottom = '10px';
             addressDiv.innerHTML = `📍 ${client.address.replace(/\n/g, '<br>')}`;
+
+            // Botão de navegação
+            const navigateBtn = document.createElement('button');
+            navigateBtn.style.width = '100%';
+            navigateBtn.style.padding = '8px 12px';
+            navigateBtn.style.marginTop = '8px';
+            navigateBtn.style.background = '#4285f4';
+            navigateBtn.style.color = 'white';
+            navigateBtn.style.border = 'none';
+            navigateBtn.style.borderRadius = '6px';
+            navigateBtn.style.fontSize = '13px';
+            navigateBtn.style.fontWeight = 'bold';
+            navigateBtn.style.cursor = 'pointer';
+            navigateBtn.style.transition = 'background 0.2s';
+            navigateBtn.innerHTML = '🧭 Navegar até cliente';
+
+            navigateBtn.addEventListener('mouseenter', () => {
+                navigateBtn.style.background = '#3367d6';
+            });
+            navigateBtn.addEventListener('mouseleave', () => {
+                navigateBtn.style.background = '#4285f4';
+            });
+
+            navigateBtn.addEventListener('click', () => {
+                navigateToClient(client);
+            });
 
             infoWindowContent.appendChild(badgeDiv);
             infoWindowContent.appendChild(nameDiv);
             infoWindowContent.appendChild(phoneDiv);
             infoWindowContent.appendChild(addressDiv);
+            infoWindowContent.appendChild(navigateBtn);
 
             const infoWindow = new google.maps.InfoWindow({
                 content: infoWindowContent,
