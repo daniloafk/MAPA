@@ -2894,6 +2894,7 @@ class GPSTracker {
         this.lastUpdate = 0;
         this.currentTween = null;
         this.markerCoords = { lat: 0, lng: 0 };
+        this.animationFrameId = null; // Para animação suave com requestAnimationFrame
 
         // Kalman Filter state
         this.kalman = {
@@ -2997,19 +2998,14 @@ class GPSTracker {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
 
-        // Log para debug
-        console.log(`📍 GPS Update: ${lat.toFixed(6)}, ${lng.toFixed(6)} (±${Math.round(accuracy)}m)`);
-
-        // Usar posição DIRETA - sem filtro Kalman para máxima responsividade
+        // Usar posição direta
         const newPos = { lat, lng };
 
-        // Atualizar marcador IMEDIATAMENTE sem animação
+        // Atualizar marcador com animação suave
         if (this.marker) {
-            this.setMarkerPositionInstant(newPos);
+            this.animateMarkerSmooth(newPos);
             this.accuracy = accuracy;
             locationAccuracy = accuracy;
-            this.markerCoords = newPos;
-            markerCoords = newPos; // Atualizar global
 
             // Indicador visual de qualidade do sinal
             const qualityIcon = accuracy <= 10 ? '🎯' : accuracy <= 30 ? '📍' : '📡';
@@ -3017,17 +3013,71 @@ class GPSTracker {
         }
     }
 
-    // Nova função para atualização INSTANTÂNEA (sem animação)
-    setMarkerPositionInstant(newPosition) {
+    // Animação suave usando requestAnimationFrame (como Google Maps)
+    animateMarkerSmooth(newPosition) {
         if (!this.marker) return;
 
-        // Atualizar posição diretamente sem animação
+        // Cancelar animação anterior se existir
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+        }
+
+        const startPos = { ...this.markerCoords };
+        const endPos = newPosition;
+        const duration = 250; // 250ms - suave mas rápido
+        const startTime = performance.now();
+
+        // Se é a primeira posição, definir diretamente
+        if (startPos.lat === 0 && startPos.lng === 0) {
+            this.markerCoords = endPos;
+            markerCoords = endPos;
+            this.setMarkerPosition(endPos);
+            return;
+        }
+
+        const animate = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+
+            // Easing suave (ease-out cubic)
+            const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+            // Interpolar posição
+            const currentPos = {
+                lat: startPos.lat + (endPos.lat - startPos.lat) * easeProgress,
+                lng: startPos.lng + (endPos.lng - startPos.lng) * easeProgress
+            };
+
+            // Atualizar marcador
+            this.setMarkerPosition(currentPos);
+            this.markerCoords = currentPos;
+            markerCoords = currentPos;
+
+            // Continuar animação se não terminou
+            if (progress < 1) {
+                this.animationFrameId = requestAnimationFrame(animate);
+            } else {
+                // Garantir posição final exata
+                this.markerCoords = endPos;
+                markerCoords = endPos;
+                this.setMarkerPosition(endPos);
+                this.animationFrameId = null;
+            }
+        };
+
+        this.animationFrameId = requestAnimationFrame(animate);
+    }
+
+    // Função auxiliar para definir posição do marcador
+    setMarkerPosition(position) {
+        if (!this.marker) return;
+
         if (this.marker.position !== undefined) {
             // AdvancedMarkerElement
-            this.marker.position = newPosition;
+            this.marker.position = position;
         } else if (this.marker.setPosition) {
             // Marker clássico
-            this.marker.setPosition(newPosition);
+            this.marker.setPosition(position);
         }
     }
 
