@@ -5591,11 +5591,11 @@ function showUpdateLocationPanel(client, addressData) {
     // Transformar botão "Adicionar Cliente" em "Atualizar Localização"
     transformAddButtonToUpdate();
 
-    // Centralizar no marcador do cliente se existir com zoom 90%
+    // Centralizar no marcador do cliente se existir com zoom 80%
     if (client.latitude && client.longitude) {
         const clientPos = { lat: client.latitude, lng: client.longitude };
         map.panTo(clientPos);
-        map.setZoom(22); // Zoom 90% - máximo disponível
+        map.setZoom(20); // Zoom 80%
     }
 
     showToast(
