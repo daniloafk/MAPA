@@ -4993,19 +4993,26 @@ function isValidPackageCode(code) {
     // Remover espaços
     const trimmed = code.trim();
 
-    // Verificar comprimento mínimo (códigos de pacote geralmente têm 10+ caracteres)
-    if (trimmed.length < 8) return false;
+    // Verificar comprimento mínimo (códigos podem ter a partir de 4 caracteres)
+    if (trimmed.length < 4) return false;
 
-    // Verificar se contém apenas caracteres válidos (letras, números, alguns símbolos)
-    // Códigos de pacote geralmente são alfanuméricos
-    const validPattern = /^[A-Za-z0-9\-_\.\/]+$/;
-    if (!validPattern.test(trimmed)) return false;
+    // Rejeitar strings vazias ou apenas espaços
+    if (trimmed.length === 0) return false;
 
-    // Rejeitar URLs (falsos positivos comuns)
+    // Rejeitar URLs completas (falsos positivos de propagandas)
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return false;
 
-    // Rejeitar códigos muito longos (provavelmente não é código de pacote)
-    if (trimmed.length > 50) return false;
+    // Rejeitar códigos extremamente longos (> 100 caracteres - provavelmente erro)
+    if (trimmed.length > 100) return false;
+
+    // Aceitar qualquer código alfanumérico com símbolos comuns de pacotes
+    // Inclui: letras, números, hífen, underscore, ponto, barra, dois pontos, espaços
+    const validPattern = /^[A-Za-z0-9\-_\.\/\:\s\#\@\+\=]+$/;
+    if (!validPattern.test(trimmed)) {
+        // Se falhar, ainda aceitar se tiver pelo menos 50% alfanumérico
+        const alphanumCount = (trimmed.match(/[A-Za-z0-9]/g) || []).length;
+        if (alphanumCount / trimmed.length < 0.5) return false;
+    }
 
     return true;
 }
@@ -5053,7 +5060,7 @@ function startScanning() {
 
                 // Verificar tamanho mínimo do QR code detectado (evitar falsos positivos)
                 const qrSize = Math.abs(code.location.bottomRightCorner.x - code.location.topLeftCorner.x);
-                if (qrSize < 50) {
+                if (qrSize < 20) {
                     // QR code muito pequeno - pode ser ruído
                     return;
                 }
@@ -7119,7 +7126,7 @@ function startPackageScanning() {
 
                 // Verificar tamanho mínimo do QR
                 const qrSize = Math.abs(code.location.bottomRightCorner.x - code.location.topLeftCorner.x);
-                if (qrSize < 50) return;
+                if (qrSize < 20) return;
 
                 // Sistema de confirmação
                 if (qrData === packageLastReadData) {
