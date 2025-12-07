@@ -6422,7 +6422,8 @@ async function showMatchedClientMarkers() {
 
             const infoWindow = new google.maps.InfoWindow({
                 content: infoWindowContent,
-                maxWidth: 300
+                maxWidth: 300,
+                disableAutoPan: true
             });
 
             try {
