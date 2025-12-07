@@ -2627,6 +2627,8 @@ let navigationMode = {
     active: false,
     destination: null,
     destinationName: '',
+    destinationMarker: null,
+    destinationInfoWindow: null,
     lastHeading: 0,
     lastPosition: null,
     followInterval: null
@@ -2664,13 +2666,21 @@ function calculateDistanceMeters(from, to) {
 }
 
 // Iniciar modo de navegação
-function startNavigationMode(destination, destinationName) {
+function startNavigationMode(destination, destinationName, marker = null, infoWindow = null) {
     navigationMode.active = true;
     navigationMode.destination = destination;
     navigationMode.destinationName = destinationName;
+    navigationMode.destinationMarker = marker;
+    navigationMode.destinationInfoWindow = infoWindow;
     navigationMode.lastPosition = null;
 
     console.log('🧭 Modo de navegação iniciado:', destinationName);
+
+    // Fechar InfoWindow atual
+    if (currentInfoWindow) {
+        currentInfoWindow.close();
+        currentInfoWindow = null;
+    }
 
     // Mostrar botão de parar navegação
     const btnStopNav = document.getElementById('btnStopNavigation');
@@ -2780,13 +2790,34 @@ function updateNavigationView() {
 
     // Verificar se chegou ao destino (< 30 metros)
     if (distanceToDestination < 30) {
+        // Salvar referências antes de parar navegação
+        const arrivedMarker = navigationMode.destinationMarker;
+        const arrivedInfoWindow = navigationMode.destinationInfoWindow;
+        const arrivedDestination = navigationMode.destination;
+
         showToast(
             '🎉 Você chegou!',
             `Destino: ${navigationMode.destinationName}`,
             'success',
             5000
         );
+
         stopNavigationMode();
+
+        // Reabrir InfoWindow do destino após pequeno delay
+        setTimeout(() => {
+            if (arrivedInfoWindow && arrivedMarker) {
+                // Centralizar no destino
+                if (arrivedDestination) {
+                    map.panTo(arrivedDestination);
+                    map.setZoom(18);
+                }
+                // Abrir InfoWindow
+                arrivedInfoWindow.open(map, arrivedMarker);
+                currentInfoWindow = arrivedInfoWindow;
+            }
+        }, 500);
+
         return;
     }
 
@@ -4289,7 +4320,7 @@ async function addDeliveryMarkers() {
             navigateBtn.innerHTML = '🧭 Navegar';
             navigateBtn.addEventListener('mouseenter', () => { navigateBtn.style.background = '#3367d6'; });
             navigateBtn.addEventListener('mouseleave', () => { navigateBtn.style.background = '#4285f4'; });
-            navigateBtn.addEventListener('click', () => { navigateToClient(client); });
+            navigateBtn.addEventListener('click', () => { navigateToClient(client, marker, infoWindow); });
 
             // Botão marcar como entregue / desfazer
             const deliveredBtn = document.createElement('button');
@@ -4564,7 +4595,7 @@ async function addDeliveryMarkers() {
                     longitude: position.lng,
                     address: fullAddress
                 };
-                navigateToClient(clientData);
+                navigateToClient(clientData, marker, infoWindow);
             });
 
             // Botão marcar como entregue / desfazer
@@ -5823,7 +5854,9 @@ function renderClients(clients) {
             const clientId = btn.getAttribute('data-client-id');
             const client = clients.find(c => c.id === clientId);
             if (client) {
-                navigateToClient(client);
+                // Buscar marker do cliente se existir
+                const marker = clientMarkers[clientId] || null;
+                navigateToClient(client, marker, null);
             }
         });
     });
@@ -6321,7 +6354,7 @@ function deleteClient(client) {
 // NAVEGAR ATÉ O CLIENTE
 // ===========================
 
-async function navigateToClient(client) {
+async function navigateToClient(client, marker = null, infoWindow = null) {
     // Fechar sidebar
     closeSidebar();
 
@@ -6447,7 +6480,7 @@ async function navigateToClient(client) {
             });
 
             // Iniciar modo de navegação em tempo real
-            startNavigationMode(destination, client.name);
+            startNavigationMode(destination, client.name, marker, infoWindow);
 
         } else {
             throw new Error(`Directions API retornou status: ${result.status}`);
@@ -8156,10 +8189,6 @@ async function showMatchedClientMarkers() {
                 navigateBtn.style.background = '#4285f4';
             });
 
-            navigateBtn.addEventListener('click', () => {
-                navigateToClient(client);
-            });
-
             infoWindowContent.appendChild(navigateBtn);
 
             const infoWindow = new google.maps.InfoWindow({
@@ -8167,6 +8196,9 @@ async function showMatchedClientMarkers() {
                 maxWidth: 300,
                 disableAutoPan: true
             });
+
+            // Variável para armazenar referência ao marker
+            let currentMarkerRef = null;
 
             try {
                 // Criar marcador usando AdvancedMarkerElement
@@ -8188,6 +8220,7 @@ async function showMatchedClientMarkers() {
                     });
 
                     matchedClientMarkers[client.id] = marker;
+                    currentMarkerRef = marker;
                 } else {
                     // Fallback: Marcador clássico
                     const marker = new google.maps.Marker({
@@ -8214,10 +8247,16 @@ async function showMatchedClientMarkers() {
                     });
 
                     matchedClientMarkers[client.id] = marker;
+                    currentMarkerRef = marker;
                 }
             } catch (error) {
                 console.error('Erro ao criar marcador:', error);
             }
+
+            // Atribuir evento de navegação após criar marker e infoWindow
+            navigateBtn.addEventListener('click', () => {
+                navigateToClient(client, currentMarkerRef, infoWindow);
+            });
         });
 
         matchedClientsVisible = true;
