@@ -2992,6 +2992,33 @@ async function addDeliveryMarkers() {
     // PASSO 2: Resetar objeto completamente
     deliveryMarkers = {};
 
+    // PASSO 2.5: Buscar clientes cadastrados para verificar quais endereços já existem
+    let registeredClients = [];
+    let registeredClientsByAddress = new Map(); // Mapa de endereço normalizado -> cliente
+    try {
+        const { data: clients, error: clientsError } = await supabase
+            .from('clients')
+            .select('*');
+
+        if (clientsError) throw clientsError;
+        registeredClients = clients || [];
+        console.log(`📋 ${registeredClients.length} clientes cadastrados encontrados`);
+
+        // Criar mapa de endereços normalizados -> dados do cliente
+        registeredClients.forEach(client => {
+            const clientAddress = client.address || '';
+            const clientAddressFirstLine = clientAddress.split('\n')[0];
+            const normalized = normalizeAddressForComparison(clientAddressFirstLine);
+            if (normalized && client.latitude && client.longitude) {
+                registeredClientsByAddress.set(normalized, client);
+            }
+        });
+        console.log(`✅ ${registeredClientsByAddress.size} endereços únicos cadastrados com coordenadas`);
+    } catch (error) {
+        console.warn('Aviso: Não foi possível buscar clientes cadastrados:', error);
+        // Continuar mesmo se não conseguir buscar clientes (todos serão vermelhos)
+    }
+
     // PASSO 3: Buscar dados da planilha (delivery_data) do Supabase
     let deliveryData = [];
     try {
@@ -3024,8 +3051,9 @@ async function addDeliveryMarkers() {
         return;
     }
 
-    // PASSO 4: Agrupar entregas por coordenadas (endereço)
-    const groupedByLocation = {};
+    // PASSO 4: Separar entregas em cadastradas vs não cadastradas
+    const groupedByRegistered = new Map(); // Cliente cadastrado -> entregas
+    const groupedByUnregistered = {}; // Coordenada -> entregas não cadastradas
 
     deliveryData.forEach((delivery) => {
         if (!delivery.latitude || !delivery.longitude) {
@@ -3033,59 +3061,294 @@ async function addDeliveryMarkers() {
             return;
         }
 
-        const coordKey = `${delivery.latitude.toFixed(6)},${delivery.longitude.toFixed(6)}`;
-        if (!groupedByLocation[coordKey]) {
-            groupedByLocation[coordKey] = {
-                position: { lat: delivery.latitude, lng: delivery.longitude },
-                address: delivery.destination_address,
-                bairro: delivery.bairro,
-                city: delivery.city,
-                zipcode: delivery.zipcode,
-                deliveries: []
-            };
+        // Verificar se o endereço está cadastrado
+        const deliveryAddress = delivery.destination_address || '';
+        const normalized = normalizeAddressForComparison(deliveryAddress);
+        const registeredClient = registeredClientsByAddress.get(normalized);
+
+        if (registeredClient) {
+            // Endereço CADASTRADO: agrupar por cliente
+            if (!groupedByRegistered.has(registeredClient.id)) {
+                groupedByRegistered.set(registeredClient.id, {
+                    client: registeredClient,
+                    deliveries: []
+                });
+            }
+            groupedByRegistered.get(registeredClient.id).deliveries.push({
+                id: delivery.id,
+                spx_tn: delivery.spx_tn,
+                sequence: delivery.sequence,
+                destination_address: delivery.destination_address
+            });
+        } else {
+            // Endereço NÃO CADASTRADO: agrupar por coordenada da planilha
+            const coordKey = `${delivery.latitude.toFixed(6)},${delivery.longitude.toFixed(6)}`;
+            if (!groupedByUnregistered[coordKey]) {
+                groupedByUnregistered[coordKey] = {
+                    position: { lat: delivery.latitude, lng: delivery.longitude },
+                    address: delivery.destination_address,
+                    bairro: delivery.bairro,
+                    city: delivery.city,
+                    zipcode: delivery.zipcode,
+                    deliveries: []
+                };
+            }
+            groupedByUnregistered[coordKey].deliveries.push({
+                id: delivery.id,
+                spx_tn: delivery.spx_tn,
+                sequence: delivery.sequence || groupedByUnregistered[coordKey].deliveries.length + 1,
+                destination_address: delivery.destination_address
+            });
         }
-        groupedByLocation[coordKey].deliveries.push({
-            id: delivery.id,
-            spx_tn: delivery.spx_tn,
-            sequence: delivery.sequence || groupedByLocation[coordKey].deliveries.length + 1,
-            destination_address: delivery.destination_address
-        });
     });
 
     console.log(`📦 Total de entregas: ${deliveryData.length}`);
-    console.log(`📍 Locais únicos (paradas): ${Object.keys(groupedByLocation).length}`);
+    console.log(`✅ Clientes cadastrados com entregas: ${groupedByRegistered.size}`);
+    console.log(`❌ Locais não cadastrados: ${Object.keys(groupedByUnregistered).length}`);
 
-    let markerNumber = 1; // Contador para numeração sequencial
     const bounds = new google.maps.LatLngBounds();
+    let registeredMarkersCount = 0;
+    let unregisteredMarkersCount = 0;
 
-    // Criar um marcador para cada local único
-    Object.entries(groupedByLocation).forEach(([coordKey, locationData]) => {
-        const position = locationData.position;
-        const deliveryCount = locationData.deliveries.length;
+    // PASSO 5: Criar marcadores VERDES para clientes cadastrados (reutilizar marcadores existentes)
+    // PASSO 5: Criar marcadores VERDES para clientes cadastrados
+    groupedByRegistered.forEach((data, clientId) => {
+        const client = data.client;
+        const deliveries = data.deliveries;
+        const deliveryCount = deliveries.length;
+        const position = { lat: client.latitude, lng: client.longitude };
 
-        // Criar elemento do marcador com pin estilo Google Maps
+        console.log(`✅ Criando marcador verde para cliente: ${client.name} (${deliveryCount} entregas)`);
+
+        // Criar marcador VERDE estilo pin do Google Maps
         const markerDiv = document.createElement('div');
         markerDiv.style.cursor = 'pointer';
         markerDiv.style.transition = 'transform 0.2s';
 
-        // Criar imagem do pin com número de entregas
-        const pinImg = document.createElement('img');
-        pinImg.src = createPinSVG(deliveryCount);
+        // Pin verde
+        const pinImg = document.createElement('div');
         pinImg.style.width = '32px';
-        pinImg.style.height = '44px';
-        pinImg.style.display = 'block';
+        pinImg.style.height = '32px';
+        pinImg.style.background = '#4CAF50';
+        pinImg.style.border = '3px solid white';
+        pinImg.style.borderRadius = '50% 50% 50% 0';
+        pinImg.style.transform = 'rotate(-45deg)';
+        pinImg.style.boxShadow = '0 3px 6px rgba(0,0,0,0.4)';
+        pinImg.style.display = 'flex';
+        pinImg.style.alignItems = 'center';
+        pinImg.style.justifyContent = 'center';
 
+        const innerCircle = document.createElement('div');
+        innerCircle.style.width = '18px';
+        innerCircle.style.height = '18px';
+        innerCircle.style.background = 'white';
+        innerCircle.style.borderRadius = '50%';
+        innerCircle.style.transform = 'rotate(45deg)';
+        innerCircle.style.fontSize = '11px';
+        innerCircle.style.fontWeight = 'bold';
+        innerCircle.style.color = '#4CAF50';
+        innerCircle.style.display = 'flex';
+        innerCircle.style.alignItems = 'center';
+        innerCircle.style.justifyContent = 'center';
+        innerCircle.textContent = deliveryCount;
+
+        pinImg.appendChild(innerCircle);
         markerDiv.appendChild(pinImg);
 
         // Efeito hover
-        markerDiv.addEventListener('mouseenter', () => {
-            markerDiv.style.transform = 'scale(1.15)';
-        });
-        markerDiv.addEventListener('mouseleave', () => {
-            markerDiv.style.transform = 'scale(1)';
+        markerDiv.addEventListener('mouseenter', () => { markerDiv.style.transform = 'scale(1.2)'; });
+        markerDiv.addEventListener('mouseleave', () => { markerDiv.style.transform = 'scale(1)'; });
+
+        // Criar InfoWindow
+        const infoWindowContent = document.createElement('div');
+        infoWindowContent.style.padding = '12px';
+        infoWindowContent.style.maxWidth = '300px';
+        infoWindowContent.style.maxHeight = '400px';
+        infoWindowContent.style.overflowY = 'auto';
+
+        // Badge
+        const badgeDiv = document.createElement('div');
+        badgeDiv.style.background = '#4CAF50';
+        badgeDiv.style.color = 'white';
+        badgeDiv.style.padding = '4px 8px';
+        badgeDiv.style.borderRadius = '4px';
+        badgeDiv.style.fontSize = '11px';
+        badgeDiv.style.fontWeight = 'bold';
+        badgeDiv.style.marginBottom = '8px';
+        badgeDiv.style.display = 'inline-block';
+        badgeDiv.textContent = '✓ CLIENTE CADASTRADO';
+
+        // Nome
+        const nameDiv = document.createElement('div');
+        nameDiv.style.fontWeight = 'bold';
+        nameDiv.style.fontSize = '14px';
+        nameDiv.style.color = '#4CAF50';
+        nameDiv.style.marginBottom = '6px';
+        nameDiv.textContent = `👤 ${client.name}`;
+
+        // Telefone
+        const phoneDiv = document.createElement('div');
+        phoneDiv.style.fontSize = '12px';
+        phoneDiv.style.color = '#666';
+        phoneDiv.style.marginBottom = '4px';
+        phoneDiv.innerHTML = `📞 ${client.phone || 'Sem telefone'}`;
+
+        // Endereço
+        const addressDiv = document.createElement('div');
+        addressDiv.style.fontSize = '12px';
+        addressDiv.style.color = '#333';
+        addressDiv.style.lineHeight = '1.4';
+        addressDiv.style.marginBottom = '8px';
+        addressDiv.innerHTML = `📍 ${client.address.replace(/\n/g, '<br>')}`;
+
+        infoWindowContent.appendChild(badgeDiv);
+        infoWindowContent.appendChild(nameDiv);
+        infoWindowContent.appendChild(phoneDiv);
+        infoWindowContent.appendChild(addressDiv);
+
+        // Lista de entregas
+        const packagesTitle = document.createElement('div');
+        packagesTitle.style.fontWeight = 'bold';
+        packagesTitle.style.fontSize = '11px';
+        packagesTitle.style.color = '#666';
+        packagesTitle.style.marginTop = '8px';
+        packagesTitle.style.marginBottom = '6px';
+        packagesTitle.style.borderTop = '1px solid #eee';
+        packagesTitle.style.paddingTop = '8px';
+        packagesTitle.textContent = `📦 ${deliveryCount} pacote${deliveryCount > 1 ? 's' : ''} para entrega:`;
+        infoWindowContent.appendChild(packagesTitle);
+
+        deliveries.forEach((delivery, index) => {
+            const deliveryDiv = document.createElement('div');
+            deliveryDiv.style.fontSize = '11px';
+            deliveryDiv.style.color = '#333';
+            deliveryDiv.style.lineHeight = '1.4';
+            deliveryDiv.style.marginBottom = '4px';
+            deliveryDiv.style.paddingBottom = '4px';
+            deliveryDiv.style.paddingLeft = '8px';
+            if (index < deliveries.length - 1) deliveryDiv.style.borderBottom = '1px solid #eee';
+
+            const qrDiv = document.createElement('div');
+            qrDiv.style.display = 'flex';
+            qrDiv.style.justifyContent = 'space-between';
+            qrDiv.style.alignItems = 'center';
+            qrDiv.style.gap = '8px';
+
+            const sequenceSpan = document.createElement('span');
+            sequenceSpan.style.color = '#4CAF50';
+            sequenceSpan.style.fontWeight = 'bold';
+            sequenceSpan.textContent = `Ordem: ${delivery.sequence || (index + 1)}`;
+
+            const qrSpan = document.createElement('span');
+            qrSpan.style.fontSize = '10px';
+            qrSpan.style.color = '#666';
+            qrSpan.style.fontFamily = 'monospace';
+            qrSpan.textContent = delivery.spx_tn || 'N/A';
+
+            qrDiv.appendChild(sequenceSpan);
+            qrDiv.appendChild(qrSpan);
+            deliveryDiv.appendChild(qrDiv);
+            infoWindowContent.appendChild(deliveryDiv);
         });
 
-        // Criar InfoWindow customizada mostrando todas as entregas
+        // Botão de navegação
+        const navigateBtn = document.createElement('button');
+        navigateBtn.style.width = '100%';
+        navigateBtn.style.padding = '8px 12px';
+        navigateBtn.style.marginTop = '8px';
+        navigateBtn.style.background = '#4285f4';
+        navigateBtn.style.color = 'white';
+        navigateBtn.style.border = 'none';
+        navigateBtn.style.borderRadius = '6px';
+        navigateBtn.style.fontSize = '13px';
+        navigateBtn.style.fontWeight = 'bold';
+        navigateBtn.style.cursor = 'pointer';
+        navigateBtn.style.transition = 'background 0.2s';
+        navigateBtn.innerHTML = '🧭 Navegar até cliente';
+        navigateBtn.addEventListener('mouseenter', () => { navigateBtn.style.background = '#3367d6'; });
+        navigateBtn.addEventListener('mouseleave', () => { navigateBtn.style.background = '#4285f4'; });
+        navigateBtn.addEventListener('click', () => { navigateToClient(client); });
+        infoWindowContent.appendChild(navigateBtn);
+
+        const infoWindow = new google.maps.InfoWindow({
+            content: infoWindowContent,
+            maxWidth: 300,
+            disableAutoPan: true
+        });
+
+        try {
+            if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+                const marker = new google.maps.marker.AdvancedMarkerElement({
+                    map,
+                    position,
+                    content: markerDiv,
+                    title: client.name
+                });
+
+                marker.addListener('click', () => {
+                    if (currentInfoWindow) currentInfoWindow.close();
+                    infoWindow.open(map, marker);
+                    currentInfoWindow = infoWindow;
+                    map.panTo(position);
+                });
+
+                deliveryMarkers[`registered_${clientId}`] = marker;
+                registeredMarkersCount++;
+            } else {
+                const marker = new google.maps.Marker({
+                    map,
+                    position,
+                    title: client.name,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        fillColor: '#4CAF50',
+                        fillOpacity: 1,
+                        strokeColor: 'white',
+                        strokeWeight: 2,
+                        scale: 10
+                    }
+                });
+
+                marker.addListener('click', () => {
+                    if (currentInfoWindow) currentInfoWindow.close();
+                    infoWindow.open(map, marker);
+                    currentInfoWindow = infoWindow;
+                    map.panTo(position);
+                });
+
+                deliveryMarkers[`registered_${clientId}`] = marker;
+                registeredMarkersCount++;
+            }
+
+            bounds.extend(position);
+        } catch (error) {
+            console.error('Erro ao criar marcador verde:', error);
+        }
+    });
+
+    // PASSO 6: Criar marcadores VERMELHOS para endereços não cadastrados
+    Object.entries(groupedByUnregistered).forEach(([coordKey, locationData]) => {
+        const position = locationData.position;
+        const deliveryCount = locationData.deliveries.length;
+
+        console.log(`❌ Criando marcador vermelho para local não cadastrado: ${locationData.address} (${deliveryCount} entregas)`);
+
+        // Criar marcador vermelho
+        const markerDiv = document.createElement('div');
+        markerDiv.style.cursor = 'pointer';
+        markerDiv.style.transition = 'transform 0.2s';
+
+        const pinImg = document.createElement('img');
+        pinImg.src = createPinSVG(deliveryCount, '#EA4335');
+        pinImg.style.width = '32px';
+        pinImg.style.height = '44px';
+        pinImg.style.display = 'block';
+        markerDiv.appendChild(pinImg);
+
+        markerDiv.addEventListener('mouseenter', () => { markerDiv.style.transform = 'scale(1.15)'; });
+        markerDiv.addEventListener('mouseleave', () => { markerDiv.style.transform = 'scale(1)'; });
+
+        // Criar InfoWindow
         const infoWindowContent = document.createElement('div');
         infoWindowContent.style.padding = '8px';
         infoWindowContent.style.maxWidth = '250px';
@@ -3115,16 +3378,26 @@ async function addDeliveryMarkers() {
         closeBtn.style.lineHeight = '1';
         closeBtn.style.fontWeight = 'normal';
         closeBtn.title = 'Fechar';
-        closeBtn.addEventListener('click', () => {
-            infoWindow.close();
-            currentInfoWindow = null;
-        });
+        closeBtn.addEventListener('click', () => { infoWindow.close(); currentInfoWindow = null; });
 
         headerDiv.appendChild(titleDiv);
         headerDiv.appendChild(closeBtn);
         infoWindowContent.appendChild(headerDiv);
 
-        // Adicionar informações do endereço (parada)
+        // Badge de não cadastrado
+        const statusBadge = document.createElement('div');
+        statusBadge.style.background = '#FF9800';
+        statusBadge.style.color = 'white';
+        statusBadge.style.padding = '4px 8px';
+        statusBadge.style.borderRadius = '4px';
+        statusBadge.style.fontSize = '11px';
+        statusBadge.style.fontWeight = 'bold';
+        statusBadge.style.marginBottom = '8px';
+        statusBadge.style.display = 'inline-block';
+        statusBadge.textContent = '⚠ CLIENTE NÃO CADASTRADO';
+        infoWindowContent.appendChild(statusBadge);
+
+        // Endereço
         const addressInfoDiv = document.createElement('div');
         addressInfoDiv.style.fontSize = '12px';
         addressInfoDiv.style.color = '#333';
@@ -3137,11 +3410,10 @@ async function addDeliveryMarkers() {
         let fullAddress = locationData.address || '';
         if (locationData.bairro) fullAddress += `\nBairro: ${locationData.bairro}`;
         if (locationData.city && locationData.zipcode) fullAddress += `\n${locationData.city} - ${locationData.zipcode}`;
-
         addressInfoDiv.innerHTML = fullAddress.replace(/\n/g, '<br>');
         infoWindowContent.appendChild(addressInfoDiv);
 
-        // Título da lista de pacotes
+        // Lista de pacotes
         const packagesTitle = document.createElement('div');
         packagesTitle.style.fontWeight = 'bold';
         packagesTitle.style.fontSize = '11px';
@@ -3150,7 +3422,6 @@ async function addDeliveryMarkers() {
         packagesTitle.textContent = `${deliveryCount} pacote${deliveryCount > 1 ? 's' : ''} nesta parada:`;
         infoWindowContent.appendChild(packagesTitle);
 
-        // Adicionar cada pacote (QR code) à InfoWindow
         locationData.deliveries.forEach((delivery, index) => {
             const deliveryDiv = document.createElement('div');
             deliveryDiv.style.fontSize = '11px';
@@ -3159,12 +3430,8 @@ async function addDeliveryMarkers() {
             deliveryDiv.style.marginBottom = '4px';
             deliveryDiv.style.paddingBottom = '4px';
             deliveryDiv.style.paddingLeft = '8px';
+            if (index < locationData.deliveries.length - 1) deliveryDiv.style.borderBottom = '1px solid #eee';
 
-            if (index < locationData.deliveries.length - 1) {
-                deliveryDiv.style.borderBottom = '1px solid #eee';
-            }
-
-            // Linha com Ordem e Código QR
             const qrDiv = document.createElement('div');
             qrDiv.style.display = 'flex';
             qrDiv.style.justifyContent = 'space-between';
@@ -3184,7 +3451,6 @@ async function addDeliveryMarkers() {
 
             qrDiv.appendChild(sequenceSpan);
             qrDiv.appendChild(qrSpan);
-
             deliveryDiv.appendChild(qrDiv);
             infoWindowContent.appendChild(deliveryDiv);
         });
@@ -3203,16 +3469,9 @@ async function addDeliveryMarkers() {
         navigateBtn.style.cursor = 'pointer';
         navigateBtn.style.transition = 'background 0.2s';
         navigateBtn.innerHTML = '🧭 Navegar até este local';
-
-        navigateBtn.addEventListener('mouseenter', () => {
-            navigateBtn.style.background = '#3367d6';
-        });
-        navigateBtn.addEventListener('mouseleave', () => {
-            navigateBtn.style.background = '#4285f4';
-        });
-
+        navigateBtn.addEventListener('mouseenter', () => { navigateBtn.style.background = '#3367d6'; });
+        navigateBtn.addEventListener('mouseleave', () => { navigateBtn.style.background = '#4285f4'; });
         navigateBtn.addEventListener('click', () => {
-            // Criar objeto cliente compatível com navigateToClient
             const clientData = {
                 name: locationData.address || 'Cliente',
                 latitude: position.lat,
@@ -3221,7 +3480,6 @@ async function addDeliveryMarkers() {
             };
             navigateToClient(clientData);
         });
-
         infoWindowContent.appendChild(navigateBtn);
 
         const infoWindow = new google.maps.InfoWindow({
@@ -3231,7 +3489,6 @@ async function addDeliveryMarkers() {
         });
 
         try {
-            // Criar marcador usando AdvancedMarkerElement (preferencial)
             if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
                 const marker = new google.maps.marker.AdvancedMarkerElement({
                     map,
@@ -3240,111 +3497,70 @@ async function addDeliveryMarkers() {
                     title: `${deliveryCount} entrega${deliveryCount > 1 ? 's' : ''} neste local`
                 });
 
-                // Adicionar listener de clique no marcador
                 marker.addListener('click', () => {
-                    // Fechar InfoWindow anterior se existir
-                    if (currentInfoWindow) {
-                        currentInfoWindow.close();
-                    }
-
-                    // Salvar orientação atual ANTES de qualquer ação
+                    if (currentInfoWindow) currentInfoWindow.close();
                     const savedHeading = map.getHeading() || 0;
                     const savedTilt = map.getTilt() || 0;
-
-                    // Criar listeners temporários para TRAVAR rotação durante pan
                     const headingListener = map.addListener('heading_changed', () => {
-                        if (map.getHeading() !== savedHeading) {
-                            map.setHeading(savedHeading);
-                        }
+                        if (map.getHeading() !== savedHeading) map.setHeading(savedHeading);
                     });
-
                     const tiltListener = map.addListener('tilt_changed', () => {
-                        if (map.getTilt() !== savedTilt) {
-                            map.setTilt(savedTilt);
-                        }
+                        if (map.getTilt() !== savedTilt) map.setTilt(savedTilt);
                     });
-
-                    // Centralizar suavemente no marcador
                     map.panTo(position);
-
-                    // Abrir InfoWindow
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
-
-                    // Remover listeners após 500ms (tempo suficiente para completar o pan)
                     setTimeout(() => {
                         google.maps.event.removeListener(headingListener);
                         google.maps.event.removeListener(tiltListener);
                     }, 500);
                 });
 
-                // Armazenar o marcador com a chave da coordenada
                 deliveryMarkers[coordKey] = marker;
+                unregisteredMarkersCount++;
             } else {
-                // Fallback: usar Marker clássico com ícone SVG
                 const marker = new google.maps.Marker({
                     map,
                     position,
                     title: `${deliveryCount} entrega${deliveryCount > 1 ? 's' : ''} neste local`,
                     icon: {
-                        url: createPinSVG(deliveryCount),
+                        url: createPinSVG(deliveryCount, '#EA4335'),
                         scaledSize: new google.maps.Size(32, 44),
-                        anchor: new google.maps.Point(16, 44) // Ancorar na ponta do pin
+                        anchor: new google.maps.Point(16, 44)
                     }
                 });
 
-                // Adicionar listener de clique
                 marker.addListener('click', () => {
-                    // Fechar InfoWindow anterior se existir
-                    if (currentInfoWindow) {
-                        currentInfoWindow.close();
-                    }
-
-                    // Salvar orientação atual ANTES de qualquer ação
+                    if (currentInfoWindow) currentInfoWindow.close();
                     const savedHeading = map.getHeading() || 0;
                     const savedTilt = map.getTilt() || 0;
-
-                    // Criar listeners temporários para TRAVAR rotação durante pan
                     const headingListener = map.addListener('heading_changed', () => {
-                        if (map.getHeading() !== savedHeading) {
-                            map.setHeading(savedHeading);
-                        }
+                        if (map.getHeading() !== savedHeading) map.setHeading(savedHeading);
                     });
-
                     const tiltListener = map.addListener('tilt_changed', () => {
-                        if (map.getTilt() !== savedTilt) {
-                            map.setTilt(savedTilt);
-                        }
+                        if (map.getTilt() !== savedTilt) map.setTilt(savedTilt);
                     });
-
-                    // Centralizar suavemente no marcador
                     map.panTo(position);
-
-                    // Abrir InfoWindow
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
-
-                    // Remover listeners após 500ms (tempo suficiente para completar o pan)
                     setTimeout(() => {
                         google.maps.event.removeListener(headingListener);
                         google.maps.event.removeListener(tiltListener);
                     }, 500);
                 });
 
-                // Armazenar o marcador com a chave da coordenada
                 deliveryMarkers[coordKey] = marker;
+                unregisteredMarkersCount++;
             }
 
-            // Adicionar posição aos bounds
             bounds.extend(position);
-
-            markerNumber++; // Incrementar contador (não usado mais, mas mantido para compatibilidade)
         } catch (error) {
-            console.error('Erro ao criar marcador de entrega:', error);
+            console.error('Erro ao criar marcador vermelho:', error);
         }
     });
 
-    console.log(`✅ Total: ${Object.keys(deliveryMarkers).length} marcadores criados para ${Object.keys(addressDatabase).length} entregas`);
+    console.log(`✅ Total: ${registeredMarkersCount + unregisteredMarkersCount} marcadores criados`);
+    console.log(`✅ Cadastrados: ${registeredMarkersCount} (verde) | Não cadastrados: ${unregisteredMarkersCount} (vermelho)`);
 
     // Ajustar mapa para mostrar todos os marcadores
     if (!bounds.isEmpty()) {
@@ -3353,6 +3569,15 @@ async function addDeliveryMarkers() {
         });
         console.log('🗺️ Mapa ajustado para mostrar todos os marcadores');
     }
+
+    // Mostrar toast com estatísticas
+    const totalLocations = registeredMarkersCount + unregisteredMarkersCount;
+    showToast(
+        `📍 ${totalLocations} local${totalLocations > 1 ? 'is' : ''} de entrega`,
+        `✅ ${registeredMarkersCount} cadastrado${registeredMarkersCount !== 1 ? 's' : ''} (verde)\n❌ ${unregisteredMarkersCount} não cadastrado${unregisteredMarkersCount !== 1 ? 's' : ''} (vermelho)`,
+        'info',
+        6000
+    );
 }
 
 // ===========================
