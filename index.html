@@ -6436,11 +6436,10 @@ async function showMatchedClientMarkers() {
                     });
 
                     marker.addListener('click', () => {
+                        // Fechar InfoWindow anterior se existir
                         if (currentInfoWindow) {
                             currentInfoWindow.close();
                         }
-                        infoWindow.open(map, marker);
-                        currentInfoWindow = infoWindow;
 
                         // ✅ SOLUÇÃO DEFINITIVA: setCenter ao invés de panTo (SEM animação = SEM rotação)
                         const currentHeading = map.getHeading() || 0;
@@ -6456,6 +6455,10 @@ async function showMatchedClientMarkers() {
                         if (map.getTilt() !== currentTilt) {
                             map.setTilt(currentTilt);
                         }
+
+                        // Abrir InfoWindow DEPOIS de centralizar
+                        infoWindow.open(map, marker);
+                        currentInfoWindow = infoWindow;
                     });
 
                     matchedClientMarkers[client.id] = marker;
@@ -6476,11 +6479,10 @@ async function showMatchedClientMarkers() {
                     });
 
                     marker.addListener('click', () => {
+                        // Fechar InfoWindow anterior se existir
                         if (currentInfoWindow) {
                             currentInfoWindow.close();
                         }
-                        infoWindow.open(map, marker);
-                        currentInfoWindow = infoWindow;
 
                         // ✅ SOLUÇÃO DEFINITIVA: setCenter ao invés de panTo (SEM animação = SEM rotação)
                         const currentHeading = map.getHeading() || 0;
@@ -6496,6 +6498,10 @@ async function showMatchedClientMarkers() {
                         if (map.getTilt() !== currentTilt) {
                             map.setTilt(currentTilt);
                         }
+
+                        // Abrir InfoWindow DEPOIS de centralizar
+                        infoWindow.open(map, marker);
+                        currentInfoWindow = infoWindow;
                     });
 
                     matchedClientMarkers[client.id] = marker;
