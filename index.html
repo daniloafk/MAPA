@@ -4340,6 +4340,7 @@ let scannedQRCode = ''; // Armazena o código QR escaneado
 let scannedLatLng = null; // Armazena coordenadas do endereço escaneado
 
 // Popular lista de endereços da planilha do dia (Supabase) no select
+// Exibe apenas endereços NÃO cadastrados
 async function populateAddressSelect() {
     if (!selectAddressManual) return;
 
@@ -4367,8 +4368,38 @@ async function populateAddressSelect() {
             return;
         }
 
-        // Adicionar opções ao select
+        // Buscar clientes já cadastrados
+        const { data: clients, error: clientsError } = await supabase
+            .from('clients')
+            .select('address');
+
+        if (clientsError) {
+            console.warn('Erro ao buscar clientes:', clientsError);
+        }
+
+        // Criar Set de endereços já cadastrados (normalizados)
+        const registeredAddresses = new Set();
+        if (clients && clients.length > 0) {
+            clients.forEach(client => {
+                if (client.address) {
+                    // Normalizar: primeira linha, lowercase, sem espaços extras
+                    const firstLine = client.address.split('\n')[0].toLowerCase().trim();
+                    registeredAddresses.add(firstLine);
+                }
+            });
+        }
+
+        // Filtrar apenas endereços NÃO cadastrados
+        let addedCount = 0;
         deliveryData.forEach((item, index) => {
+            // Verificar se já está cadastrado
+            const addressFirstLine = (item.destination_address || '').split('\n')[0].toLowerCase().trim();
+
+            if (registeredAddresses.has(addressFirstLine)) {
+                // Endereço já cadastrado - pular
+                return;
+            }
+
             const option = document.createElement('option');
             option.value = item.spx_tn || item.id; // Código QR ou ID
 
@@ -4380,11 +4411,11 @@ async function populateAddressSelect() {
                 item.zipcode
             ].filter(Boolean).join('\n');
 
-            // Pegar primeira linha do endereço (geralmente rua e número)
-            const addressFirstLine = (item.destination_address || '').split('\n')[0].trim();
-            const shortAddress = addressFirstLine.length > 45
-                ? addressFirstLine.substring(0, 42) + '...'
-                : addressFirstLine;
+            // Pegar primeira linha do endereço para exibição
+            const displayAddress = (item.destination_address || '').split('\n')[0].trim();
+            const shortAddress = displayAddress.length > 45
+                ? displayAddress.substring(0, 42) + '...'
+                : displayAddress;
 
             // Usar sequence da planilha ou índice + 1
             const seq = item.sequence || (index + 1);
@@ -4396,9 +4427,19 @@ async function populateAddressSelect() {
             option.dataset.spxTn = item.spx_tn || '';
 
             selectAddressManual.appendChild(option);
+            addedCount++;
         });
 
-        console.log(`📋 ${deliveryData.length} endereços da planilha carregados no select`);
+        // Se todos já estão cadastrados
+        if (addedCount === 0) {
+            const optionAll = document.createElement('option');
+            optionAll.value = '';
+            optionAll.textContent = '✅ Todos os endereços já cadastrados';
+            optionAll.disabled = true;
+            selectAddressManual.appendChild(optionAll);
+        }
+
+        console.log(`📋 ${addedCount} endereços não cadastrados disponíveis (${deliveryData.length - addedCount} já cadastrados)`);
 
     } catch (err) {
         console.error('Erro ao popular select de endereços:', err);
