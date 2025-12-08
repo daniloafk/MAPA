@@ -3643,6 +3643,9 @@ window.initMap = function () {
         directionsRenderer = new google.maps.DirectionsRenderer({
             map: map,
             suppressMarkers: false, // Não suprimir marcadores (A, B, C, etc.)
+            // *** AJUSTE CRUCIAL: Impede o ajuste automático do zoom/viewport ***
+            // Isso evita que o mapa fique "bugado" afastando muito para mostrar toda a rota
+            preserveViewport: true,
             polylineOptions: {
                 strokeColor: '#4285f4',
                 strokeWeight: 5,
@@ -7051,11 +7054,10 @@ async function navigateToClient(client, marker = null, infoWindow = null) {
         // O DirectionsRenderer desenha automaticamente a linha azul e os marcadores
         const routeInfo = await calculateAndDisplayRoute(userPosition, destination, 'DRIVING');
 
-        // Ajustar mapa para mostrar toda a rota
-        const bounds = new google.maps.LatLngBounds();
-        bounds.extend(userPosition);
-        bounds.extend(destination);
-        map.fitBounds(bounds);
+        // *** AJUSTE GEMINI: Centralizar no usuário com zoom apropriado para navegação ***
+        // Em vez de fitBounds (que afasta muito), centraliza no usuário
+        map.setCenter(userPosition);
+        map.setZoom(17); // Zoom apertado ideal para início de navegação
 
         // Exibir informações da rota
         showToast(
@@ -7235,6 +7237,8 @@ function clearAllRoutesAndMarkers() {
         directionsRenderer = new google.maps.DirectionsRenderer({
             map: null, // Inicialmente sem mapa
             suppressMarkers: false,
+            // *** AJUSTE CRUCIAL: Impede o ajuste automático do zoom/viewport ***
+            preserveViewport: true,
             polylineOptions: {
                 strokeColor: '#4285f4',
                 strokeWeight: 5,
