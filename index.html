@@ -6291,6 +6291,13 @@ form.addEventListener('submit', async (e) => {
         // Atualizar lista de clientes no sidebar
         await loadClients();
 
+        // Se os marcadores de clientes estão visíveis, atualizar no mapa
+        if (clientsVisible) {
+            // Recarregar todos os marcadores para incluir o novo/atualizado
+            hideClientMarkers();
+            await showClientMarkers();
+        }
+
         closeModal();
 
     } catch (error) {
