@@ -7189,19 +7189,8 @@ function deactivateRouteMode() {
     btnToggleRoute.style.display = 'flex';
     document.getElementById('btnClearRoute').style.display = 'none';
 
-    // Limpar rota do mapa COMPLETAMENTE
-    if (directionsRenderer) {
-        directionsRenderer.setDirections({routes: []});
-        directionsRenderer.setMap(null);
-    }
-
-    // Limpar polylines (rotas em segmentos)
-    if (window.routePolylines) {
-        window.routePolylines.forEach(polyline => {
-            polyline.setMap(null);
-        });
-        window.routePolylines = [];
-    }
+    // Limpar rota do mapa COMPLETAMENTE usando função centralizada
+    clearRoute();
 
     // Remover marcadores de entrega
     Object.values(deliveryMarkers).forEach(marker => {
@@ -7237,49 +7226,25 @@ function clearAllRoutesAndMarkers() {
     document.getElementById('btnClearRoute').style.display = 'none';
     btnToggleRoute.style.display = 'flex';
 
-    // 1. Limpar DirectionsRenderer COMPLETAMENTE
-    if (directionsRenderer) {
-        console.log('🗑️ Limpando DirectionsRenderer...');
-        try {
-            directionsRenderer.setDirections({routes: []});
-            directionsRenderer.setMap(null);
-            directionsRenderer.setPanel(null);
-            // Recriar DirectionsRenderer limpo
-            directionsRenderer = new google.maps.DirectionsRenderer({
-                map: null, // Inicialmente sem mapa
-                suppressMarkers: false,
-                polylineOptions: {
-                    strokeColor: '#4285f4',
-                    strokeWeight: 5,
-                    strokeOpacity: 0.7
-                }
-            });
-        } catch (e) {
-            console.warn('Erro ao limpar DirectionsRenderer:', e);
-        }
-    }
+    // 1. Limpar rotas usando função centralizada
+    console.log('🗑️ Limpando rotas...');
+    clearRoute();
 
-    // 2. Limpar TODAS as polylines (array + verificação extra)
-    let polylinesRemoved = 0;
-
-    if (window.routePolylines && window.routePolylines.length > 0) {
-        console.log(`🗑️ Removendo ${window.routePolylines.length} polylines do array...`);
-        window.routePolylines.forEach(polyline => {
-            try {
-                if (polyline && polyline.setMap) {
-                    polyline.setMap(null);
-                    polylinesRemoved++;
-                }
-            } catch (e) {
-                console.warn('Erro ao remover polyline:', e);
+    // 2. Recriar DirectionsRenderer limpo para próximo uso
+    try {
+        directionsRenderer = new google.maps.DirectionsRenderer({
+            map: null, // Inicialmente sem mapa
+            suppressMarkers: false,
+            polylineOptions: {
+                strokeColor: '#4285f4',
+                strokeWeight: 5,
+                strokeOpacity: 0.7
             }
         });
-        window.routePolylines = [];
-    } else {
-        console.log('🗑️ Nenhuma polyline encontrada no array');
+        console.log('✅ DirectionsRenderer recriado');
+    } catch (e) {
+        console.warn('Erro ao recriar DirectionsRenderer:', e);
     }
-
-    console.log(`✅ ${polylinesRemoved} polylines removidas`);
 
     // 3. Remover TODOS os marcadores de entrega
     const markerCount = Object.keys(deliveryMarkers).length;
@@ -7630,25 +7595,8 @@ async function renderFleetRoute(fleetResult, origin, deliveryPoints) {
 async function drawRouteInSegments(allPoints, totalDeliveries) {
     console.log(`🔵 Desenhando rota com ${allPoints.length} pontos totais`);
 
-    // PASSO 1: Limpar TODAS as rotas anteriores COMPLETAMENTE
-    if (directionsRenderer) {
-        directionsRenderer.setMap(null);
-    }
-
-    // PASSO 2: Limpar polylines antigas se existirem
-    if (window.routePolylines && window.routePolylines.length > 0) {
-        console.log(`🗑️ Removendo ${window.routePolylines.length} polylines antigas antes de desenhar...`);
-        window.routePolylines.forEach(polyline => {
-            try {
-                polyline.setMap(null);
-            } catch (e) {
-                console.warn('Erro ao remover polyline antiga:', e);
-            }
-        });
-    }
-
-    // PASSO 3: Resetar array de polylines
-    window.routePolylines = [];
+    // PASSO 1: Limpar TODAS as rotas anteriores usando função centralizada
+    clearRoute();
 
     // Dividir pontos em segmentos de até 25 (origem + 23 waypoints + destino)
     const segments = [];
@@ -9060,15 +9008,8 @@ async function clearSpreadsheetData() {
         });
         deliveryMarkers = {};
 
-        // Limpar rotas
-        if (directionsRenderer) {
-            directionsRenderer.setDirections({routes: []});
-            directionsRenderer.setMap(null);
-        }
-        if (window.routePolylines) {
-            window.routePolylines.forEach(polyline => polyline.setMap(null));
-            window.routePolylines = [];
-        }
+        // Limpar rotas usando função centralizada
+        clearRoute();
 
         // Voltar botão para modo upload
         setButtonToUploadMode();
@@ -9246,18 +9187,12 @@ async function processSpreadsheetData(jsonData) {
             console.warn('Erro ao limpar delivery_data (talvez a tabela não exista ainda):', deleteDeliveryError);
         }
 
-        // 2. Limpar rotas existentes
+        // 2. Limpar rotas existentes usando função centralizada
         if (typeof currentRoute !== 'undefined' && currentRoute) {
             currentRoute.setMap(null);
             currentRoute = null;
         }
-        if (typeof directionsRenderer !== 'undefined' && directionsRenderer) {
-            directionsRenderer.setMap(null);
-        }
-        if (typeof window.routePolylines !== 'undefined' && window.routePolylines) {
-            window.routePolylines.forEach(polyline => polyline.setMap(null));
-            window.routePolylines = [];
-        }
+        clearRoute();
 
         // 3. Processar dados da planilha
         const deliveryDataRecords = [];
