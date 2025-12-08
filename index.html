@@ -3000,6 +3000,9 @@ class GPSTracker {
         const markerDiv = document.createElement('div');
         markerDiv.className = 'location-marker active';
 
+        // Guardar referência ao elemento do marcador para contra-rotação
+        this.markerElement = markerDiv;
+
         if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
             this.marker = new google.maps.marker.AdvancedMarkerElement({
                 map: map,
@@ -3027,6 +3030,24 @@ class GPSTracker {
         userLocationMarker = this.marker;
         locationAccuracy = this.accuracy;
         markerCoords = this.markerCoords;
+
+        // Listener para contra-rotacionar o marcador quando o mapa gira
+        // Mantém o marcador sempre na posição fixa (não gira com o mapa)
+        this.headingListener = map.addListener('heading_changed', () => {
+            this.counterRotateMarker();
+        });
+
+        // Aplicar contra-rotação inicial
+        this.counterRotateMarker();
+    }
+
+    // Contra-rotaciona o marcador para manter orientação fixa
+    counterRotateMarker() {
+        if (!this.markerElement) return;
+
+        const heading = map.getHeading() || 0;
+        // Aplicar rotação inversa ao heading do mapa
+        this.markerElement.style.transform = `translate(-50%, -50%) rotate(${-heading}deg)`;
     }
 
     startWatching(options) {
@@ -3260,6 +3281,12 @@ class GPSTracker {
             navigator.geolocation.clearWatch(this.watchId);
             this.watchId = null;
             watchId = null;
+        }
+
+        // Remover listener de heading
+        if (this.headingListener) {
+            google.maps.event.removeListener(this.headingListener);
+            this.headingListener = null;
         }
     }
 
