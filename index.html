@@ -244,39 +244,59 @@
     }
 
     /* ===========================
-       MARCADOR DA LOCALIZAÇÃO
+       MARCADOR DA LOCALIZAÇÃO (Estilo Google Maps)
        =========================== */
     .location-marker {
-        width: 20px;
-        height: 20px;
-        background: var(--primary-color);
-        border: 3px solid white;
-        border-radius: 50%;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
         position: relative;
+        width: 22px;
+        height: 22px;
         transform: translate(-50%, -50%);
     }
 
+    /* Anel de precisão/accuracy (círculo azul claro pulsante) */
+    .location-marker::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80px;
+        height: 80px;
+        background: rgba(66, 133, 244, 0.15);
+        border-radius: 50%;
+        z-index: 1;
+    }
+
+    /* Bolinha azul principal (estilo Google Maps) */
     .location-marker::after {
         content: '';
         position: absolute;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        width: 8px;
-        height: 8px;
-        background: white;
+        width: 18px;
+        height: 18px;
+        background: #4285F4;
+        border: 3px solid white;
         border-radius: 50%;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+        z-index: 3;
     }
 
+    /* Animação do anel de precisão */
     @keyframes pulse {
-        0% { box-shadow: 0 0 0 0 rgba(66,133,244,0.7); }
-        70% { box-shadow: 0 0 0 10px rgba(66,133,244,0); }
-        100% { box-shadow: 0 0 0 0 rgba(66,133,244,0); }
+        0% {
+            transform: translate(-50%, -50%) scale(0.5);
+            opacity: 1;
+        }
+        100% {
+            transform: translate(-50%, -50%) scale(1.2);
+            opacity: 0.4;
+        }
     }
 
-    .location-marker.active {
-        animation: pulse 2s infinite;
+    .location-marker.active::before {
+        animation: pulse 2s ease-out infinite;
     }
 
     /* ===========================
