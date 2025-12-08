@@ -6,9 +6,6 @@
 <title>Mapa de Clientes - Google Maps</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📍</text></svg>">
 
-<!-- Material Icons - Biblioteca oficial do Google -->
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-
 <style>
     :root {
         --primary-color: #4285f4;
@@ -1690,43 +1687,6 @@
     .gm-ui-hover-effect {
         display: none !important;
     }
-
-    /* ===========================
-       BOTÃO MINHA LOCALIZAÇÃO (Custom Control - Estilo Google Maps)
-       =========================== */
-    .custom-my-location-button {
-        background-color: #fff;
-        border: 0;
-        border-radius: 2px;
-        box-shadow: 0 1px 4px -1px rgba(0, 0, 0, 0.3);
-        margin: 10px;
-        padding: 0;
-        width: 40px;
-        height: 40px;
-        cursor: pointer;
-        text-align: center;
-        /* Garante que o ícone se alinhe */
-        line-height: 40px;
-        transition: background-color 0.2s ease;
-    }
-
-    .custom-my-location-button:hover {
-        background-color: #f5f5f5;
-    }
-
-    .custom-my-location-button:active {
-        background-color: #e0e0e0;
-    }
-
-    .custom-my-location-button.active {
-        background-color: #e8f0fe;
-    }
-
-    /* Material Icons dentro do botão */
-    .custom-my-location-button .material-icons {
-        font-size: 24px;
-        vertical-align: middle;
-    }
 </style>
 </head>
 <body>
@@ -3400,110 +3360,6 @@ function updateStatus(text, active = true) {
 }
 
 // ===========================
-// BOTÃO MINHA LOCALIZAÇÃO (Custom Control - Padrão Google Maps)
-// ===========================
-
-/**
- * Adiciona um controle customizado de "Minha Localização" ao mapa.
- * Implementação seguindo as diretrizes oficiais do Google Maps API.
- * Usando Material Icons para fidelidade visual com Google Maps original.
- *
- * @param {google.maps.Map} map O objeto Google Map.
- */
-function addMyLocationControl(map) {
-    // 1. Cria o elemento div para o botão
-    const locationButton = document.createElement("div");
-    locationButton.className = "custom-my-location-button";
-    locationButton.title = "Minha Localização";
-
-    // Cria o elemento i para o Material Icon
-    const iconElement = document.createElement("i");
-    iconElement.className = "material-icons";
-    iconElement.style.color = "#757575"; // Cor cinza (padrão do Google Maps)
-    iconElement.textContent = "my_location"; // Nome do Ícone: my_location
-    locationButton.appendChild(iconElement);
-
-    // Variável para rastrear estado de seguimento
-    let isFollowingLocation = false;
-
-    // 2. Define o que acontece ao clicar no botão
-    locationButton.addEventListener("click", () => {
-        // Verifica se o navegador suporta a Geolocation API
-        if (navigator.geolocation) {
-            // Se já tem marcador de localização, centraliza nele
-            if (userLocationMarker && markerCoords && markerCoords.lat !== 0) {
-                map.setCenter(markerCoords);
-                map.setZoom(17);
-
-                // Ativar modo de seguimento - mudar cor do ícone para azul
-                isFollowingLocation = true;
-                locationButton.classList.add('active');
-                iconElement.style.color = "#4285F4"; // Azul Google quando ativo
-
-                showToast('📍 Localização', 'Mapa centralizado na sua posição', 'info', 2000);
-            } else {
-                // Ainda não tem localização, solicitar uma nova
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const pos = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude,
-                        };
-
-                        // Centraliza o mapa na localização do usuário
-                        map.setCenter(pos);
-                        map.setZoom(17);
-
-                        // Ativar modo de seguimento - mudar cor do ícone para azul
-                        isFollowingLocation = true;
-                        locationButton.classList.add('active');
-                        iconElement.style.color = "#4285F4"; // Azul Google quando ativo
-
-                        showToast('📍 Localização', 'Posição encontrada', 'success', 2000);
-                    },
-                    (error) => {
-                        // Função de erro (se o usuário negar ou se houver um problema)
-                        handleLocationError(true, error);
-                    },
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 0
-                    }
-                );
-            }
-        } else {
-            // O navegador não suporta Geolocation
-            handleLocationError(false, null);
-        }
-    });
-
-    // Desativar seguimento quando o usuário arrastar o mapa
-    map.addListener('dragstart', () => {
-        if (isFollowingLocation) {
-            isFollowingLocation = false;
-            locationButton.classList.remove('active');
-            iconElement.style.color = "#757575"; // Voltar para cinza quando inativo
-        }
-    });
-
-    // 3. Adiciona o botão à posição do mapa (RIGHT_BOTTOM como padrão Google Maps)
-    map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(locationButton);
-}
-
-/**
- * Função para lidar com erros de localização
- */
-function handleLocationError(browserHasGeolocation, error) {
-    const errorMessage = browserHasGeolocation
-        ? `Erro: O serviço de geolocalização falhou. ${error ? error.message : ''}`
-        : "Erro: Seu navegador não suporta geolocalização.";
-
-    showToast('❌ Erro de Localização', errorMessage, 'error', 5000);
-    console.error('Erro de geolocalização:', errorMessage);
-}
-
-// ===========================
 // INICIALIZAÇÃO DO MAPA
 // ===========================
 
@@ -3530,8 +3386,16 @@ window.initMap = function () {
             maxZoom: 22 // Zoom máximo detalhado
         });
 
-        // Adicionar botão customizado "Minha Localização" (padrão Google Maps)
-        addMyLocationControl(map);
+        // Ativar o marcador azul nativo do Google Maps (My Location)
+        if (navigator.geolocation) {
+            // Ativar controle de localização
+            map.setOptions({
+                zoomControl: true,
+                zoomControlOptions: {
+                    position: google.maps.ControlPosition.RIGHT_CENTER
+                }
+            });
+        }
 
         // Inicializar serviços de rota
         directionsService = new google.maps.DirectionsService();
@@ -3580,36 +3444,8 @@ window.initMap = function () {
 // RASTREAMENTO EM TEMPO REAL
 // ===========================
 
-// Diagnóstico detalhado da Geolocation API
-function runGeolocationDiagnostics() {
-    console.log('🔍 [DIAGNÓSTICO] Verificando Geolocation API...');
-
-    // Verificar suporte à Geolocation API
-    if ('geolocation' in navigator) {
-        console.log('✅ Geolocation API suportada');
-
-        // Testar se consegue obter posição
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                console.log('✅ GPS funcionando!');
-                console.log(`📍 Lat: ${pos.coords.latitude}`);
-                console.log(`📍 Lng: ${pos.coords.longitude}`);
-                console.log(`🎯 Precisão: ${pos.coords.accuracy}m`);
-            },
-            (error) => {
-                console.error('❌ Erro GPS:', error.message);
-            }
-        );
-    } else {
-        console.error('❌ Geolocation API NÃO suportada');
-    }
-}
-
 async function startLocationTracking() {
     console.log('✅ [MODULAR] Iniciando GPS Tracker...');
-
-    // Executar diagnóstico antes de iniciar o rastreamento
-    runGeolocationDiagnostics();
 
     try {
         // Criar instância do GPS Tracker modular
