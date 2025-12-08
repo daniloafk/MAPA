@@ -2635,6 +2635,101 @@ let navigationMode = {
     followInterval: null
 };
 
+// ===========================
+// SENSORES DO DISPOSITIVO (Bússola e Orientação)
+// ===========================
+let deviceSensors = {
+    compassHeading: null,       // Direção da bússola (0-360)
+    hasCompass: false,          // Se dispositivo tem bússola
+    isListening: false,         // Se está ouvindo eventos
+    lastAlpha: null,            // Último valor alpha
+    calibrated: false           // Se bússola foi calibrada
+};
+
+// Iniciar sensores do dispositivo
+async function startDeviceSensors() {
+    if (deviceSensors.isListening) return;
+
+    // Verificar se DeviceOrientationEvent está disponível
+    if (!window.DeviceOrientationEvent) {
+        console.warn('⚠️ DeviceOrientationEvent não suportado');
+        return false;
+    }
+
+    // Para iOS 13+, precisa solicitar permissão
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+            const permission = await DeviceOrientationEvent.requestPermission();
+            if (permission !== 'granted') {
+                console.warn('⚠️ Permissão de orientação negada');
+                return false;
+            }
+        } catch (error) {
+            console.error('Erro ao solicitar permissão:', error);
+            return false;
+        }
+    }
+
+    // Adicionar listener para orientação do dispositivo
+    window.addEventListener('deviceorientationabsolute', handleDeviceOrientation, true);
+    window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+
+    deviceSensors.isListening = true;
+    deviceSensors.hasCompass = true;
+    console.log('🧭 Sensores do dispositivo ativados');
+
+    return true;
+}
+
+// Parar sensores do dispositivo
+function stopDeviceSensors() {
+    if (!deviceSensors.isListening) return;
+
+    window.removeEventListener('deviceorientationabsolute', handleDeviceOrientation, true);
+    window.removeEventListener('deviceorientation', handleDeviceOrientation, true);
+
+    deviceSensors.isListening = false;
+    console.log('🧭 Sensores do dispositivo desativados');
+}
+
+// Handler para eventos de orientação do dispositivo
+function handleDeviceOrientation(event) {
+    let heading = null;
+
+    // webkitCompassHeading é mais preciso em iOS
+    if (event.webkitCompassHeading !== undefined) {
+        heading = event.webkitCompassHeading;
+        deviceSensors.calibrated = true;
+    }
+    // Para Android e outros, usar alpha
+    else if (event.alpha !== null) {
+        // Alpha é relativo, precisamos ajustar
+        // Se absolute é true, alpha é a direção magnética
+        if (event.absolute === true) {
+            heading = 360 - event.alpha;
+        } else {
+            // Fallback: usar alpha diretamente (pode precisar calibração)
+            heading = 360 - event.alpha;
+        }
+        deviceSensors.calibrated = event.absolute === true;
+    }
+
+    if (heading !== null) {
+        // Suavizar a leitura da bússola
+        if (deviceSensors.compassHeading !== null) {
+            let diff = heading - deviceSensors.compassHeading;
+            // Normalizar diferença
+            if (diff > 180) diff -= 360;
+            if (diff < -180) diff += 360;
+            // Aplicar suavização
+            deviceSensors.compassHeading = (deviceSensors.compassHeading + diff * 0.3 + 360) % 360;
+        } else {
+            deviceSensors.compassHeading = heading;
+        }
+        deviceSensors.hasCompass = true;
+    }
+}
+
 // Calcular heading (direção) entre duas posições
 function calculateHeading(from, to) {
     const lat1 = from.lat * Math.PI / 180;
@@ -2667,7 +2762,7 @@ function calculateDistanceMeters(from, to) {
 }
 
 // Iniciar modo de navegação
-function startNavigationMode(destination, destinationName, marker = null, infoWindow = null) {
+async function startNavigationMode(destination, destinationName, marker = null, infoWindow = null) {
     navigationMode.active = true;
     navigationMode.destination = destination;
     navigationMode.destinationName = destinationName;
@@ -2676,6 +2771,12 @@ function startNavigationMode(destination, destinationName, marker = null, infoWi
     navigationMode.lastPosition = null;
 
     console.log('🧭 Modo de navegação iniciado:', destinationName);
+
+    // Iniciar sensores do dispositivo (bússola)
+    const sensorsStarted = await startDeviceSensors();
+    if (sensorsStarted) {
+        console.log('🧭 Bússola ativada para navegação');
+    }
 
     // Fechar InfoWindow atual
     if (currentInfoWindow) {
@@ -2696,9 +2797,10 @@ function startNavigationMode(destination, destinationName, marker = null, infoWi
     }
 
     // Mostrar toast informativo
+    const compassMsg = sensorsStarted ? ' (bússola ativa)' : '';
     showToast(
         '🧭 Navegação ativa',
-        'O mapa seguirá seu veículo automaticamente',
+        `O mapa seguirá seu veículo${compassMsg}`,
         'info',
         4000
     );
@@ -2723,6 +2825,9 @@ function stopNavigationMode() {
         clearInterval(navigationMode.followInterval);
         navigationMode.followInterval = null;
     }
+
+    // Parar sensores do dispositivo
+    stopDeviceSensors();
 
     // Esconder botão de parar navegação
     const btnStopNav = document.getElementById('btnStopNavigation');
@@ -2822,16 +2927,16 @@ function updateNavigationView() {
         return;
     }
 
-    // Calcular heading baseado na direção do movimento
-    let heading = navigationMode.lastHeading;
+    // Determinar heading: usar bússola se disponível, senão calcular pelo movimento
+    let movementHeading = navigationMode.lastHeading;
 
     if (navigationMode.lastPosition) {
         const movementDistance = calculateDistanceMeters(navigationMode.lastPosition, currentPos);
 
-        // Só atualizar heading se houve movimento significativo (> 3 metros)
+        // Só atualizar heading pelo movimento se houve movimento significativo (> 3 metros)
         if (movementDistance > 3) {
-            heading = calculateHeading(navigationMode.lastPosition, currentPos);
-            navigationMode.lastHeading = heading;
+            movementHeading = calculateHeading(navigationMode.lastPosition, currentPos);
+            navigationMode.lastHeading = movementHeading;
         }
     }
 
@@ -2839,28 +2944,41 @@ function updateNavigationView() {
 
     // Atualizar mapa: centralizar e rotacionar
     if (map) {
-        // Calcular heading para o destino
-        const headingToDestination = calculateHeading(currentPos, navigationMode.destination);
+        // Usar bússola para rotação se disponível (mais precisa e responsiva)
+        let mapRotation;
+        if (deviceSensors.hasCompass && deviceSensors.compassHeading !== null) {
+            // Bússola disponível - usar direção do dispositivo
+            // Rotacionar mapa para que o norte fique sempre na direção que o celular aponta
+            mapRotation = deviceSensors.compassHeading;
+        } else {
+            // Sem bússola - usar direção calculada para o destino
+            mapRotation = calculateHeading(currentPos, navigationMode.destination);
+        }
 
         // Usar setHeading se disponível (requer tilt > 0 para funcionar)
         if (map.setHeading) {
             // Suavizar a rotação
             const currentMapHeading = map.getHeading() || 0;
-            let diff = headingToDestination - currentMapHeading;
+            let diff = mapRotation - currentMapHeading;
 
             // Normalizar diferença para -180 a 180
             if (diff > 180) diff -= 360;
             if (diff < -180) diff += 360;
 
-            // Aplicar rotação suavizada
-            const newHeading = currentMapHeading + diff * 0.3;
+            // Aplicar rotação suavizada (mais suave com bússola)
+            const smoothFactor = deviceSensors.hasCompass ? 0.15 : 0.3;
+            const newHeading = currentMapHeading + diff * smoothFactor;
             map.setHeading(newHeading);
         }
 
         // Calcular ponto de centro deslocado para frente (para celular em pé)
-        // Isso faz o marcador GPS ficar na parte inferior da tela, mostrando mais do caminho à frente
+        // Usar direção da bússola ou do destino para o deslocamento
+        const headingForOffset = deviceSensors.hasCompass && deviceSensors.compassHeading !== null
+            ? deviceSensors.compassHeading
+            : calculateHeading(currentPos, navigationMode.destination);
+
         const offsetDistance = 0.0003; // Aproximadamente 30 metros de deslocamento
-        const headingRad = headingToDestination * Math.PI / 180;
+        const headingRad = headingForOffset * Math.PI / 180;
 
         const offsetCenter = {
             lat: currentPos.lat + offsetDistance * Math.cos(headingRad),
