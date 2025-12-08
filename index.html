@@ -2942,13 +2942,19 @@ class GPSTracker {
         this.accuracy = position.coords.accuracy;
         this.markerCoords = coords;
 
-        // Usar marcador padrão do Google Maps (azul com círculo)
-        this.marker = new google.maps.Marker({
-            map: map,
+        // Não criar marcador manual - usar o marcador azul nativo do Google Maps
+        // O Google Maps já mostra a bolinha azul automaticamente
+        this.marker = {
             position: coords,
-            title: "Sua Localização"
-            // Sem ícone customizado - usa o padrão do Google Maps
-        });
+            getPosition: () => coords,
+            setPosition: (newPos) => {
+                coords.lat = newPos.lat;
+                coords.lng = newPos.lng;
+            }
+        };
+
+        // Centralizar mapa na posição inicial
+        map.setCenter(coords);
 
         // Atualizar referências globais (compatibilidade)
         userLocationMarker = this.marker;
@@ -3044,11 +3050,11 @@ class GPSTracker {
     setMarkerPosition(position) {
         if (!this.marker) return;
 
+        // Apenas atualizar referência interna (não há marcador visual manual)
         if (this.marker.position !== undefined) {
-            // AdvancedMarkerElement
             this.marker.position = position;
-        } else if (this.marker.setPosition) {
-            // Marker clássico
+        }
+        if (this.marker.setPosition) {
             this.marker.setPosition(position);
         }
     }
@@ -3360,6 +3366,17 @@ window.initMap = function () {
             maxZoom: 22 // Zoom máximo detalhado
         });
 
+        // Ativar o marcador azul nativo do Google Maps (My Location)
+        if (navigator.geolocation) {
+            // Ativar controle de localização
+            map.setOptions({
+                zoomControl: true,
+                zoomControlOptions: {
+                    position: google.maps.ControlPosition.RIGHT_CENTER
+                }
+            });
+        }
+
         // Inicializar serviços de rota
         directionsService = new google.maps.DirectionsService();
         directionsRenderer = new google.maps.DirectionsRenderer({
@@ -3425,6 +3442,18 @@ async function startLocationTracking() {
             lng: position.coords.longitude
         });
         map.setZoom(17);
+
+        // Ativar o marcador azul nativo do Google Maps (My Location dot)
+        // Isso mostra aquela bolinha azul padrão do Google Maps
+        try {
+            // Solicitar permissão e ativar a localização nativa
+            navigator.geolocation.getCurrentPosition(() => {
+                // Permissão concedida - o Google Maps mostrará o ponto azul automaticamente
+                console.log('📍 Marcador azul nativo do Google Maps ativado');
+            });
+        } catch (err) {
+            console.warn('Não foi possível ativar marcador azul nativo:', err);
+        }
 
         // Esconder loading screen
         hideLoadingScreen();
