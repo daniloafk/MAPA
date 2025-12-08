@@ -250,12 +250,10 @@
         position: relative;
         width: 22px;
         height: 22px;
-        transform: translate(-50%, -50%);
     }
 
     /* Anel de precisão/accuracy (círculo azul claro pulsante) */
-    .location-marker::before {
-        content: '';
+    .location-marker-pulse {
         position: absolute;
         top: 50%;
         left: 50%;
@@ -268,8 +266,7 @@
     }
 
     /* Bolinha azul principal (estilo Google Maps) */
-    .location-marker::after {
-        content: '';
+    .location-marker-dot {
         position: absolute;
         top: 50%;
         left: 50%;
@@ -295,7 +292,7 @@
         }
     }
 
-    .location-marker.active::before {
+    .location-marker.active .location-marker-pulse {
         animation: pulse 2s ease-out infinite;
     }
 
@@ -2997,11 +2994,24 @@ class GPSTracker {
         this.accuracy = position.coords.accuracy;
         this.markerCoords = coords;
 
+        // Container principal do marcador
         const markerDiv = document.createElement('div');
         markerDiv.className = 'location-marker active';
 
-        // Guardar referência ao elemento do marcador para contra-rotação
+        // Anel de precisão (pulso)
+        const pulseDiv = document.createElement('div');
+        pulseDiv.className = 'location-marker-pulse';
+        markerDiv.appendChild(pulseDiv);
+
+        // Bolinha azul central
+        const dotDiv = document.createElement('div');
+        dotDiv.className = 'location-marker-dot';
+        markerDiv.appendChild(dotDiv);
+
+        // Guardar referências para contra-rotação
         this.markerElement = markerDiv;
+        this.pulseElement = pulseDiv;
+        this.dotElement = dotDiv;
 
         if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
             this.marker = new google.maps.marker.AdvancedMarkerElement({
@@ -3043,11 +3053,12 @@ class GPSTracker {
 
     // Contra-rotaciona o marcador para manter orientação fixa
     counterRotateMarker() {
-        if (!this.markerElement) return;
+        if (!this.pulseElement || !this.dotElement) return;
 
         const heading = map.getHeading() || 0;
-        // Aplicar rotação inversa ao heading do mapa
-        this.markerElement.style.transform = `translate(-50%, -50%) rotate(${-heading}deg)`;
+        // Aplicar rotação inversa aos elementos internos
+        this.pulseElement.style.transform = `translate(-50%, -50%) rotate(${-heading}deg)`;
+        this.dotElement.style.transform = `translate(-50%, -50%) rotate(${-heading}deg)`;
     }
 
     startWatching(options) {
