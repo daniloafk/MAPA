@@ -243,6 +243,41 @@
         color: transparent;
     }
 
+    /* ===========================
+       MARCADOR DA LOCALIZAÇÃO
+       =========================== */
+    .location-marker {
+        width: 20px;
+        height: 20px;
+        background: var(--primary-color);
+        border: 3px solid white;
+        border-radius: 50%;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        position: relative;
+        transform: translate(-50%, -50%);
+    }
+
+    .location-marker::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 8px;
+        height: 8px;
+        background: white;
+        border-radius: 50%;
+    }
+
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(66,133,244,0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(66,133,244,0); }
+        100% { box-shadow: 0 0 0 0 rgba(66,133,244,0); }
+    }
+
+    .location-marker.active {
+        animation: pulse 2s infinite;
+    }
 
     /* ===========================
        SISTEMA DE NOTIFICAÇÕES
@@ -2942,37 +2977,31 @@ class GPSTracker {
         this.accuracy = position.coords.accuracy;
         this.markerCoords = coords;
 
-        // Criar marcador com estilo da bolinha azul do Google Maps
-        this.marker = new google.maps.Marker({
-            map: map,
-            position: coords,
-            icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 7,
-                fillColor: '#4285F4',
-                fillOpacity: 1,
-                strokeColor: '#FFFFFF',
-                strokeWeight: 2.5
-            },
-            zIndex: 1000,
-            optimized: true
-        });
+        const markerDiv = document.createElement('div');
+        markerDiv.className = 'location-marker active';
 
-        // Criar círculo de precisão (halo azul claro ao redor)
-        this.accuracyCircle = new google.maps.Circle({
-            map: map,
-            center: coords,
-            radius: position.coords.accuracy,
-            fillColor: '#4285F4',
-            fillOpacity: 0.15,
-            strokeColor: '#4285F4',
-            strokeOpacity: 0.3,
-            strokeWeight: 1,
-            zIndex: 999
-        });
-
-        // Centralizar mapa na posição inicial
-        map.setCenter(coords);
+        if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+            this.marker = new google.maps.marker.AdvancedMarkerElement({
+                map: map,
+                position: coords,
+                content: markerDiv,
+                title: "Sua Localização"
+            });
+        } else {
+            this.marker = new google.maps.Marker({
+                map: map,
+                position: coords,
+                title: "Sua Localização",
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 8,
+                    fillColor: "#4285f4",
+                    fillOpacity: 1,
+                    strokeColor: "white",
+                    strokeWeight: 3
+                }
+            });
+        }
 
         // Atualizar referências globais (compatibilidade)
         userLocationMarker = this.marker;
@@ -3068,14 +3097,12 @@ class GPSTracker {
     setMarkerPosition(position) {
         if (!this.marker) return;
 
-        // Atualizar posição do marcador
-        if (this.marker.setPosition) {
+        if (this.marker.position !== undefined) {
+            // AdvancedMarkerElement
+            this.marker.position = position;
+        } else if (this.marker.setPosition) {
+            // Marker clássico
             this.marker.setPosition(position);
-        }
-
-        // Atualizar círculo de precisão
-        if (this.accuracyCircle && this.accuracyCircle.setCenter) {
-            this.accuracyCircle.setCenter(position);
         }
     }
 
@@ -3386,17 +3413,6 @@ window.initMap = function () {
             maxZoom: 22 // Zoom máximo detalhado
         });
 
-        // Ativar o marcador azul nativo do Google Maps (My Location)
-        if (navigator.geolocation) {
-            // Ativar controle de localização
-            map.setOptions({
-                zoomControl: true,
-                zoomControlOptions: {
-                    position: google.maps.ControlPosition.RIGHT_CENTER
-                }
-            });
-        }
-
         // Inicializar serviços de rota
         directionsService = new google.maps.DirectionsService();
         directionsRenderer = new google.maps.DirectionsRenderer({
@@ -3462,18 +3478,6 @@ async function startLocationTracking() {
             lng: position.coords.longitude
         });
         map.setZoom(17);
-
-        // Ativar o marcador azul nativo do Google Maps (My Location dot)
-        // Isso mostra aquela bolinha azul padrão do Google Maps
-        try {
-            // Solicitar permissão e ativar a localização nativa
-            navigator.geolocation.getCurrentPosition(() => {
-                // Permissão concedida - o Google Maps mostrará o ponto azul automaticamente
-                console.log('📍 Marcador azul nativo do Google Maps ativado');
-            });
-        } catch (err) {
-            console.warn('Não foi possível ativar marcador azul nativo:', err);
-        }
 
         // Esconder loading screen
         hideLoadingScreen();
