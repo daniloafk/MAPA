@@ -2629,8 +2629,7 @@ if (!window.routePolylines) {
 }
 
 // ===========================
-// MODO DE NAVEGAÇÃO EM TEMPO REAL (Padrão Google Gemini)
-// Usa watchPosition para atualizações contínuas e position.coords.heading para rotação
+// MODO DE NAVEGAÇÃO EM TEMPO REAL
 // ===========================
 let navigationMode = {
     active: false,
@@ -2640,8 +2639,7 @@ let navigationMode = {
     destinationInfoWindow: null,
     lastHeading: 0,
     lastPosition: null,
-    watchId: null,           // ID do watchPosition para navegação
-    isRouteDrawn: false      // Flag para desenhar a rota apenas uma vez
+    followInterval: null
 };
 
 // ===========================
@@ -2771,22 +2769,16 @@ function calculateDistanceMeters(from, to) {
     return R * c;
 }
 
-// **********************************************
-// FUNÇÃO CRUCIAL: Iniciar Navegação em Tempo Real (Padrão Gemini)
-// Usa watchPosition para atualizações contínuas e position.coords.heading
-// **********************************************
+// Iniciar modo de navegação
 function startNavigationMode(destination, destinationName, marker = null, infoWindow = null) {
-    // Configurar estado de navegação
     navigationMode.active = true;
     navigationMode.destination = destination;
     navigationMode.destinationName = destinationName;
     navigationMode.destinationMarker = marker;
     navigationMode.destinationInfoWindow = infoWindow;
     navigationMode.lastPosition = null;
-    navigationMode.lastHeading = 0;
-    navigationMode.isRouteDrawn = true; // Rota já foi desenhada pela função navigateToClient
 
-    console.log('🧭 [GEMINI] Modo de navegação iniciado:', destinationName);
+    console.log('🧭 Modo de navegação iniciado:', destinationName);
 
     // Fechar InfoWindow atual
     if (currentInfoWindow) {
@@ -2809,162 +2801,30 @@ function startNavigationMode(destination, destinationName, marker = null, infoWi
     // Mostrar toast informativo
     showToast(
         '🧭 Navegação ativa',
-        'O mapa seguirá seu veículo e girará automaticamente',
+        'O mapa seguirá seu veículo automaticamente',
         'info',
         4000
     );
 
-    // Parar watchPosition anterior se existir
-    if (navigationMode.watchId !== null) {
-        navigator.geolocation.clearWatch(navigationMode.watchId);
-        navigationMode.watchId = null;
+    // Iniciar acompanhamento
+    if (navigationMode.followInterval) {
+        clearInterval(navigationMode.followInterval);
     }
 
-    // **********************************************
-    // GEMINI: Usa watchPosition para atualizações contínuas
-    // **********************************************
-    if (navigator.geolocation) {
-        navigationMode.watchId = navigator.geolocation.watchPosition(
-            (position) => {
-                const pos = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude,
-                };
-
-                // *** 1. OBTENÇÃO DA DIREÇÃO (HEADING) DO GPS ***
-                // position.coords.heading retorna a direção em graus (0 a 360)
-                let heading = position.coords.heading;
-
-                // Se heading não disponível do GPS, calcular baseado no movimento
-                if (heading === null || heading === undefined || isNaN(heading)) {
-                    if (navigationMode.lastPosition) {
-                        const movementDistance = calculateDistanceMeters(navigationMode.lastPosition, pos);
-                        if (movementDistance > 2) {
-                            heading = calculateHeading(navigationMode.lastPosition, pos);
-                        } else {
-                            heading = navigationMode.lastHeading;
-                        }
-                    } else {
-                        // Primeira posição - usar direção para o destino
-                        heading = calculateHeading(pos, destination);
-                    }
-                }
-
-                // Suavizar transição do heading
-                if (navigationMode.lastHeading !== 0 && heading !== navigationMode.lastHeading) {
-                    let diff = heading - navigationMode.lastHeading;
-                    if (diff > 180) diff -= 360;
-                    if (diff < -180) diff += 360;
-                    heading = (navigationMode.lastHeading + diff * 0.3 + 360) % 360;
-                }
-
-                navigationMode.lastHeading = heading;
-                navigationMode.lastPosition = pos;
-
-                // *** 2. VERIFICAR SE CHEGOU AO DESTINO ***
-                const distanceToDestination = calculateDistanceMeters(pos, destination);
-                if (distanceToDestination < 30) {
-                    handleArrivalAtDestination();
-                    return;
-                }
-
-                // *** 3. ATUALIZAR O MAPA E O MARCADOR ***
-                if (map) {
-                    // Centraliza o mapa no usuário
-                    map.setCenter(pos);
-
-                    // Zoom apertado para navegação (nível 17)
-                    const currentZoom = map.getZoom();
-                    if (currentZoom < 17) {
-                        map.setZoom(17);
-                    }
-
-                    // *** 4. ROTAÇÃO DO MAPA (map.setHeading) ***
-                    // Isso faz o mapa girar na direção do movimento
-                    if (map.setHeading && heading !== null && heading !== undefined && !isNaN(heading)) {
-                        // Suavizar rotação do mapa
-                        const currentMapHeading = map.getHeading() || 0;
-                        let diff = heading - currentMapHeading;
-                        if (diff > 180) diff -= 360;
-                        if (diff < -180) diff += 360;
-                        const newMapHeading = currentMapHeading + diff * 0.2;
-                        map.setHeading(newMapHeading);
-                    }
-
-                    // *** 5. INCLINAR MAPA PARA VISTA 3D (Opcional) ***
-                    if (map.setTilt && map.getTilt() < 45) {
-                        map.setTilt(45);
-                    }
-                }
-
-                // Atualizar marcador do usuário se existir
-                if (userLocationMarker && userLocationMarker.setPosition) {
-                    userLocationMarker.setPosition(pos);
-                }
-
-                console.log(`🧭 Navegação: heading=${heading?.toFixed(0)}° | distância=${distanceToDestination.toFixed(0)}m`);
-            },
-            (error) => {
-                console.error("❌ Erro no monitoramento de localização:", error);
-                showToast('❌ Erro GPS', error.message, 'error', 3000);
-            },
-            // Opções para alta precisão (Gemini)
-            {
-                enableHighAccuracy: true,
-                maximumAge: 0,
-                timeout: 5000
-            }
-        );
-
-        console.log('📍 watchPosition iniciado com ID:', navigationMode.watchId);
-    } else {
-        showToast('❌ Erro', 'Seu navegador não suporta monitoramento de geolocalização', 'error', 5000);
-    }
+    navigationMode.followInterval = setInterval(() => {
+        updateNavigationView();
+    }, 200); // Atualizar a cada 200ms para acompanhar em tempo real
 }
 
-// Função auxiliar para tratar chegada ao destino
-function handleArrivalAtDestination() {
-    const arrivedMarker = navigationMode.destinationMarker;
-    const arrivedInfoWindow = navigationMode.destinationInfoWindow;
-    const arrivedDestination = navigationMode.destination;
-    const arrivedName = navigationMode.destinationName;
-
-    showToast(
-        '🎉 Você chegou!',
-        `Destino: ${arrivedName}`,
-        'success',
-        5000
-    );
-
-    stopNavigationMode();
-
-    // Reabrir InfoWindow do destino após pequeno delay
-    setTimeout(() => {
-        if (arrivedInfoWindow && arrivedMarker) {
-            if (arrivedDestination) {
-                map.panTo(arrivedDestination);
-                map.setZoom(18);
-            }
-            arrivedInfoWindow.open(map, arrivedMarker);
-            currentInfoWindow = arrivedInfoWindow;
-        }
-    }, 500);
-}
-
-// **********************************************
-// Parar modo de navegação (Gemini)
-// **********************************************
+// Parar modo de navegação
 function stopNavigationMode() {
     navigationMode.active = false;
     navigationMode.destination = null;
     navigationMode.destinationName = '';
-    navigationMode.isRouteDrawn = false;
 
-    // *** CRUCIAL: Parar o watchPosition ***
-    if (navigationMode.watchId !== null) {
-        navigator.geolocation.clearWatch(navigationMode.watchId);
-        console.log('📍 watchPosition parado, ID:', navigationMode.watchId);
-        navigationMode.watchId = null;
+    if (navigationMode.followInterval) {
+        clearInterval(navigationMode.followInterval);
+        navigationMode.followInterval = null;
     }
 
     // Esconder botão de parar navegação
@@ -2992,7 +2852,7 @@ function stopNavigationMode() {
         }
     }
 
-    console.log('🛑 [GEMINI] Modo de navegação encerrado');
+    console.log('🛑 Modo de navegação encerrado');
 
     showToast(
         '🛑 Navegação encerrada',
@@ -3000,6 +2860,140 @@ function stopNavigationMode() {
         'info',
         3000
     );
+}
+
+// Atualizar visualização durante navegação
+function updateNavigationView() {
+    if (!navigationMode.active || !navigationMode.destination) return;
+
+    // Obter posição atual do GPS
+    let currentPos = null;
+    if (gpsTracker && gpsTracker.marker) {
+        const pos = gpsTracker.marker.position || (gpsTracker.marker.getPosition && gpsTracker.marker.getPosition());
+        if (pos) {
+            currentPos = { lat: pos.lat, lng: pos.lng };
+        }
+    } else if (userLocationMarker) {
+        const pos = userLocationMarker.position || (userLocationMarker.getPosition && userLocationMarker.getPosition());
+        if (pos) {
+            currentPos = { lat: pos.lat, lng: pos.lng };
+        }
+    }
+
+    if (!currentPos) return;
+
+    // Calcular distância até o destino
+    const distanceToDestination = calculateDistanceMeters(currentPos, navigationMode.destination);
+
+    // Verificar se chegou ao destino (< 30 metros)
+    if (distanceToDestination < 30) {
+        // Salvar referências antes de parar navegação
+        const arrivedMarker = navigationMode.destinationMarker;
+        const arrivedInfoWindow = navigationMode.destinationInfoWindow;
+        const arrivedDestination = navigationMode.destination;
+
+        showToast(
+            '🎉 Você chegou!',
+            `Destino: ${navigationMode.destinationName}`,
+            'success',
+            5000
+        );
+
+        stopNavigationMode();
+
+        // Reabrir InfoWindow do destino após pequeno delay
+        setTimeout(() => {
+            if (arrivedInfoWindow && arrivedMarker) {
+                // Centralizar no destino
+                if (arrivedDestination) {
+                    map.panTo(arrivedDestination);
+                    map.setZoom(18);
+                }
+                // Abrir InfoWindow
+                arrivedInfoWindow.open(map, arrivedMarker);
+                currentInfoWindow = arrivedInfoWindow;
+            }
+        }, 500);
+
+        return;
+    }
+
+    // Calcular heading baseado na direção do MOVIMENTO do veículo
+    // Isso faz o mapa girar conforme o veículo faz curvas
+    let movementHeading = navigationMode.lastHeading;
+
+    if (navigationMode.lastPosition) {
+        const movementDistance = calculateDistanceMeters(navigationMode.lastPosition, currentPos);
+
+        // Atualizar heading se houve movimento significativo (> 2 metros)
+        if (movementDistance > 2) {
+            const newHeading = calculateHeading(navigationMode.lastPosition, currentPos);
+
+            // Suavizar a transição do heading para evitar saltos bruscos
+            if (movementHeading !== 0) {
+                let diff = newHeading - movementHeading;
+                // Normalizar diferença
+                if (diff > 180) diff -= 360;
+                if (diff < -180) diff += 360;
+                // Aplicar suavização
+                movementHeading = (movementHeading + diff * 0.5 + 360) % 360;
+            } else {
+                movementHeading = newHeading;
+            }
+
+            navigationMode.lastHeading = movementHeading;
+        }
+    } else {
+        // Primeira posição - usar direção para o destino como inicial
+        movementHeading = calculateHeading(currentPos, navigationMode.destination);
+        navigationMode.lastHeading = movementHeading;
+    }
+
+    navigationMode.lastPosition = currentPos;
+
+    // Atualizar mapa: centralizar e rotacionar na direção do movimento
+    if (map) {
+        // Usar setHeading para rotacionar o mapa na direção do movimento
+        if (map.setHeading) {
+            // Suavizar a rotação do mapa
+            const currentMapHeading = map.getHeading() || 0;
+            let diff = movementHeading - currentMapHeading;
+
+            // Normalizar diferença para -180 a 180
+            if (diff > 180) diff -= 360;
+            if (diff < -180) diff += 360;
+
+            // Aplicar rotação suavizada (mais suave para curvas naturais)
+            const newMapHeading = currentMapHeading + diff * 0.2;
+            map.setHeading(newMapHeading);
+        }
+
+        // Calcular ponto de centro deslocado para frente (para celular em pé)
+        // Usar a direção do MOVIMENTO para o deslocamento
+        const offsetDistance = 0.0004; // Aproximadamente 40 metros de deslocamento
+        const headingRad = movementHeading * Math.PI / 180;
+
+        const offsetCenter = {
+            lat: currentPos.lat + offsetDistance * Math.cos(headingRad),
+            lng: currentPos.lng + offsetDistance * Math.sin(headingRad)
+        };
+
+        // Centralizar no ponto deslocado (GPS fica na parte inferior da tela)
+        map.panTo(offsetCenter);
+
+        // Manter zoom apropriado para navegação
+        const currentZoom = map.getZoom();
+        if (currentZoom < 17) {
+            map.setZoom(17);
+        } else if (currentZoom > 19) {
+            map.setZoom(18);
+        }
+
+        // Inclinar mapa para vista de navegação 3D (se suportado)
+        if (map.setTilt && map.getTilt() === 0) {
+            map.setTilt(45);
+        }
+    }
 }
 
 // Loop de animação Tween.js (sincronizado com requestAnimationFrame)
@@ -3649,9 +3643,6 @@ window.initMap = function () {
         directionsRenderer = new google.maps.DirectionsRenderer({
             map: map,
             suppressMarkers: false, // Não suprimir marcadores (A, B, C, etc.)
-            // *** AJUSTE CRUCIAL: Impede o ajuste automático do zoom/viewport ***
-            // Isso evita que o mapa fique "bugado" afastando muito para mostrar toda a rota
-            preserveViewport: true,
             polylineOptions: {
                 strokeColor: '#4285f4',
                 strokeWeight: 5,
@@ -6291,13 +6282,6 @@ form.addEventListener('submit', async (e) => {
         // Atualizar lista de clientes no sidebar
         await loadClients();
 
-        // Se os marcadores de clientes estão visíveis, atualizar no mapa
-        if (clientsVisible) {
-            // Recarregar todos os marcadores para incluir o novo/atualizado
-            hideClientMarkers();
-            await showClientMarkers();
-        }
-
         closeModal();
 
     } catch (error) {
@@ -7067,10 +7051,11 @@ async function navigateToClient(client, marker = null, infoWindow = null) {
         // O DirectionsRenderer desenha automaticamente a linha azul e os marcadores
         const routeInfo = await calculateAndDisplayRoute(userPosition, destination, 'DRIVING');
 
-        // *** AJUSTE GEMINI: Centralizar no usuário com zoom apropriado para navegação ***
-        // Em vez de fitBounds (que afasta muito), centraliza no usuário
-        map.setCenter(userPosition);
-        map.setZoom(17); // Zoom apertado ideal para início de navegação
+        // Ajustar mapa para mostrar toda a rota
+        const bounds = new google.maps.LatLngBounds();
+        bounds.extend(userPosition);
+        bounds.extend(destination);
+        map.fitBounds(bounds);
 
         // Exibir informações da rota
         showToast(
@@ -7204,8 +7189,19 @@ function deactivateRouteMode() {
     btnToggleRoute.style.display = 'flex';
     document.getElementById('btnClearRoute').style.display = 'none';
 
-    // Limpar rota do mapa COMPLETAMENTE usando função centralizada
-    clearRoute();
+    // Limpar rota do mapa COMPLETAMENTE
+    if (directionsRenderer) {
+        directionsRenderer.setDirections({routes: []});
+        directionsRenderer.setMap(null);
+    }
+
+    // Limpar polylines (rotas em segmentos)
+    if (window.routePolylines) {
+        window.routePolylines.forEach(polyline => {
+            polyline.setMap(null);
+        });
+        window.routePolylines = [];
+    }
 
     // Remover marcadores de entrega
     Object.values(deliveryMarkers).forEach(marker => {
@@ -7241,27 +7237,49 @@ function clearAllRoutesAndMarkers() {
     document.getElementById('btnClearRoute').style.display = 'none';
     btnToggleRoute.style.display = 'flex';
 
-    // 1. Limpar rotas usando função centralizada
-    console.log('🗑️ Limpando rotas...');
-    clearRoute();
+    // 1. Limpar DirectionsRenderer COMPLETAMENTE
+    if (directionsRenderer) {
+        console.log('🗑️ Limpando DirectionsRenderer...');
+        try {
+            directionsRenderer.setDirections({routes: []});
+            directionsRenderer.setMap(null);
+            directionsRenderer.setPanel(null);
+            // Recriar DirectionsRenderer limpo
+            directionsRenderer = new google.maps.DirectionsRenderer({
+                map: null, // Inicialmente sem mapa
+                suppressMarkers: false,
+                polylineOptions: {
+                    strokeColor: '#4285f4',
+                    strokeWeight: 5,
+                    strokeOpacity: 0.7
+                }
+            });
+        } catch (e) {
+            console.warn('Erro ao limpar DirectionsRenderer:', e);
+        }
+    }
 
-    // 2. Recriar DirectionsRenderer limpo para próximo uso
-    try {
-        directionsRenderer = new google.maps.DirectionsRenderer({
-            map: null, // Inicialmente sem mapa
-            suppressMarkers: false,
-            // *** AJUSTE CRUCIAL: Impede o ajuste automático do zoom/viewport ***
-            preserveViewport: true,
-            polylineOptions: {
-                strokeColor: '#4285f4',
-                strokeWeight: 5,
-                strokeOpacity: 0.7
+    // 2. Limpar TODAS as polylines (array + verificação extra)
+    let polylinesRemoved = 0;
+
+    if (window.routePolylines && window.routePolylines.length > 0) {
+        console.log(`🗑️ Removendo ${window.routePolylines.length} polylines do array...`);
+        window.routePolylines.forEach(polyline => {
+            try {
+                if (polyline && polyline.setMap) {
+                    polyline.setMap(null);
+                    polylinesRemoved++;
+                }
+            } catch (e) {
+                console.warn('Erro ao remover polyline:', e);
             }
         });
-        console.log('✅ DirectionsRenderer recriado');
-    } catch (e) {
-        console.warn('Erro ao recriar DirectionsRenderer:', e);
+        window.routePolylines = [];
+    } else {
+        console.log('🗑️ Nenhuma polyline encontrada no array');
     }
+
+    console.log(`✅ ${polylinesRemoved} polylines removidas`);
 
     // 3. Remover TODOS os marcadores de entrega
     const markerCount = Object.keys(deliveryMarkers).length;
@@ -7612,8 +7630,25 @@ async function renderFleetRoute(fleetResult, origin, deliveryPoints) {
 async function drawRouteInSegments(allPoints, totalDeliveries) {
     console.log(`🔵 Desenhando rota com ${allPoints.length} pontos totais`);
 
-    // PASSO 1: Limpar TODAS as rotas anteriores usando função centralizada
-    clearRoute();
+    // PASSO 1: Limpar TODAS as rotas anteriores COMPLETAMENTE
+    if (directionsRenderer) {
+        directionsRenderer.setMap(null);
+    }
+
+    // PASSO 2: Limpar polylines antigas se existirem
+    if (window.routePolylines && window.routePolylines.length > 0) {
+        console.log(`🗑️ Removendo ${window.routePolylines.length} polylines antigas antes de desenhar...`);
+        window.routePolylines.forEach(polyline => {
+            try {
+                polyline.setMap(null);
+            } catch (e) {
+                console.warn('Erro ao remover polyline antiga:', e);
+            }
+        });
+    }
+
+    // PASSO 3: Resetar array de polylines
+    window.routePolylines = [];
 
     // Dividir pontos em segmentos de até 25 (origem + 23 waypoints + destino)
     const segments = [];
@@ -9025,8 +9060,15 @@ async function clearSpreadsheetData() {
         });
         deliveryMarkers = {};
 
-        // Limpar rotas usando função centralizada
-        clearRoute();
+        // Limpar rotas
+        if (directionsRenderer) {
+            directionsRenderer.setDirections({routes: []});
+            directionsRenderer.setMap(null);
+        }
+        if (window.routePolylines) {
+            window.routePolylines.forEach(polyline => polyline.setMap(null));
+            window.routePolylines = [];
+        }
 
         // Voltar botão para modo upload
         setButtonToUploadMode();
@@ -9204,12 +9246,18 @@ async function processSpreadsheetData(jsonData) {
             console.warn('Erro ao limpar delivery_data (talvez a tabela não exista ainda):', deleteDeliveryError);
         }
 
-        // 2. Limpar rotas existentes usando função centralizada
+        // 2. Limpar rotas existentes
         if (typeof currentRoute !== 'undefined' && currentRoute) {
             currentRoute.setMap(null);
             currentRoute = null;
         }
-        clearRoute();
+        if (typeof directionsRenderer !== 'undefined' && directionsRenderer) {
+            directionsRenderer.setMap(null);
+        }
+        if (typeof window.routePolylines !== 'undefined' && window.routePolylines) {
+            window.routePolylines.forEach(polyline => polyline.setMap(null));
+            window.routePolylines = [];
+        }
 
         // 3. Processar dados da planilha
         const deliveryDataRecords = [];
