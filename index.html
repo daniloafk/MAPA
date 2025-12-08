@@ -1687,6 +1687,49 @@
     .gm-ui-hover-effect {
         display: none !important;
     }
+
+    /* ===========================
+       BOTÃO MINHA LOCALIZAÇÃO (Custom Control - Estilo Google Maps)
+       =========================== */
+    .custom-my-location-button {
+        background-color: #fff;
+        border: 0;
+        border-radius: 2px;
+        box-shadow: 0 1px 4px -1px rgba(0, 0, 0, 0.3);
+        margin: 10px;
+        padding: 0;
+        width: 40px;
+        height: 40px;
+        cursor: pointer;
+        text-align: center;
+        transition: background-color 0.2s ease;
+    }
+
+    .custom-my-location-button:hover {
+        background-color: #f5f5f5;
+    }
+
+    .custom-my-location-button:active {
+        background-color: #e0e0e0;
+    }
+
+    .custom-my-location-button.active {
+        background-color: #e8f0fe;
+    }
+
+    .custom-my-location-icon {
+        width: 24px;
+        height: 24px;
+        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23757575"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.1-3.3-7.46-7.23-8.82L12 1h-1v2.18C7.36 4.54 4.5 7.9 4.06 12H1v1h3.06c.44 3.93 3.3 7.29 7.23 8.65V23h1v-2.18c3.93-1.36 6.79-4.72 7.23-8.65H23v-1h-3.06zM12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>');
+        background-repeat: no-repeat;
+        background-position: center;
+        margin-top: 8px;
+        display: inline-block;
+    }
+
+    .custom-my-location-icon.tracking {
+        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%234285F4"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.1-3.3-7.46-7.23-8.82L12 1h-1v2.18C7.36 4.54 4.5 7.9 4.06 12H1v1h3.06c.44 3.93 3.3 7.29 7.23 8.65V23h1v-2.18c3.93-1.36 6.79-4.72 7.23-8.65H23v-1h-3.06zM12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>');
+    }
 </style>
 </head>
 <body>
@@ -3360,6 +3403,106 @@ function updateStatus(text, active = true) {
 }
 
 // ===========================
+// BOTÃO MINHA LOCALIZAÇÃO (Custom Control - Padrão Google Maps)
+// ===========================
+
+/**
+ * Adiciona um controle customizado de "Minha Localização" ao mapa.
+ * Implementação seguindo as diretrizes oficiais do Google Maps API.
+ *
+ * @param {google.maps.Map} map O objeto Google Map.
+ */
+function addMyLocationControl(map) {
+    // 1. Cria o elemento div para o botão
+    const locationButton = document.createElement("div");
+    locationButton.className = "custom-my-location-button";
+    locationButton.title = "Minha Localização";
+
+    const iconSpan = document.createElement("span");
+    iconSpan.className = "custom-my-location-icon";
+    locationButton.appendChild(iconSpan);
+
+    // Variável para rastrear estado de seguimento
+    let isFollowingLocation = false;
+
+    // 2. Define o que acontece ao clicar no botão
+    locationButton.addEventListener("click", () => {
+        // Verifica se o navegador suporta a Geolocation API
+        if (navigator.geolocation) {
+            // Se já tem marcador de localização, centraliza nele
+            if (userLocationMarker && markerCoords && markerCoords.lat !== 0) {
+                map.setCenter(markerCoords);
+                map.setZoom(17);
+
+                // Ativar modo de seguimento
+                isFollowingLocation = true;
+                locationButton.classList.add('active');
+                iconSpan.classList.add('tracking');
+
+                showToast('📍 Localização', 'Mapa centralizado na sua posição', 'info', 2000);
+            } else {
+                // Ainda não tem localização, solicitar uma nova
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const pos = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                        };
+
+                        // Centraliza o mapa na localização do usuário
+                        map.setCenter(pos);
+                        map.setZoom(17);
+
+                        // Ativar modo de seguimento
+                        isFollowingLocation = true;
+                        locationButton.classList.add('active');
+                        iconSpan.classList.add('tracking');
+
+                        showToast('📍 Localização', 'Posição encontrada', 'success', 2000);
+                    },
+                    (error) => {
+                        // Função de erro (se o usuário negar ou se houver um problema)
+                        handleLocationError(true, error);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
+            }
+        } else {
+            // O navegador não suporta Geolocation
+            handleLocationError(false, null);
+        }
+    });
+
+    // Desativar seguimento quando o usuário arrastar o mapa
+    map.addListener('dragstart', () => {
+        if (isFollowingLocation) {
+            isFollowingLocation = false;
+            locationButton.classList.remove('active');
+            iconSpan.classList.remove('tracking');
+        }
+    });
+
+    // 3. Adiciona o botão à posição do mapa (RIGHT_BOTTOM como padrão Google Maps)
+    map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(locationButton);
+}
+
+/**
+ * Função para lidar com erros de localização
+ */
+function handleLocationError(browserHasGeolocation, error) {
+    const errorMessage = browserHasGeolocation
+        ? `Erro: O serviço de geolocalização falhou. ${error ? error.message : ''}`
+        : "Erro: Seu navegador não suporta geolocalização.";
+
+    showToast('❌ Erro de Localização', errorMessage, 'error', 5000);
+    console.error('Erro de geolocalização:', errorMessage);
+}
+
+// ===========================
 // INICIALIZAÇÃO DO MAPA
 // ===========================
 
@@ -3386,16 +3529,8 @@ window.initMap = function () {
             maxZoom: 22 // Zoom máximo detalhado
         });
 
-        // Ativar o marcador azul nativo do Google Maps (My Location)
-        if (navigator.geolocation) {
-            // Ativar controle de localização
-            map.setOptions({
-                zoomControl: true,
-                zoomControlOptions: {
-                    position: google.maps.ControlPosition.RIGHT_CENTER
-                }
-            });
-        }
+        // Adicionar botão customizado "Minha Localização" (padrão Google Maps)
+        addMyLocationControl(map);
 
         // Inicializar serviços de rota
         directionsService = new google.maps.DirectionsService();
