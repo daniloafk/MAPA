@@ -2839,11 +2839,7 @@ function updateNavigationView() {
 
     // Atualizar mapa: centralizar e rotacionar
     if (map) {
-        // Centralizar no GPS com suavidade
-        map.panTo(currentPos);
-
-        // Rotacionar mapa na direção do movimento (heading)
-        // O mapa deve apontar na direção do destino a partir da posição atual
+        // Calcular heading para o destino
         const headingToDestination = calculateHeading(currentPos, navigationMode.destination);
 
         // Usar setHeading se disponível (requer tilt > 0 para funcionar)
@@ -2860,6 +2856,19 @@ function updateNavigationView() {
             const newHeading = currentMapHeading + diff * 0.3;
             map.setHeading(newHeading);
         }
+
+        // Calcular ponto de centro deslocado para frente (para celular em pé)
+        // Isso faz o marcador GPS ficar na parte inferior da tela, mostrando mais do caminho à frente
+        const offsetDistance = 0.0003; // Aproximadamente 30 metros de deslocamento
+        const headingRad = headingToDestination * Math.PI / 180;
+
+        const offsetCenter = {
+            lat: currentPos.lat + offsetDistance * Math.cos(headingRad),
+            lng: currentPos.lng + offsetDistance * Math.sin(headingRad)
+        };
+
+        // Centralizar no ponto deslocado (GPS fica na parte inferior da tela)
+        map.panTo(offsetCenter);
 
         // Manter zoom apropriado para navegação
         const currentZoom = map.getZoom();
