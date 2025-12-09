@@ -2713,6 +2713,7 @@ let navigationMode = {
 // Marcar interação do usuário durante navegação (helper function)
 function markUserInteraction() {
     if (navigationMode.active) {
+        console.log('✋ Usuário interagindo - pausando controle automático');
         navigationMode.userInteracting = true;
         navigationMode.lastUserInteraction = Date.now();
 
@@ -3117,8 +3118,10 @@ function updateNavigationView() {
         if (map.setTilt && map.getTilt() === 0) {
             map.setTilt(45);
         }
+    } else if (navigationMode.userInteracting) {
+        // DEBUG: Mostrar que estamos respeitando a interação do usuário
+        console.log('✋ Usuário está controlando o mapa - não interferindo');
     }
-    // Se usuário estiver interagindo, não fazer nada (deixar ele controlar o mapa)
 }
 
 // Loop de animação Tween.js (sincronizado com requestAnimationFrame)
