@@ -3098,32 +3098,29 @@ function updateNavigationView() {
     }
 
     // Calcular heading baseado na direção do MOVIMENTO do veículo
-    // Isso faz o mapa girar conforme o veículo faz curvas
-    let movementHeading = navigationMode.lastHeading;
+    let movementHeading = navigationMode.lastHeading || 0;
 
     if (navigationMode.lastPosition) {
         const movementDistance = calculateDistanceMeters(navigationMode.lastPosition, currentPos);
 
-        // Atualizar heading se houve movimento significativo (> 2 metros)
-        if (movementDistance > 2) {
+        // SÓ atualizar heading se houve movimento SIGNIFICATIVO (> 10 metros)
+        // Isso evita rotações desnecessárias por ruído do GPS
+        if (movementDistance > 10) {
             const newHeading = calculateHeading(navigationMode.lastPosition, currentPos);
 
-            // Suavizar a transição do heading para evitar saltos bruscos
-            if (movementHeading !== 0) {
-                let diff = newHeading - movementHeading;
-                // Normalizar diferença
-                if (diff > 180) diff -= 360;
-                if (diff < -180) diff += 360;
-                // Aplicar suavização
-                movementHeading = (movementHeading + diff * 0.5 + 360) % 360;
-            } else {
-                movementHeading = newHeading;
-            }
+            // Calcular diferença de ângulo
+            let diff = newHeading - movementHeading;
+            if (diff > 180) diff -= 360;
+            if (diff < -180) diff += 360;
 
-            navigationMode.lastHeading = movementHeading;
+            // SÓ aplicar se a mudança de direção for SIGNIFICATIVA (> 15 graus)
+            if (Math.abs(diff) > 15) {
+                movementHeading = newHeading;
+                navigationMode.lastHeading = movementHeading;
+            }
         }
     } else {
-        // Primeira posição - usar direção para o destino como inicial
+        // Primeira posição - usar direção para o destino
         movementHeading = calculateHeading(currentPos, navigationMode.destination);
         navigationMode.lastHeading = movementHeading;
     }
@@ -3131,30 +3128,24 @@ function updateNavigationView() {
     navigationMode.lastPosition = currentPos;
 
     // ✨ PERMITIR INTERAÇÃO DO USUÁRIO
-    // Só controlar o mapa automaticamente se o usuário NÃO estiver interagindo
     if (!navigationMode.userInteracting && map) {
-        // Acompanhamento suave do GPS - Estilo Google Maps Navigation
-        map.panTo(currentPos);  // Centralização suave e contínua
+        // Centralização contínua
+        map.panTo(currentPos);
 
-        // Rotação suave na direção do movimento
-        if (map.setHeading) {
-            map.setHeading(movementHeading);
+        // Aplicar heading SEM animação (direto)
+        if (map.setHeading && navigationMode.lastHeading) {
+            map.setHeading(navigationMode.lastHeading);
         }
 
-        // Manter zoom adequado para navegação
+        // Ajustar zoom apenas se necessário
         const currentZoom = map.getZoom();
-        if (currentZoom < 17) {
-            map.setZoom(17);
-        } else if (currentZoom > 19) {
+        if (currentZoom < 17 || currentZoom > 19) {
             map.setZoom(18);
         }
 
-        // Manter inclinação 3D para navegação
-        if (map.setTilt) {
-            const currentTilt = map.getTilt();
-            if (currentTilt < 45) {
-                map.setTilt(45);
-            }
+        // Aplicar inclinação 3D apenas se necessário
+        if (map.setTilt && map.getTilt() < 45) {
+            map.setTilt(45);
         }
     }
     // Se usuário estiver interagindo, não fazer nada (deixar ele controlar o mapa)
