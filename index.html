@@ -5542,11 +5542,11 @@ async function startCamera() {
             focusMode: { ideal: 'continuous' },
             exposureMode: { ideal: 'continuous' },
             whiteBalanceMode: { ideal: 'continuous' },
-            // 💡 Aumentar brilho e compensação de exposição
-            brightness: { ideal: 1.2 },
-            contrast: { ideal: 1.1 },
+            // 💡 AUMENTAR MUITO o brilho e compensação de exposição
+            brightness: { ideal: 1.8 },  // Aumentado de 1.2 para 1.8
+            contrast: { ideal: 1.3 },    // Aumentado de 1.1 para 1.3
             // Usar HDR se disponível para melhor exposição
-            exposureCompensation: { ideal: 1 },
+            exposureCompensation: { ideal: 2.5 },  // Aumentado de 1 para 2.5
             // Priorizar framerate para scanning rápido
             frameRate: { ideal: 30 }
         }
@@ -5567,13 +5567,13 @@ async function startCamera() {
             const advancedConstraints = {};
 
             if (capabilities.exposureCompensation) {
-                advancedConstraints.exposureCompensation = 1; // Aumentar exposição
+                advancedConstraints.exposureCompensation = 2.5; // MUITO aumentado de 1 para 2.5
             }
             if (capabilities.brightness) {
-                advancedConstraints.brightness = capabilities.brightness.max * 0.7; // 70% do brilho máximo
+                advancedConstraints.brightness = capabilities.brightness.max * 0.9; // 90% do brilho máximo (era 70%)
             }
             if (capabilities.contrast) {
-                advancedConstraints.contrast = capabilities.contrast.max * 0.6; // 60% do contraste máximo
+                advancedConstraints.contrast = capabilities.contrast.max * 0.75; // 75% do contraste máximo (era 60%)
             }
 
             if (Object.keys(advancedConstraints).length > 0) {
@@ -8015,11 +8015,11 @@ async function startPackageCamera() {
             focusMode: { ideal: 'continuous' },
             exposureMode: { ideal: 'continuous' },
             whiteBalanceMode: { ideal: 'continuous' },
-            // 💡 Aumentar brilho e compensação de exposição
-            brightness: { ideal: 1.2 },
-            contrast: { ideal: 1.1 },
+            // 💡 AUMENTAR MUITO o brilho e compensação de exposição
+            brightness: { ideal: 1.8 },  // Aumentado de 1.2 para 1.8
+            contrast: { ideal: 1.3 },    // Aumentado de 1.1 para 1.3
             // Usar HDR se disponível para melhor exposição
-            exposureCompensation: { ideal: 1 },
+            exposureCompensation: { ideal: 2.5 },  // Aumentado de 1 para 2.5
             // Priorizar framerate para scanning rápido
             frameRate: { ideal: 30 }
         }
@@ -8038,13 +8038,13 @@ async function startPackageCamera() {
             const advancedConstraints = {};
 
             if (capabilities.exposureCompensation) {
-                advancedConstraints.exposureCompensation = 1; // Aumentar exposição
+                advancedConstraints.exposureCompensation = 2.5; // MUITO aumentado de 1 para 2.5
             }
             if (capabilities.brightness) {
-                advancedConstraints.brightness = capabilities.brightness.max * 0.7; // 70% do brilho máximo
+                advancedConstraints.brightness = capabilities.brightness.max * 0.9; // 90% do brilho máximo (era 70%)
             }
             if (capabilities.contrast) {
-                advancedConstraints.contrast = capabilities.contrast.max * 0.6; // 60% do contraste máximo
+                advancedConstraints.contrast = capabilities.contrast.max * 0.75; // 75% do contraste máximo (era 60%)
             }
 
             if (Object.keys(advancedConstraints).length > 0) {
