@@ -2710,6 +2710,24 @@ let navigationMode = {
     autoResumeTimeout: null // Timeout para retomar controle automático
 };
 
+// Marcar interação do usuário durante navegação (helper function)
+function markUserInteraction() {
+    if (navigationMode.active) {
+        navigationMode.userInteracting = true;
+        navigationMode.lastUserInteraction = Date.now();
+
+        if (navigationMode.autoResumeTimeout) {
+            clearTimeout(navigationMode.autoResumeTimeout);
+        }
+
+        navigationMode.autoResumeTimeout = setTimeout(() => {
+            navigationMode.userInteracting = false;
+            console.log('🔄 Retomando controle automático do mapa');
+            showToast('🧭 Navegação retomada', 'Controle automático do mapa reativado', 'info', 2000);
+        }, 8000);
+    }
+}
+
 // Detectar quando usuário interage com o mapa durante navegação
 function setupNavigationMapInteraction() {
     if (!map) return;
@@ -2718,32 +2736,7 @@ function setupNavigationMapInteraction() {
     const interactionEvents = ['drag', 'zoom_changed', 'heading_changed', 'tilt_changed'];
 
     interactionEvents.forEach(eventName => {
-        map.addListener(eventName, () => {
-            if (navigationMode.active) {
-                // Marcar que usuário está interagindo
-                navigationMode.userInteracting = true;
-                navigationMode.lastUserInteraction = Date.now();
-
-                // Limpar timeout anterior
-                if (navigationMode.autoResumeTimeout) {
-                    clearTimeout(navigationMode.autoResumeTimeout);
-                }
-
-                // Retomar controle automático após 8 segundos sem interação
-                navigationMode.autoResumeTimeout = setTimeout(() => {
-                    navigationMode.userInteracting = false;
-                    console.log('🔄 Retomando controle automático do mapa');
-
-                    // Opcional: mostrar toast informando
-                    showToast(
-                        '🧭 Navegação retomada',
-                        'Controle automático do mapa reativado',
-                        'info',
-                        2000
-                    );
-                }, 8000); // 8 segundos
-            }
-        });
+        map.addListener(eventName, markUserInteraction);
     });
 }
 
@@ -4668,6 +4661,7 @@ async function addDeliveryMarkers() {
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
                     map.panTo(position);
+                    markUserInteraction(); // Detectar interação durante navegação
                 });
 
                 deliveryMarkers[`registered_${clientId}`] = marker;
@@ -4692,6 +4686,7 @@ async function addDeliveryMarkers() {
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
                     map.panTo(position);
+                    markUserInteraction(); // Detectar interação durante navegação
                 });
 
                 deliveryMarkers[`registered_${clientId}`] = marker;
@@ -4923,6 +4918,7 @@ async function addDeliveryMarkers() {
                     map.panTo(position);
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
+                    markUserInteraction(); // Detectar interação durante navegação
                     setTimeout(() => {
                         google.maps.event.removeListener(headingListener);
                         google.maps.event.removeListener(tiltListener);
@@ -4956,6 +4952,7 @@ async function addDeliveryMarkers() {
                     map.panTo(position);
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
+                    markUserInteraction(); // Detectar interação durante navegação
                     setTimeout(() => {
                         google.maps.event.removeListener(headingListener);
                         google.maps.event.removeListener(tiltListener);
@@ -8574,6 +8571,7 @@ async function showClientMarkers() {
                         infoWindow.open(map, marker);
                         currentInfoWindow = infoWindow;
                         map.panTo(position);
+                        markUserInteraction(); // Detectar interação durante navegação
                     });
 
                     clientMarkers[client.id] = marker;
@@ -8600,6 +8598,7 @@ async function showClientMarkers() {
                         infoWindow.open(map, marker);
                         currentInfoWindow = infoWindow;
                         map.panTo(position);
+                        markUserInteraction(); // Detectar interação durante navegação
                     });
 
                     clientMarkers[client.id] = marker;
@@ -8965,6 +8964,7 @@ async function showMatchedClientMarkers() {
                         infoWindow.open(map, marker);
                         currentInfoWindow = infoWindow;
                         map.panTo(position);
+                        markUserInteraction(); // Detectar interação durante navegação
                     });
 
                     matchedClientMarkers[client.id] = marker;
@@ -8992,6 +8992,7 @@ async function showMatchedClientMarkers() {
                         infoWindow.open(map, marker);
                         currentInfoWindow = infoWindow;
                         map.panTo(position);
+                        markUserInteraction(); // Detectar interação durante navegação
                     });
 
                     matchedClientMarkers[client.id] = marker;
