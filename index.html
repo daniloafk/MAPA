@@ -297,6 +297,45 @@
     }
 
     /* ===========================
+       BOTÃO DE CENTRALIZAR LOCALIZAÇÃO (Estilo Google Maps)
+       =========================== */
+    .gps-center-button {
+        position: absolute !important;
+        bottom: 180px !important; /* Acima dos controles de zoom */
+        right: 10px !important;
+        background-color: #fff !important;
+        border: 0 !important;
+        border-radius: 2px !important;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+        cursor: pointer !important;
+        width: 40px !important;
+        height: 40px !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: background-color 0.2s ease !important;
+        z-index: 1 !important;
+    }
+
+    .gps-center-button:hover {
+        background-color: #f5f5f5 !important;
+    }
+
+    .gps-center-button:active {
+        background-color: #e8e8e8 !important;
+    }
+
+    .gps-center-button .material-icons {
+        color: #666 !important;
+        font-size: 20px !important;
+    }
+
+    .gps-center-button.active .material-icons {
+        color: #4285F4 !important;
+    }
+
+    /* ===========================
        SISTEMA DE NOTIFICAÇÕES
        =========================== */
     #toast-container {
@@ -1758,7 +1797,6 @@
 <!-- Controles -->
 <div class="map-control">
     <button id="btnToggle3D" class="control-btn" title="Alternar visualização 3D">3D</button>
-    <button id="btnCenterLocation" class="control-btn" title="Centralizar na minha localização">📍</button>
     <button id="btnToggleRoute" class="control-btn" title="Planejar rota de entrega">🚗</button>
     <button id="btnClearRoute" class="control-btn" title="Limpar rotas e marcadores" style="display: none;">🗑️</button>
     <button id="btnOpenSidebar" class="control-btn" title="Ver lista de clientes">👥</button>
@@ -3552,6 +3590,72 @@ function updateStatus(text, active = true) {
 // INICIALIZAÇÃO DO MAPA
 // ===========================
 
+// Adicionar botão de GPS customizado (estilo Google Maps)
+function addGPSCenterButton() {
+    // Criar botão
+    const gpsCenterButton = document.createElement('button');
+    gpsCenterButton.className = 'gps-center-button';
+    gpsCenterButton.type = 'button';
+    gpsCenterButton.title = 'Centralizar na minha localização';
+
+    // Ícone Material Icons
+    const icon = document.createElement('i');
+    icon.className = 'material-icons';
+    icon.textContent = 'gps_fixed'; // Ícone de GPS/mira
+    gpsCenterButton.appendChild(icon);
+
+    // Adicionar evento de clique
+    gpsCenterButton.addEventListener('click', () => {
+        // Usar GPS Tracker modular se disponível
+        if (gpsTracker) {
+            gpsTracker.centerOnUser();
+            gpsCenterButton.classList.add('active');
+
+            showToast('Centralizado', 'Mapa centralizado na sua localização', 'info', 2000);
+
+            // Remover classe active após 2 segundos
+            setTimeout(() => {
+                gpsCenterButton.classList.remove('active');
+            }, 2000);
+            return;
+        }
+
+        // Fallback para código legado
+        if (!userLocationMarker) {
+            showToast('Localização não disponível', 'Aguarde obter sua posição GPS', 'warning', 3000);
+            return;
+        }
+
+        // Pega a posição atual do marcador (compatível com ambos os tipos)
+        let currentPosition;
+        if (userLocationMarker.position) {
+            currentPosition = userLocationMarker.position;
+        } else if (userLocationMarker.getPosition) {
+            currentPosition = userLocationMarker.getPosition();
+        }
+
+        if (!currentPosition) {
+            showToast('Erro ao centralizar', 'Posição não encontrada', 'error', 3000);
+            return;
+        }
+
+        // Anima o zoom e centraliza
+        map.panTo(currentPosition);
+        map.setZoom(17);
+
+        gpsCenterButton.classList.add('active');
+        showToast('Centralizado', 'Mapa centralizado na sua localização', 'info', 2000);
+
+        // Remover classe active após 2 segundos
+        setTimeout(() => {
+            gpsCenterButton.classList.remove('active');
+        }, 2000);
+    });
+
+    // Adicionar ao mapa usando controls API do Google Maps
+    map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(gpsCenterButton);
+}
+
 window.initMap = function () {
     console.log('Iniciando mapa...');
     updateLoadingScreen('Carregando mapa...', 'Preparando visualização');
@@ -3586,6 +3690,9 @@ window.initMap = function () {
                 strokeOpacity: 0.7
             }
         });
+
+        // Adicionar botão de centralizar localização (estilo Google Maps)
+        addGPSCenterButton();
 
         // Fechar InfoWindow ao clicar no mapa (fora dos marcadores)
         map.addListener('click', () => {
@@ -4956,9 +5063,11 @@ document.getElementById("btnStopNavigation").onclick = () => {
 };
 
 // ===========================
-// CENTRALIZAR LOCALIZAÇÃO
+// CENTRALIZAR LOCALIZAÇÃO (BOTÃO ANTIGO - REMOVIDO)
 // ===========================
+// Agora usa o botão GPS customizado adicionado via addGPSCenterButton()
 
+/* CÓDIGO ANTIGO COMENTADO - Botão removido do HTML
 document.getElementById("btnCenterLocation").onclick = () => {
     const btn = document.getElementById("btnCenterLocation");
 
@@ -5013,6 +5122,7 @@ document.getElementById("btnCenterLocation").onclick = () => {
         );
     }, 400);
 };
+*/
 
 // ===========================
 // MODAL E QR CODE SCANNER
