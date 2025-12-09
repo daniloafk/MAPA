@@ -2704,8 +2704,48 @@ let navigationMode = {
     lastHeading: 0,
     lastPosition: null,
     followInterval: null,
-    lastRerouteTime: null // Para controlar frequência de recálculo de rota
+    lastRerouteTime: null, // Para controlar frequência de recálculo de rota
+    userInteracting: false, // Flag para detectar interação do usuário
+    lastUserInteraction: null, // Timestamp da última interação
+    autoResumeTimeout: null // Timeout para retomar controle automático
 };
+
+// Detectar quando usuário interage com o mapa durante navegação
+function setupNavigationMapInteraction() {
+    if (!map) return;
+
+    // Eventos que indicam interação do usuário
+    const interactionEvents = ['drag', 'zoom_changed', 'heading_changed', 'tilt_changed'];
+
+    interactionEvents.forEach(eventName => {
+        map.addListener(eventName, () => {
+            if (navigationMode.active) {
+                // Marcar que usuário está interagindo
+                navigationMode.userInteracting = true;
+                navigationMode.lastUserInteraction = Date.now();
+
+                // Limpar timeout anterior
+                if (navigationMode.autoResumeTimeout) {
+                    clearTimeout(navigationMode.autoResumeTimeout);
+                }
+
+                // Retomar controle automático após 8 segundos sem interação
+                navigationMode.autoResumeTimeout = setTimeout(() => {
+                    navigationMode.userInteracting = false;
+                    console.log('🔄 Retomando controle automático do mapa');
+
+                    // Opcional: mostrar toast informando
+                    showToast(
+                        '🧭 Navegação retomada',
+                        'Controle automático do mapa reativado',
+                        'info',
+                        2000
+                    );
+                }, 8000); // 8 segundos
+            }
+        });
+    });
+}
 
 // Calcular heading (direção) entre duas posições
 function calculateHeading(from, to) {
@@ -2790,10 +2830,17 @@ function stopNavigationMode() {
     navigationMode.active = false;
     navigationMode.destination = null;
     navigationMode.destinationName = '';
+    navigationMode.userInteracting = false; // Resetar flag de interação
 
     if (navigationMode.followInterval) {
         clearInterval(navigationMode.followInterval);
         navigationMode.followInterval = null;
+    }
+
+    // Limpar timeout de retomada automática
+    if (navigationMode.autoResumeTimeout) {
+        clearTimeout(navigationMode.autoResumeTimeout);
+        navigationMode.autoResumeTimeout = null;
     }
 
     // Esconder botão de parar navegação
@@ -3043,8 +3090,9 @@ function updateNavigationView() {
 
     navigationMode.lastPosition = currentPos;
 
-    // Atualizar mapa: centralizar e rotacionar na direção do movimento
-    if (map) {
+    // ✨ PERMITIR INTERAÇÃO DO USUÁRIO
+    // Só controlar o mapa automaticamente se o usuário NÃO estiver interagindo
+    if (!navigationMode.userInteracting && map) {
         // Usar setHeading para rotacionar o mapa na direção do movimento
         if (map.setHeading) {
             // Suavizar a rotação do mapa
@@ -3077,6 +3125,7 @@ function updateNavigationView() {
             map.setTilt(45);
         }
     }
+    // Se usuário estiver interagindo, não fazer nada (deixar ele controlar o mapa)
 }
 
 // Loop de animação Tween.js (sincronizado com requestAnimationFrame)
@@ -3713,6 +3762,9 @@ window.initMap = function () {
 
         // Adicionar botão de centralizar localização (estilo Google Maps)
         addGPSCenterButton();
+
+        // Configurar detecção de interação do usuário durante navegação
+        setupNavigationMapInteraction();
 
         // Fechar InfoWindow ao clicar no mapa (fora dos marcadores)
         map.addListener('click', () => {
