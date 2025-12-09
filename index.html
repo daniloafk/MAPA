@@ -2710,18 +2710,41 @@ let navigationMode = {
     autoResumeTimeout: null // Timeout para retomar controle automático
 };
 
-// Marcar interação do usuário durante navegação (helper function)
-// NOTA: Função mantida para compatibilidade, mas não é mais necessária
-// pois o mapa está totalmente livre durante a navegação
-function markUserInteraction() {
-    // Função vazia - mapa sempre livre
-}
-
 // Detectar quando usuário interage com o mapa durante navegação
-// NOTA: Função mantida para compatibilidade, mas não faz mais nada
-// pois o mapa está totalmente livre durante a navegação
 function setupNavigationMapInteraction() {
-    console.log('✅ Modo de navegação livre - usuário tem controle total do mapa');
+    if (!map) return;
+
+    // Eventos que indicam interação do usuário
+    const interactionEvents = ['drag', 'zoom_changed', 'heading_changed', 'tilt_changed'];
+
+    interactionEvents.forEach(eventName => {
+        map.addListener(eventName, () => {
+            if (navigationMode.active) {
+                // Marcar que usuário está interagindo
+                navigationMode.userInteracting = true;
+                navigationMode.lastUserInteraction = Date.now();
+
+                // Limpar timeout anterior
+                if (navigationMode.autoResumeTimeout) {
+                    clearTimeout(navigationMode.autoResumeTimeout);
+                }
+
+                // Retomar controle automático após 8 segundos sem interação
+                navigationMode.autoResumeTimeout = setTimeout(() => {
+                    navigationMode.userInteracting = false;
+                    console.log('🔄 Retomando controle automático do mapa');
+
+                    // Opcional: mostrar toast informando
+                    showToast(
+                        '🧭 Navegação retomada',
+                        'Controle automático do mapa reativado',
+                        'info',
+                        2000
+                    );
+                }, 8000); // 8 segundos
+            }
+        });
+    });
 }
 
 // Calcular heading (direção) entre duas posições
@@ -2787,7 +2810,7 @@ function startNavigationMode(destination, destinationName, marker = null, infoWi
     // Mostrar toast informativo
     showToast(
         '🧭 Navegação ativa',
-        'Você pode mover o mapa livremente!',
+        'O mapa seguirá seu veículo automaticamente',
         'info',
         4000
     );
@@ -3034,12 +3057,75 @@ function updateNavigationView() {
         return;
     }
 
-    // ✨ NAVEGAÇÃO SEM CONTROLE AUTOMÁTICO DO MAPA
-    // O mapa agora fica TOTALMENTE livre para o usuário controlar
-    // Apenas mantemos o tracking de distância e verificação de chegada
+    // Calcular heading baseado na direção do MOVIMENTO do veículo
+    // Isso faz o mapa girar conforme o veículo faz curvas
+    let movementHeading = navigationMode.lastHeading;
+
+    if (navigationMode.lastPosition) {
+        const movementDistance = calculateDistanceMeters(navigationMode.lastPosition, currentPos);
+
+        // Atualizar heading se houve movimento significativo (> 2 metros)
+        if (movementDistance > 2) {
+            const newHeading = calculateHeading(navigationMode.lastPosition, currentPos);
+
+            // Suavizar a transição do heading para evitar saltos bruscos
+            if (movementHeading !== 0) {
+                let diff = newHeading - movementHeading;
+                // Normalizar diferença
+                if (diff > 180) diff -= 360;
+                if (diff < -180) diff += 360;
+                // Aplicar suavização
+                movementHeading = (movementHeading + diff * 0.5 + 360) % 360;
+            } else {
+                movementHeading = newHeading;
+            }
+
+            navigationMode.lastHeading = movementHeading;
+        }
+    } else {
+        // Primeira posição - usar direção para o destino como inicial
+        movementHeading = calculateHeading(currentPos, navigationMode.destination);
+        navigationMode.lastHeading = movementHeading;
+    }
+
     navigationMode.lastPosition = currentPos;
 
-    console.log(`📍 Navegação ativa - Distância até destino: ${Math.round(distanceToDestination)}m`);
+    // ✨ PERMITIR INTERAÇÃO DO USUÁRIO
+    // Só controlar o mapa automaticamente se o usuário NÃO estiver interagindo
+    if (!navigationMode.userInteracting && map) {
+        // Usar setHeading para rotacionar o mapa na direção do movimento
+        if (map.setHeading) {
+            // Suavizar a rotação do mapa
+            const currentMapHeading = map.getHeading() || 0;
+            let diff = movementHeading - currentMapHeading;
+
+            // Normalizar diferença para -180 a 180
+            if (diff > 180) diff -= 360;
+            if (diff < -180) diff += 360;
+
+            // Aplicar rotação suavizada (mais suave para curvas naturais)
+            const newMapHeading = currentMapHeading + diff * 0.2;
+            map.setHeading(newMapHeading);
+        }
+
+        // Centralizar diretamente na posição atual do GPS
+        // Isso mantém o marcador alinhado com a linha azul da rota
+        map.panTo(currentPos);
+
+        // Manter zoom apropriado para navegação
+        const currentZoom = map.getZoom();
+        if (currentZoom < 17) {
+            map.setZoom(17);
+        } else if (currentZoom > 19) {
+            map.setZoom(18);
+        }
+
+        // Inclinar mapa para vista de navegação 3D (se suportado)
+        if (map.setTilt && map.getTilt() === 0) {
+            map.setTilt(45);
+        }
+    }
+    // Se usuário estiver interagindo, não fazer nada (deixar ele controlar o mapa)
 }
 
 // Loop de animação Tween.js (sincronizado com requestAnimationFrame)
@@ -3640,7 +3726,7 @@ function addGPSCenterButton() {
 }
 
 window.initMap = function () {
-    console.log('🚀🚀🚀 VERSÃO COM MAPA LIVRE v2.0 - Iniciando mapa...');
+    console.log('Iniciando mapa...');
     updateLoadingScreen('Carregando mapa...', 'Preparando visualização');
 
     try {
@@ -4582,7 +4668,6 @@ async function addDeliveryMarkers() {
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
                     map.panTo(position);
-                    markUserInteraction(); // Detectar interação durante navegação
                 });
 
                 deliveryMarkers[`registered_${clientId}`] = marker;
@@ -4607,7 +4692,6 @@ async function addDeliveryMarkers() {
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
                     map.panTo(position);
-                    markUserInteraction(); // Detectar interação durante navegação
                 });
 
                 deliveryMarkers[`registered_${clientId}`] = marker;
@@ -4839,7 +4923,6 @@ async function addDeliveryMarkers() {
                     map.panTo(position);
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
-                    markUserInteraction(); // Detectar interação durante navegação
                     setTimeout(() => {
                         google.maps.event.removeListener(headingListener);
                         google.maps.event.removeListener(tiltListener);
@@ -4873,7 +4956,6 @@ async function addDeliveryMarkers() {
                     map.panTo(position);
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
-                    markUserInteraction(); // Detectar interação durante navegação
                     setTimeout(() => {
                         google.maps.event.removeListener(headingListener);
                         google.maps.event.removeListener(tiltListener);
@@ -8492,7 +8574,6 @@ async function showClientMarkers() {
                         infoWindow.open(map, marker);
                         currentInfoWindow = infoWindow;
                         map.panTo(position);
-                        markUserInteraction(); // Detectar interação durante navegação
                     });
 
                     clientMarkers[client.id] = marker;
@@ -8519,7 +8600,6 @@ async function showClientMarkers() {
                         infoWindow.open(map, marker);
                         currentInfoWindow = infoWindow;
                         map.panTo(position);
-                        markUserInteraction(); // Detectar interação durante navegação
                     });
 
                     clientMarkers[client.id] = marker;
@@ -8885,7 +8965,6 @@ async function showMatchedClientMarkers() {
                         infoWindow.open(map, marker);
                         currentInfoWindow = infoWindow;
                         map.panTo(position);
-                        markUserInteraction(); // Detectar interação durante navegação
                     });
 
                     matchedClientMarkers[client.id] = marker;
@@ -8913,7 +8992,6 @@ async function showMatchedClientMarkers() {
                         infoWindow.open(map, marker);
                         currentInfoWindow = infoWindow;
                         map.panTo(position);
-                        markUserInteraction(); // Detectar interação durante navegação
                     });
 
                     matchedClientMarkers[client.id] = marker;
