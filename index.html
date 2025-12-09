@@ -2710,7 +2710,7 @@ let navigationMode = {
     autoResumeTimeout: null // Timeout para retomar controle automático
 };
 
-// Forçar centralização INSTANTÂNEA e TOTAL no GPS
+// Retomar navegação com centralização suave (Google Maps style)
 function forceCenterOnGPS() {
     if (!navigationMode.active) return;
 
@@ -2730,23 +2730,29 @@ function forceCenterOnGPS() {
 
     if (!currentPos || !map) return;
 
-    // Calcular heading baseado na última posição e posição atual
+    // Calcular heading baseado na direção do movimento
     let targetHeading = navigationMode.lastHeading || 0;
     if (navigationMode.lastPosition) {
         targetHeading = calculateHeading(navigationMode.lastPosition, currentPos);
     }
 
-    // CENTRALIZAÇÃO INSTANTÂNEA E TOTAL - SEM ANIMAÇÃO
-    map.setCenter(currentPos);  // setCenter é INSTANTÂNEO (não anima como panTo)
-    map.setZoom(18);             // Zoom fixo para navegação
-    if (map.setHeading) {
-        map.setHeading(targetHeading);  // Rotação INSTANTÂNEA na direção do movimento
-    }
-    if (map.setTilt) {
-        map.setTilt(45);         // Inclinação 3D INSTANTÂNEA
+    // RETOMAR NAVEGAÇÃO - Método Google Maps
+    map.panTo(currentPos);  // Animação suave de centralização
+
+    const currentZoom = map.getZoom();
+    if (currentZoom < 17 || currentZoom > 19) {
+        map.setZoom(18);  // Ajustar zoom se necessário
     }
 
-    console.log('✅ Centralização INSTANTÂNEA executada');
+    if (map.setHeading) {
+        map.setHeading(targetHeading);  // Aplicar rotação completa
+    }
+
+    if (map.setTilt && map.getTilt() < 45) {
+        map.setTilt(45);  // Aplicar inclinação se necessário
+    }
+
+    console.log('🧭 Navegação retomada');
 }
 
 // Detectar quando usuário interage com o mapa durante navegação
@@ -3127,16 +3133,28 @@ function updateNavigationView() {
     // ✨ PERMITIR INTERAÇÃO DO USUÁRIO
     // Só controlar o mapa automaticamente se o usuário NÃO estiver interagindo
     if (!navigationMode.userInteracting && map) {
-        // CENTRALIZAÇÃO INSTANTÂNEA E TOTAL durante navegação normal
-        map.setCenter(currentPos);  // setCenter é INSTANTÂNEO (não anima)
-        map.setZoom(18);             // Zoom fixo
+        // Acompanhamento suave do GPS - Estilo Google Maps Navigation
+        map.panTo(currentPos);  // Centralização suave e contínua
 
+        // Rotação suave na direção do movimento
         if (map.setHeading) {
-            map.setHeading(movementHeading);  // Rotação INSTANTÂNEA (sem suavização)
+            map.setHeading(movementHeading);
         }
 
+        // Manter zoom adequado para navegação
+        const currentZoom = map.getZoom();
+        if (currentZoom < 17) {
+            map.setZoom(17);
+        } else if (currentZoom > 19) {
+            map.setZoom(18);
+        }
+
+        // Manter inclinação 3D para navegação
         if (map.setTilt) {
-            map.setTilt(45);  // Inclinação 3D INSTANTÂNEA
+            const currentTilt = map.getTilt();
+            if (currentTilt < 45) {
+                map.setTilt(45);
+            }
         }
     }
     // Se usuário estiver interagindo, não fazer nada (deixar ele controlar o mapa)
