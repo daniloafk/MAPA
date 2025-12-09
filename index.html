@@ -5553,31 +5553,8 @@ async function startCamera() {
         // Garantir que o vídeo recebe o stream
         qrVideo.srcObject = videoStream;
 
-        // 💡 Aplicar configurações avançadas da câmera (se suportado)
-        try {
-            const videoTrack = videoStream.getVideoTracks()[0];
-            const capabilities = videoTrack.getCapabilities();
-
-            // Aplicar configurações avançadas se disponíveis
-            const advancedConstraints = {};
-
-            if (capabilities.exposureCompensation) {
-                advancedConstraints.exposureCompensation = 2.5; // MUITO aumentado de 1 para 2.5
-            }
-            if (capabilities.brightness) {
-                advancedConstraints.brightness = capabilities.brightness.max * 0.9; // 90% do brilho máximo (era 70%)
-            }
-            if (capabilities.contrast) {
-                advancedConstraints.contrast = capabilities.contrast.max * 0.75; // 75% do contraste máximo (era 60%)
-            }
-
-            if (Object.keys(advancedConstraints).length > 0) {
-                await videoTrack.applyConstraints({ advanced: [advancedConstraints] });
-                console.log('✨ Configurações avançadas de brilho aplicadas:', advancedConstraints);
-            }
-        } catch (err) {
-            console.warn('⚠️ Configurações avançadas não suportadas neste dispositivo:', err);
-        }
+        // ✨ Deixar o sistema operacional gerenciar exposição automaticamente
+        // (removido código que forçava brilho alto e causava superexposição)
 
         // Mostrar container da câmera
         qrCameraContainer.classList.add('active');
@@ -8019,31 +7996,8 @@ async function startPackageCamera() {
         packageVideoStream = await navigator.mediaDevices.getUserMedia(constraints);
         qrPackageVideo.srcObject = packageVideoStream;
 
-        // 💡 Aplicar configurações avançadas da câmera (se suportado)
-        try {
-            const videoTrack = packageVideoStream.getVideoTracks()[0];
-            const capabilities = videoTrack.getCapabilities();
-
-            // Aplicar configurações avançadas se disponíveis
-            const advancedConstraints = {};
-
-            if (capabilities.exposureCompensation) {
-                advancedConstraints.exposureCompensation = 2.5; // MUITO aumentado de 1 para 2.5
-            }
-            if (capabilities.brightness) {
-                advancedConstraints.brightness = capabilities.brightness.max * 0.9; // 90% do brilho máximo (era 70%)
-            }
-            if (capabilities.contrast) {
-                advancedConstraints.contrast = capabilities.contrast.max * 0.75; // 75% do contraste máximo (era 60%)
-            }
-
-            if (Object.keys(advancedConstraints).length > 0) {
-                await videoTrack.applyConstraints({ advanced: [advancedConstraints] });
-                console.log('✨ [Package Scanner] Configurações avançadas de brilho aplicadas:', advancedConstraints);
-            }
-        } catch (err) {
-            console.warn('⚠️ [Package Scanner] Configurações avançadas não suportadas:', err);
-        }
+        // ✨ Deixar o sistema operacional gerenciar exposição automaticamente
+        // (removido código que forçava brilho alto e causava superexposição)
 
         qrPackageCameraContainer.classList.add('active');
 
