@@ -2736,19 +2736,46 @@ function setupNavigationMapInteraction() {
         return;
     }
 
-    console.log('🎯 Configurando listeners de interação do mapa...');
+    console.log('🎯 Configurando listeners de interação do mapa para navegação...');
 
-    // Eventos que indicam interação do usuário
-    const interactionEvents = ['drag', 'zoom_changed', 'heading_changed', 'tilt_changed', 'dragstart', 'dragend', 'center_changed', 'bounds_changed'];
+    // Eventos do Google Maps que indicam interação do usuário
+    const interactionEvents = [
+        'dragstart',      // Usuário começou a arrastar
+        'zoom_changed',   // Zoom foi alterado
+        'heading_changed',// Rotação foi alterada
+        'tilt_changed',   // Inclinação foi alterada
+        'bounds_changed'  // Viewport mudou (captura tudo)
+    ];
 
     interactionEvents.forEach(eventName => {
         map.addListener(eventName, () => {
-            console.log(`🔔 Evento detectado: ${eventName}`);
+            console.log(`🔔 Evento do mapa detectado: ${eventName}`);
             markUserInteraction();
         });
     });
 
-    console.log('✅ Listeners de interação configurados:', interactionEvents);
+    // Também adicionar listeners DOM no elemento do mapa (backup)
+    const mapDiv = document.getElementById('map');
+    if (mapDiv) {
+        console.log('🎯 Adicionando listeners DOM no elemento #map...');
+
+        mapDiv.addEventListener('mousedown', () => {
+            console.log('🖱️ MOUSEDOWN no mapa!');
+            markUserInteraction();
+        });
+
+        mapDiv.addEventListener('touchstart', () => {
+            console.log('👆 TOUCHSTART no mapa!');
+            markUserInteraction();
+        });
+
+        mapDiv.addEventListener('wheel', () => {
+            console.log('🎡 WHEEL no mapa!');
+            markUserInteraction();
+        });
+    }
+
+    console.log('✅ Listeners de interação configurados!');
 }
 
 // Calcular heading (direção) entre duas posições
@@ -3006,6 +3033,12 @@ async function recalculateRoute(origin, destination) {
 function updateNavigationView() {
     if (!navigationMode.active || !navigationMode.destination) return;
 
+    // ✨ PAUSAR COMPLETAMENTE se usuário estiver interagindo
+    if (navigationMode.userInteracting) {
+        // console.log('⏸️ Navegação pausada - usuário interagindo');
+        return; // Não fazer NADA quando usuário está controlando
+    }
+
     // Obter posição atual do GPS
     let currentPos = null;
     if (gpsTracker && gpsTracker.marker) {
@@ -3094,9 +3127,9 @@ function updateNavigationView() {
 
     navigationMode.lastPosition = currentPos;
 
-    // ✨ PERMITIR INTERAÇÃO DO USUÁRIO
-    // Só controlar o mapa automaticamente se o usuário NÃO estiver interagindo
-    if (!navigationMode.userInteracting && map) {
+    // ✨ CONTROLE AUTOMÁTICO DO MAPA
+    // Neste ponto, sabemos que o usuário NÃO está interagindo (verificado no início da função)
+    if (map) {
         // Usar setHeading para rotacionar o mapa na direção do movimento
         if (map.setHeading) {
             // Suavizar a rotação do mapa
@@ -3128,9 +3161,6 @@ function updateNavigationView() {
         if (map.setTilt && map.getTilt() === 0) {
             map.setTilt(45);
         }
-    } else if (navigationMode.userInteracting) {
-        // DEBUG: Mostrar que estamos respeitando a interação do usuário
-        console.log('✋ Usuário está controlando o mapa - não interferindo');
     }
 }
 
@@ -3779,12 +3809,6 @@ window.initMap = function () {
                 currentInfoWindow = null;
             }
         });
-
-        // DEBUG: Testar se eventos do mapa funcionam
-        console.log('🧪 Testando eventos do mapa...');
-        map.addListener('click', () => console.log('🖱️ TESTE: Click no mapa detectado!'));
-        map.addListener('drag', () => console.log('🖱️ TESTE: Drag detectado!'));
-        map.addListener('zoom_changed', () => console.log('🔍 TESTE: Zoom changed detectado!'));
 
         console.log('Mapa criado, aguardando tiles...');
 
