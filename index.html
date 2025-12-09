@@ -2731,14 +2731,24 @@ function markUserInteraction() {
 
 // Detectar quando usuário interage com o mapa durante navegação
 function setupNavigationMapInteraction() {
-    if (!map) return;
+    if (!map) {
+        console.error('❌ setupNavigationMapInteraction: mapa não existe!');
+        return;
+    }
+
+    console.log('🎯 Configurando listeners de interação do mapa...');
 
     // Eventos que indicam interação do usuário
-    const interactionEvents = ['drag', 'zoom_changed', 'heading_changed', 'tilt_changed'];
+    const interactionEvents = ['drag', 'zoom_changed', 'heading_changed', 'tilt_changed', 'dragstart', 'dragend', 'center_changed', 'bounds_changed'];
 
     interactionEvents.forEach(eventName => {
-        map.addListener(eventName, markUserInteraction);
+        map.addListener(eventName, () => {
+            console.log(`🔔 Evento detectado: ${eventName}`);
+            markUserInteraction();
+        });
     });
+
+    console.log('✅ Listeners de interação configurados:', interactionEvents);
 }
 
 // Calcular heading (direção) entre duas posições
@@ -3769,6 +3779,12 @@ window.initMap = function () {
                 currentInfoWindow = null;
             }
         });
+
+        // DEBUG: Testar se eventos do mapa funcionam
+        console.log('🧪 Testando eventos do mapa...');
+        map.addListener('click', () => console.log('🖱️ TESTE: Click no mapa detectado!'));
+        map.addListener('drag', () => console.log('🖱️ TESTE: Drag detectado!'));
+        map.addListener('zoom_changed', () => console.log('🔍 TESTE: Zoom changed detectado!'));
 
         console.log('Mapa criado, aguardando tiles...');
 
