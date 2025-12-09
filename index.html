@@ -2677,6 +2677,22 @@ if (!window.routePolylines) {
 }
 
 // ===========================
+// FUNÇÃO DE DEBOUNCE (OTIMIZAÇÃO DE PERFORMANCE)
+// ===========================
+// Evita executar funções múltiplas vezes durante interações do mapa (drag, zoom, etc)
+function debounce(func, wait = 500) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// ===========================
 // MODO DE NAVEGAÇÃO EM TEMPO REAL
 // ===========================
 let navigationMode = {
@@ -2823,7 +2839,8 @@ function stopNavigationMode() {
 }
 
 // RECÁLCULO AUTOMÁTICO DE ROTA (quando sai do trajeto)
-async function checkAndRerouteIfNeeded(currentPos) {
+// ✨ Função original (será chamada com debounce)
+async function checkAndRerouteIfNeededCore(currentPos) {
     // Só verifica se há uma rota ativa
     if (!window.routePolylines || window.routePolylines.length === 0) return;
 
@@ -2863,6 +2880,9 @@ async function checkAndRerouteIfNeeded(currentPos) {
         }
     }
 }
+
+// ✨ Versão com debounce (evita recálculos excessivos durante movimentação)
+const checkAndRerouteIfNeeded = debounce(checkAndRerouteIfNeededCore, 500);
 
 // Recalcular rota com nova origem
 async function recalculateRoute(origin, destination) {
