@@ -2889,18 +2889,9 @@ function updateNavigationView() {
             map.setHeading(newMapHeading);
         }
 
-        // Calcular ponto de centro deslocado para frente (para celular em pé)
-        // Usar a direção do MOVIMENTO para o deslocamento
-        const offsetDistance = 0.0004; // Aproximadamente 40 metros de deslocamento
-        const headingRad = movementHeading * Math.PI / 180;
-
-        const offsetCenter = {
-            lat: currentPos.lat + offsetDistance * Math.cos(headingRad),
-            lng: currentPos.lng + offsetDistance * Math.sin(headingRad)
-        };
-
-        // Centralizar no ponto deslocado (GPS fica na parte inferior da tela)
-        map.panTo(offsetCenter);
+        // Centralizar diretamente na posição atual do GPS
+        // Isso mantém o marcador alinhado com a linha azul da rota
+        map.panTo(currentPos);
 
         // Manter zoom apropriado para navegação
         const currentZoom = map.getZoom();
