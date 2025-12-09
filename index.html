@@ -2710,6 +2710,45 @@ let navigationMode = {
     autoResumeTimeout: null // Timeout para retomar controle automático
 };
 
+// Forçar centralização INSTANTÂNEA e TOTAL no GPS
+function forceCenterOnGPS() {
+    if (!navigationMode.active) return;
+
+    // Obter posição atual do GPS
+    let currentPos = null;
+    if (gpsTracker && gpsTracker.marker) {
+        const pos = gpsTracker.marker.position || (gpsTracker.marker.getPosition && gpsTracker.marker.getPosition());
+        if (pos) {
+            currentPos = { lat: pos.lat, lng: pos.lng };
+        }
+    } else if (userLocationMarker) {
+        const pos = userLocationMarker.position || (userLocationMarker.getPosition && userLocationMarker.getPosition());
+        if (pos) {
+            currentPos = { lat: pos.lat, lng: pos.lng };
+        }
+    }
+
+    if (!currentPos || !map) return;
+
+    // Calcular heading baseado na última posição e posição atual
+    let targetHeading = navigationMode.lastHeading || 0;
+    if (navigationMode.lastPosition) {
+        targetHeading = calculateHeading(navigationMode.lastPosition, currentPos);
+    }
+
+    // CENTRALIZAÇÃO INSTANTÂNEA E TOTAL - SEM ANIMAÇÃO
+    map.setCenter(currentPos);  // setCenter é INSTANTÂNEO (não anima como panTo)
+    map.setZoom(18);             // Zoom fixo para navegação
+    if (map.setHeading) {
+        map.setHeading(targetHeading);  // Rotação INSTANTÂNEA na direção do movimento
+    }
+    if (map.setTilt) {
+        map.setTilt(45);         // Inclinação 3D INSTANTÂNEA
+    }
+
+    console.log('✅ Centralização INSTANTÂNEA executada');
+}
+
 // Detectar quando usuário interage com o mapa durante navegação
 function setupNavigationMapInteraction() {
     if (!map) return;
@@ -2729,19 +2768,14 @@ function setupNavigationMapInteraction() {
                     clearTimeout(navigationMode.autoResumeTimeout);
                 }
 
-                // Retomar controle automático após 8 segundos sem interação
+                // Retomar controle automático após 0.5 segundos sem interação
                 navigationMode.autoResumeTimeout = setTimeout(() => {
                     navigationMode.userInteracting = false;
-                    console.log('🔄 Retomando controle automático do mapa');
+                    console.log('🔄 Retomando controle automático - centralização instantânea');
 
-                    // Opcional: mostrar toast informando
-                    showToast(
-                        '🧭 Navegação retomada',
-                        'Controle automático do mapa reativado',
-                        'info',
-                        2000
-                    );
-                }, 8000); // 8 segundos
+                    // Forçar centralização INSTANTÂNEA e COMPLETA
+                    forceCenterOnGPS();
+                }, 500); // 0.5 segundos
             }
         });
     });
@@ -3093,36 +3127,16 @@ function updateNavigationView() {
     // ✨ PERMITIR INTERAÇÃO DO USUÁRIO
     // Só controlar o mapa automaticamente se o usuário NÃO estiver interagindo
     if (!navigationMode.userInteracting && map) {
-        // Usar setHeading para rotacionar o mapa na direção do movimento
+        // CENTRALIZAÇÃO INSTANTÂNEA E TOTAL durante navegação normal
+        map.setCenter(currentPos);  // setCenter é INSTANTÂNEO (não anima)
+        map.setZoom(18);             // Zoom fixo
+
         if (map.setHeading) {
-            // Suavizar a rotação do mapa
-            const currentMapHeading = map.getHeading() || 0;
-            let diff = movementHeading - currentMapHeading;
-
-            // Normalizar diferença para -180 a 180
-            if (diff > 180) diff -= 360;
-            if (diff < -180) diff += 360;
-
-            // Aplicar rotação suavizada (mais suave para curvas naturais)
-            const newMapHeading = currentMapHeading + diff * 0.2;
-            map.setHeading(newMapHeading);
+            map.setHeading(movementHeading);  // Rotação INSTANTÂNEA (sem suavização)
         }
 
-        // Centralizar diretamente na posição atual do GPS
-        // Isso mantém o marcador alinhado com a linha azul da rota
-        map.panTo(currentPos);
-
-        // Manter zoom apropriado para navegação
-        const currentZoom = map.getZoom();
-        if (currentZoom < 17) {
-            map.setZoom(17);
-        } else if (currentZoom > 19) {
-            map.setZoom(18);
-        }
-
-        // Inclinar mapa para vista de navegação 3D (se suportado)
-        if (map.setTilt && map.getTilt() === 0) {
-            map.setTilt(45);
+        if (map.setTilt) {
+            map.setTilt(45);  // Inclinação 3D INSTANTÂNEA
         }
     }
     // Se usuário estiver interagindo, não fazer nada (deixar ele controlar o mapa)
