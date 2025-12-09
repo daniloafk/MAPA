@@ -5538,17 +5538,10 @@ async function startCamera() {
             facingMode: currentFacingMode,
             width: { ideal: 1920, min: 1280 },
             height: { ideal: 1080, min: 720 },
-            // ✨ Otimizações avançadas para leitura de QR Code
+            // Otimizações para leitura de QR Code
             focusMode: { ideal: 'continuous' },
             exposureMode: { ideal: 'continuous' },
-            whiteBalanceMode: { ideal: 'continuous' },
-            // 💡 AUMENTAR MUITO o brilho e compensação de exposição
-            brightness: { ideal: 1.8 },  // Aumentado de 1.2 para 1.8
-            contrast: { ideal: 1.3 },    // Aumentado de 1.1 para 1.3
-            // Usar HDR se disponível para melhor exposição
-            exposureCompensation: { ideal: 2.5 },  // Aumentado de 1 para 2.5
-            // Priorizar framerate para scanning rápido
-            frameRate: { ideal: 30 }
+            whiteBalanceMode: { ideal: 'continuous' }
         }
     };
 
@@ -5557,32 +5550,6 @@ async function startCamera() {
 
         // Garantir que o vídeo recebe o stream
         qrVideo.srcObject = videoStream;
-
-        // 💡 Aplicar configurações avançadas da câmera (se suportado)
-        try {
-            const videoTrack = videoStream.getVideoTracks()[0];
-            const capabilities = videoTrack.getCapabilities();
-
-            // Aplicar configurações avançadas se disponíveis
-            const advancedConstraints = {};
-
-            if (capabilities.exposureCompensation) {
-                advancedConstraints.exposureCompensation = 2.5; // MUITO aumentado de 1 para 2.5
-            }
-            if (capabilities.brightness) {
-                advancedConstraints.brightness = capabilities.brightness.max * 0.9; // 90% do brilho máximo (era 70%)
-            }
-            if (capabilities.contrast) {
-                advancedConstraints.contrast = capabilities.contrast.max * 0.75; // 75% do contraste máximo (era 60%)
-            }
-
-            if (Object.keys(advancedConstraints).length > 0) {
-                await videoTrack.applyConstraints({ advanced: [advancedConstraints] });
-                console.log('✨ Configurações avançadas de brilho aplicadas:', advancedConstraints);
-            }
-        } catch (err) {
-            console.warn('⚠️ Configurações avançadas não suportadas neste dispositivo:', err);
-        }
 
         // Mostrar container da câmera
         qrCameraContainer.classList.add('active');
@@ -8011,50 +7978,16 @@ async function startPackageCamera() {
             facingMode: packageCurrentFacingMode,
             width: { ideal: 1920, min: 1280 },
             height: { ideal: 1080, min: 720 },
-            // ✨ Otimizações avançadas para leitura de QR Code
+            // Otimizações para leitura de QR Code
             focusMode: { ideal: 'continuous' },
             exposureMode: { ideal: 'continuous' },
-            whiteBalanceMode: { ideal: 'continuous' },
-            // 💡 AUMENTAR MUITO o brilho e compensação de exposição
-            brightness: { ideal: 1.8 },  // Aumentado de 1.2 para 1.8
-            contrast: { ideal: 1.3 },    // Aumentado de 1.1 para 1.3
-            // Usar HDR se disponível para melhor exposição
-            exposureCompensation: { ideal: 2.5 },  // Aumentado de 1 para 2.5
-            // Priorizar framerate para scanning rápido
-            frameRate: { ideal: 30 }
+            whiteBalanceMode: { ideal: 'continuous' }
         }
     };
 
     try {
         packageVideoStream = await navigator.mediaDevices.getUserMedia(constraints);
         qrPackageVideo.srcObject = packageVideoStream;
-
-        // 💡 Aplicar configurações avançadas da câmera (se suportado)
-        try {
-            const videoTrack = packageVideoStream.getVideoTracks()[0];
-            const capabilities = videoTrack.getCapabilities();
-
-            // Aplicar configurações avançadas se disponíveis
-            const advancedConstraints = {};
-
-            if (capabilities.exposureCompensation) {
-                advancedConstraints.exposureCompensation = 2.5; // MUITO aumentado de 1 para 2.5
-            }
-            if (capabilities.brightness) {
-                advancedConstraints.brightness = capabilities.brightness.max * 0.9; // 90% do brilho máximo (era 70%)
-            }
-            if (capabilities.contrast) {
-                advancedConstraints.contrast = capabilities.contrast.max * 0.75; // 75% do contraste máximo (era 60%)
-            }
-
-            if (Object.keys(advancedConstraints).length > 0) {
-                await videoTrack.applyConstraints({ advanced: [advancedConstraints] });
-                console.log('✨ [Package Scanner] Configurações avançadas de brilho aplicadas:', advancedConstraints);
-            }
-        } catch (err) {
-            console.warn('⚠️ [Package Scanner] Configurações avançadas não suportadas:', err);
-        }
-
         qrPackageCameraContainer.classList.add('active');
 
         return new Promise((resolve, reject) => {
