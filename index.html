@@ -3097,30 +3097,48 @@ function updateNavigationView() {
         return;
     }
 
+    // =================================================================
+    // CORREÇÃO DA ROTAÇÃO (HEADING) - Seguindo Google Gemini
+    // =================================================================
+
     // Calcular heading baseado na direção do MOVIMENTO do veículo
-    let movementHeading = navigationMode.lastHeading || 0;
+    let movementHeading = navigationMode.lastHeading;
 
     if (navigationMode.lastPosition) {
         const movementDistance = calculateDistanceMeters(navigationMode.lastPosition, currentPos);
 
-        // SÓ atualizar heading se houve movimento SIGNIFICATIVO (> 10 metros)
-        // Isso evita rotações desnecessárias por ruído do GPS
-        if (movementDistance > 10) {
+        // AJUSTE 1: Aumentamos o limiar de 2m para 6m.
+        // Isso evita que o mapa gire com o "ruído" do GPS quando parado ou muito devagar.
+        const MIN_DISTANCE_FOR_ROTATION = 6;
+
+        // Só atualiza o ângulo se o deslocamento for significativo
+        if (movementDistance > MIN_DISTANCE_FOR_ROTATION) {
             const newHeading = calculateHeading(navigationMode.lastPosition, currentPos);
 
-            // Calcular diferença de ângulo
-            let diff = newHeading - movementHeading;
-            if (diff > 180) diff -= 360;
-            if (diff < -180) diff += 360;
+            // Suavizar a transição do heading para evitar saltos bruscos
+            if (movementHeading !== 0) {
+                let diff = newHeading - movementHeading;
 
-            // SÓ aplicar se a mudança de direção for SIGNIFICATIVA (> 15 graus)
-            if (Math.abs(diff) > 15) {
+                // Normalizar diferença para o menor caminho (ex: de 350° para 10° é +20°, não -340°)
+                if (diff > 180) diff -= 360;
+                if (diff < -180) diff += 360;
+
+                // AJUSTE 2: Fator de suavização (Lerp) muito mais suave.
+                // Antes era 0.5 (rápido/instável). Agora 0.1 (lento/estável).
+                // Significa: "Mova apenas 10% em direção ao novo ângulo a cada atualização".
+                const SMOOTHING_FACTOR = 0.1;
+
+                movementHeading = (movementHeading + diff * SMOOTHING_FACTOR + 360) % 360;
+            } else {
                 movementHeading = newHeading;
-                navigationMode.lastHeading = movementHeading;
             }
+
+            // Atualiza o último heading conhecido apenas quando há movimento confiável
+            navigationMode.lastHeading = movementHeading;
         }
+        // Se a distância for < 6m, mantemos o 'movementHeading' anterior (o mapa não gira)
     } else {
-        // Primeira posição - usar direção para o destino
+        // Primeira posição - usar direção para o destino como inicial
         movementHeading = calculateHeading(currentPos, navigationMode.destination);
         navigationMode.lastHeading = movementHeading;
     }
@@ -3129,22 +3147,24 @@ function updateNavigationView() {
 
     // ✨ PERMITIR INTERAÇÃO DO USUÁRIO
     if (!navigationMode.userInteracting && map) {
-        // Centralização contínua
+        // Acompanhamento suave do GPS
         map.panTo(currentPos);
 
-        // Aplicar heading SEM animação (direto)
-        if (map.setHeading && navigationMode.lastHeading) {
-            map.setHeading(navigationMode.lastHeading);
+        // Rotação suave na direção do movimento
+        if (map.setHeading) {
+            map.setHeading(movementHeading);
         }
 
-        // Ajustar zoom apenas se necessário
+        // Manter zoom adequado para navegação
         const currentZoom = map.getZoom();
-        if (currentZoom < 17 || currentZoom > 19) {
+        if (currentZoom < 17) {
+            map.setZoom(17);
+        } else if (currentZoom > 19) {
             map.setZoom(18);
         }
 
-        // Aplicar inclinação 3D apenas se necessário
-        if (map.setTilt && map.getTilt() < 45) {
+        // Manter inclinação 3D para navegação
+        if (map.setTilt && map.getTilt() === 0) {
             map.setTilt(45);
         }
     }
