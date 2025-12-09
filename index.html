@@ -2649,7 +2649,8 @@ let navigationMode = {
     destinationInfoWindow: null,
     lastHeading: 0,
     lastPosition: null,
-    followInterval: null
+    followInterval: null,
+    lastRerouteTime: null // Para controlar frequência de recálculo de rota
 };
 
 // Calcular heading (direção) entre duas posições
@@ -2783,6 +2784,115 @@ function stopNavigationMode() {
     );
 }
 
+// RECÁLCULO AUTOMÁTICO DE ROTA (quando sai do trajeto)
+async function checkAndRerouteIfNeeded(currentPos) {
+    // Só verifica se há uma rota ativa
+    if (!window.routePolylines || window.routePolylines.length === 0) return;
+
+    const routePath = window.routePolylines[0].getPath();
+    if (!routePath || routePath.getLength() === 0) return;
+
+    // Calcular distância mínima até a linha da rota
+    let minDistance = Infinity;
+    for (let i = 0; i < routePath.getLength(); i++) {
+        const point = routePath.getAt(i);
+        const distance = calculateDistanceMeters(currentPos, { lat: point.lat(), lng: point.lng() });
+        if (distance < minDistance) {
+            minDistance = distance;
+        }
+    }
+
+    // Se está a mais de 50 metros da rota, recalcular
+    const REROUTE_THRESHOLD = 50; // metros
+
+    if (minDistance > REROUTE_THRESHOLD) {
+        // Evitar recálculos muito frequentes (apenas 1 vez a cada 10 segundos)
+        const now = Date.now();
+        if (!navigationMode.lastRerouteTime || (now - navigationMode.lastRerouteTime) > 10000) {
+            navigationMode.lastRerouteTime = now;
+
+            console.log(`🔄 Fora da rota (${minDistance.toFixed(0)}m). Recalculando...`);
+
+            showToast(
+                '🔄 Recalculando rota...',
+                'Você saiu do trajeto planejado',
+                'info',
+                2000
+            );
+
+            // Recalcular rota do ponto atual até o destino
+            await recalculateRoute(currentPos, navigationMode.destination);
+        }
+    }
+}
+
+// Recalcular rota com nova origem
+async function recalculateRoute(origin, destination) {
+    try {
+        const directionsService = new google.maps.DirectionsService();
+
+        const request = {
+            origin: origin,
+            destination: destination,
+            travelMode: google.maps.TravelMode.DRIVING,
+            optimizeWaypoints: false,
+            language: 'pt-BR',
+            region: 'BR'
+        };
+
+        const result = await directionsService.route(request);
+
+        if (result.status === 'OK') {
+            // Limpar rota antiga
+            if (window.routePolylines && window.routePolylines.length > 0) {
+                window.routePolylines.forEach(polyline => {
+                    if (polyline.setMap) {
+                        polyline.setMap(null);
+                    }
+                });
+                window.routePolylines = [];
+            }
+
+            // Desenhar nova rota
+            const route = result.routes[0];
+            const leg = route.legs[0];
+
+            const polyline = new google.maps.Polyline({
+                path: route.overview_path,
+                geodesic: true,
+                strokeColor: '#4285f4',
+                strokeOpacity: 0.8,
+                strokeWeight: 5,
+                map: map
+            });
+
+            window.routePolylines = [polyline];
+
+            // Formatar distância e duração
+            const distance = leg.distance.text;
+            const duration = leg.duration.text;
+
+            showToast(
+                '✅ Nova rota calculada',
+                `📏 ${distance} • ⏱️ ${duration}`,
+                'success',
+                3000
+            );
+
+            console.log('✅ Rota recalculada:', {
+                distance: leg.distance,
+                duration: leg.duration
+            });
+
+        } else {
+            console.error('Erro ao recalcular rota:', result.status);
+        }
+
+    } catch (error) {
+        console.error('Erro ao recalcular rota:', error);
+    }
+}
+
 // Atualizar visualização durante navegação
 function updateNavigationView() {
     if (!navigationMode.active || !navigationMode.destination) return;
@@ -2805,6 +2915,9 @@ function updateNavigationView() {
 
     // Calcular distância até o destino
     const distanceToDestination = calculateDistanceMeters(currentPos, navigationMode.destination);
+
+    // VERIFICAR SE ESTÁ FORA DA ROTA (Recálculo automático)
+    checkAndRerouteIfNeeded(currentPos);
 
     // Verificar se chegou ao destino (< 30 metros)
     if (distanceToDestination < 30) {
