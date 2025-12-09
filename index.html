@@ -335,6 +335,51 @@
         color: #4285F4;
     }
 
+    /* Botão de retomar navegação automática */
+    .resume-navigation-button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: 0;
+        border-radius: 24px;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        cursor: pointer;
+        padding: 12px 24px;
+        margin: 10px;
+        display: none; /* Escondido por padrão */
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+        animation: slideDown 0.3s ease-out;
+    }
+
+    .resume-navigation-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+    }
+
+    .resume-navigation-button:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    }
+
+    .resume-navigation-button .material-icons {
+        font-size: 20px;
+    }
+
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
     /* ===========================
        SISTEMA DE NOTIFICAÇÕES
        =========================== */
@@ -2719,32 +2764,66 @@ function setupNavigationMapInteraction() {
 
     interactionEvents.forEach(eventName => {
         map.addListener(eventName, () => {
-            if (navigationMode.active) {
+            if (navigationMode.active && !navigationMode.userInteracting) {
                 // Marcar que usuário está interagindo
                 navigationMode.userInteracting = true;
                 navigationMode.lastUserInteraction = Date.now();
 
-                // Limpar timeout anterior
-                if (navigationMode.autoResumeTimeout) {
-                    clearTimeout(navigationMode.autoResumeTimeout);
-                }
+                // Mostrar botão de retomar navegação
+                showResumeNavigationButton();
 
-                // Retomar controle automático após 8 segundos sem interação
-                navigationMode.autoResumeTimeout = setTimeout(() => {
-                    navigationMode.userInteracting = false;
-                    console.log('🔄 Retomando controle automático do mapa');
-
-                    // Opcional: mostrar toast informando
-                    showToast(
-                        '🧭 Navegação retomada',
-                        'Controle automático do mapa reativado',
-                        'info',
-                        2000
-                    );
-                }, 8000); // 8 segundos
+                console.log('✋ Usuário controlando o mapa - modo automático pausado');
             }
         });
     });
+}
+
+// Mostrar botão para retomar navegação automática
+function showResumeNavigationButton() {
+    let btn = document.getElementById('btnResumeNavigation');
+
+    // Criar botão se não existir
+    if (!btn) {
+        btn = document.createElement('button');
+        btn.id = 'btnResumeNavigation';
+        btn.className = 'resume-navigation-button';
+        btn.innerHTML = `
+            <i class="material-icons">gps_fixed</i>
+            <span>Retomar Navegação</span>
+        `;
+        btn.title = 'Voltar ao modo de navegação automática';
+
+        btn.addEventListener('click', resumeAutomaticNavigation);
+
+        // Adicionar ao mapa
+        map.controls[google.maps.ControlPosition.TOP_CENTER].push(btn);
+    }
+
+    // Mostrar botão
+    btn.style.display = 'flex';
+}
+
+// Esconder botão de retomar navegação
+function hideResumeNavigationButton() {
+    const btn = document.getElementById('btnResumeNavigation');
+    if (btn) {
+        btn.style.display = 'none';
+    }
+}
+
+// Retomar navegação automática
+function resumeAutomaticNavigation() {
+    navigationMode.userInteracting = false;
+    hideResumeNavigationButton();
+
+    console.log('🧭 Navegação automática retomada');
+
+    showToast(
+        '🧭 Navegação automática',
+        'O mapa voltará a seguir seu GPS',
+        'success',
+        2000
+    );
 }
 
 // Calcular heading (direção) entre duas posições
@@ -2848,6 +2927,9 @@ function stopNavigationMode() {
     if (btnStopNav) {
         btnStopNav.style.display = 'none';
     }
+
+    // Esconder botão de retomar navegação
+    hideResumeNavigationButton();
 
     // Mostrar botão adicionar cliente novamente
     const btnAddClient = document.getElementById('btn-add-client');
