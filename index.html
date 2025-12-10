@@ -2713,7 +2713,7 @@ let navigationMode = {
 
 // Retomar navegação com centralização suave (Google Maps style)
 function forceCenterOnGPS() {
-    if (!navigationMode.active) return;
+    if (!navigationMode.active || !map) return;
 
     // Obter posição atual do GPS
     let currentPos = null;
@@ -2729,31 +2729,40 @@ function forceCenterOnGPS() {
         }
     }
 
-    if (!currentPos || !map) return;
+    if (!currentPos) return;
 
-    // Calcular heading baseado na direção do movimento
-    let targetHeading = navigationMode.lastHeading || 0;
-    if (navigationMode.lastPosition) {
-        targetHeading = calculateHeading(navigationMode.lastPosition, currentPos);
-    }
+    // Marcar que o SISTEMA está atualizando (não o usuário) - EVITAR LOOP
+    navigationMode.systemUpdating = true;
 
-    // RETOMAR NAVEGAÇÃO - Método Google Maps
-    map.panTo(currentPos);  // Animação suave de centralização
+    // Usar o MESMO heading que está sendo usado na navegação contínua (movementHeading)
+    const targetHeading = navigationMode.lastHeading || 0;
 
-    const currentZoom = map.getZoom();
-    if (currentZoom < 17 || currentZoom > 19) {
-        map.setZoom(18);  // Ajustar zoom se necessário
-    }
+    // CENTRALIZAÇÃO IDÊNTICA à navegação normal
+    map.panTo(currentPos);
 
     if (map.setHeading) {
-        map.setHeading(targetHeading);  // Aplicar rotação completa
+        map.setHeading(targetHeading);
     }
 
-    if (map.setTilt && map.getTilt() < 45) {
-        map.setTilt(45);  // Aplicar inclinação se necessário
+    // Manter zoom adequado para navegação (MESMA LÓGICA)
+    const currentZoom = map.getZoom();
+    if (currentZoom < 17) {
+        map.setZoom(17);
+    } else if (currentZoom > 19) {
+        map.setZoom(18);
     }
 
-    console.log('🧭 Navegação retomada');
+    // Manter inclinação 3D para navegação (MESMA LÓGICA)
+    if (map.setTilt && map.getTilt() === 0) {
+        map.setTilt(45);
+    }
+
+    // Resetar flag após um pequeno delay
+    setTimeout(() => {
+        navigationMode.systemUpdating = false;
+    }, 100);
+
+    console.log('🔄 Retomando controle automático - centralização instantânea');
 }
 
 // Detectar quando usuário interage com o mapa durante navegação
