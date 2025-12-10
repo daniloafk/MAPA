@@ -4680,6 +4680,10 @@ async function addDeliveryMarkers() {
 
         if (error) throw error;
         deliveryData = data || [];
+
+        // DEBUG: Ver os primeiros 3 registros
+        console.log('🔍 DEBUG - Primeiros 3 registros do Supabase:', deliveryData.slice(0, 3));
+        console.log('🔍 DEBUG - Status do primeiro registro:', deliveryData[0]?.status);
     } catch (error) {
         console.error('Erro ao buscar delivery_data:', error);
         showToast(
@@ -4770,6 +4774,7 @@ async function addDeliveryMarkers() {
         const position = { lat: client.latitude, lng: client.longitude };
 
         console.log(`✅ Criando marcador verde para cliente: ${client.name} (${deliveryCount} entregas)`);
+        console.log(`🔍 DEBUG - Deliveries deste marcador:`, deliveries);
 
         // Criar marcador VERDE estilo pin do Google Maps
         const markerDiv = document.createElement('div');
