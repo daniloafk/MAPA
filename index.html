@@ -3014,10 +3014,10 @@ async function markAsNotDelivered(marker, client) {
         // Criar overlay com X vermelho sobre o marcador
         addNotDeliveredOverlay(marker);
 
-        // Reduzir opacidade do marcador (mais evidente que entregue mas ainda visível)
+        // Deixar cinza igual ao entregue (apenas o X vermelho diferencia)
         if (marker.content) {
-            marker.content.style.opacity = '0.6'; // Mais visível que o 0.35 de "entregue"
-            marker.content.style.filter = 'grayscale(20%)'; // Leve dessaturação
+            marker.content.style.opacity = '0.4'; // Mesma opacidade do entregue
+            marker.content.style.filter = 'grayscale(100%)'; // Cinza total igual ao entregue
         }
 
         showToast(
@@ -3609,7 +3609,7 @@ class GPSTracker {
         this.animationFrameId = requestAnimationFrame(animate);
     }
 
-    // Função auxiliar para definir posição do marcador
+    // Função auxiliar para definir posi��ão do marcador
     setMarkerPosition(position) {
         if (!this.marker) return;
 
@@ -5069,12 +5069,12 @@ async function addDeliveryMarkers() {
                 deliveredBtn.addEventListener('mouseleave', deliveredBtn._hoverOut);
                 console.log(`✅ Visual de ENTREGUE aplicado ao marcador verde: ${client.name}`);
             } else if (firstDelivery.status === 'not_delivered') {
-                // Aplicar visual de não entregue
+                // Aplicar visual de não entregue (cinza igual ao entregue + X vermelho)
                 marker.isNotDelivered = true;
                 addNotDeliveredOverlay(marker);
                 if (marker.content) {
-                    marker.content.style.opacity = '0.6';
-                    marker.content.style.filter = 'grayscale(20%)';
+                    marker.content.style.opacity = '0.4';
+                    marker.content.style.filter = 'grayscale(100%)';
                 }
                 console.log(`✅ Visual de NÃO ENTREGUE aplicado ao marcador verde: ${client.name}`);
             }
@@ -5396,12 +5396,12 @@ async function addDeliveryMarkers() {
                 deliveredBtn.addEventListener('mouseleave', deliveredBtn._hoverOut);
                 console.log(`✅ Visual de ENTREGUE aplicado ao marcador vermelho: ${locationData.address}`);
             } else if (firstDelivery.status === 'not_delivered') {
-                // Aplicar visual de não entregue
+                // Aplicar visual de não entregue (cinza igual ao entregue + X vermelho)
                 marker.isNotDelivered = true;
                 addNotDeliveredOverlay(marker);
                 if (marker.content) {
-                    marker.content.style.opacity = '0.6';
-                    marker.content.style.filter = 'grayscale(20%)';
+                    marker.content.style.opacity = '0.4';
+                    marker.content.style.filter = 'grayscale(100%)';
                 }
                 console.log(`✅ Visual de NÃO ENTREGUE aplicado ao marcador vermelho: ${locationData.address}`);
             }
