@@ -3058,6 +3058,7 @@ function addNotDeliveredOverlay(marker) {
     xOverlay.style.textShadow = '0 0 4px white, 0 0 8px white';
     xOverlay.style.pointerEvents = 'none';
     xOverlay.style.zIndex = '1000';
+    xOverlay.style.filter = 'none'; // 🔥 Garantir que o X não seja afetado pelo grayscale do pai
     xOverlay.innerHTML = '✕';
 
     // Adicionar ao marcador
@@ -3609,7 +3610,7 @@ class GPSTracker {
         this.animationFrameId = requestAnimationFrame(animate);
     }
 
-    // Função auxiliar para definir posi��ão do marcador
+    // Função auxiliar para definir posição do marcador
     setMarkerPosition(position) {
         if (!this.marker) return;
 
