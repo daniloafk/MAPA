@@ -9760,6 +9760,12 @@ async function handleFile(file) {
                 // Mudar botão para modo "Limpar planilha"
                 setButtonToClearMode();
 
+                // 🔥 GARANTIR QUE OS BOTÕES ESTEJAM NA POSIÇÃO CORRETA
+                // Esconder botão de limpar rotas e mostrar botão de planejar rota
+                document.getElementById('btnClearRoute').style.display = 'none';
+                document.getElementById('btnToggleRoute').style.display = 'flex';
+                routeMode = false;
+
                 showToast(
                     'Planilha atualizada!',
                     `${result.matchedCount} cadastrados, ${result.notRegisteredCount} não cadastrados`,
