@@ -5062,7 +5062,24 @@ async function addDeliveryMarkers() {
                     if (currentInfoWindow) currentInfoWindow.close();
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
-                    map.panTo(position);
+
+                    // Centralizar considerando o InfoWindow
+                    setTimeout(() => {
+                        const mapDiv = map.getDiv();
+                        const mapHeight = mapDiv.offsetHeight;
+                        const scale = Math.pow(2, map.getZoom());
+
+                        // Offset para mover o marcador mais para baixo (InfoWindow aparece acima)
+                        const offsetY = 150; // pixels para deslocar para baixo
+                        const latOffset = offsetY / scale * (85 / 111000); // Conversão aproximada
+
+                        const newCenter = {
+                            lat: position.lat - latOffset,
+                            lng: position.lng
+                        };
+
+                        map.panTo(newCenter);
+                    }, 100);
                 });
 
                 deliveryMarkers[`registered_${clientId}`] = marker;
@@ -5086,7 +5103,24 @@ async function addDeliveryMarkers() {
                     if (currentInfoWindow) currentInfoWindow.close();
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
-                    map.panTo(position);
+
+                    // Centralizar considerando o InfoWindow
+                    setTimeout(() => {
+                        const mapDiv = map.getDiv();
+                        const mapHeight = mapDiv.offsetHeight;
+                        const scale = Math.pow(2, map.getZoom());
+
+                        // Offset para mover o marcador mais para baixo (InfoWindow aparece acima)
+                        const offsetY = 150; // pixels para deslocar para baixo
+                        const latOffset = offsetY / scale * (85 / 111000); // Conversão aproximada
+
+                        const newCenter = {
+                            lat: position.lat - latOffset,
+                            lng: position.lng
+                        };
+
+                        map.panTo(newCenter);
+                    }, 100);
                 });
 
                 deliveryMarkers[`registered_${clientId}`] = marker;
@@ -5437,7 +5471,24 @@ async function addDeliveryMarkers() {
                     const tiltListener = map.addListener('tilt_changed', () => {
                         if (map.getTilt() !== savedTilt) map.setTilt(savedTilt);
                     });
-                    map.panTo(position);
+
+                    // Centralizar considerando o InfoWindow
+                    setTimeout(() => {
+                        const mapDiv = map.getDiv();
+                        const scale = Math.pow(2, map.getZoom());
+
+                        // Offset para mover o marcador mais para baixo (InfoWindow aparece acima)
+                        const offsetY = 150; // pixels para deslocar para baixo
+                        const latOffset = offsetY / scale * (85 / 111000); // Conversão aproximada
+
+                        const newCenter = {
+                            lat: position.lat - latOffset,
+                            lng: position.lng
+                        };
+
+                        map.panTo(newCenter);
+                    }, 100);
+
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
                     setTimeout(() => {
@@ -5470,7 +5521,24 @@ async function addDeliveryMarkers() {
                     const tiltListener = map.addListener('tilt_changed', () => {
                         if (map.getTilt() !== savedTilt) map.setTilt(savedTilt);
                     });
-                    map.panTo(position);
+
+                    // Centralizar considerando o InfoWindow
+                    setTimeout(() => {
+                        const mapDiv = map.getDiv();
+                        const scale = Math.pow(2, map.getZoom());
+
+                        // Offset para mover o marcador mais para baixo (InfoWindow aparece acima)
+                        const offsetY = 150; // pixels para deslocar para baixo
+                        const latOffset = offsetY / scale * (85 / 111000); // Conversão aproximada
+
+                        const newCenter = {
+                            lat: position.lat - latOffset,
+                            lng: position.lng
+                        };
+
+                        map.panTo(newCenter);
+                    }, 100);
+
                     infoWindow.open(map, marker);
                     currentInfoWindow = infoWindow;
                     setTimeout(() => {
