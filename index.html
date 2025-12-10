@@ -3333,51 +3333,31 @@ function updateNavigationView() {
     }
 
     // =================================================================
-    // CORREÇÃO DA ROTAÇÃO (HEADING) - Seguindo Google Gemini
+    // ROTAÇÃO DO MAPA - Sempre apontar para o DESTINO
     // =================================================================
 
-    // Calcular heading baseado na direção do MOVIMENTO do veículo
-    let movementHeading = navigationMode.lastHeading;
+    // Calcular heading baseado na direção ATUAL → DESTINO (não baseado em movimento passado)
+    // Isso faz o mapa sempre apontar "para frente" (onde você está indo)
+    const headingToDestination = calculateHeading(currentPos, navigationMode.destination);
 
-    if (navigationMode.lastPosition) {
-        const movementDistance = calculateDistanceMeters(navigationMode.lastPosition, currentPos);
+    let movementHeading = headingToDestination;
 
-        // AJUSTE 1: Aumentamos o limiar de 2m para 6m.
-        // Isso evita que o mapa gire com o "ruído" do GPS quando parado ou muito devagar.
-        const MIN_DISTANCE_FOR_ROTATION = 6;
+    // Suavizar a transição do heading para evitar saltos bruscos
+    if (navigationMode.lastHeading !== undefined && navigationMode.lastHeading !== 0) {
+        let diff = headingToDestination - navigationMode.lastHeading;
 
-        // Só atualiza o ângulo se o deslocamento for significativo
-        if (movementDistance > MIN_DISTANCE_FOR_ROTATION) {
-            const newHeading = calculateHeading(navigationMode.lastPosition, currentPos);
+        // Normalizar diferença para o menor caminho (ex: de 350° para 10° é +20°, não -340°)
+        if (diff > 180) diff -= 360;
+        if (diff < -180) diff += 360;
 
-            // Suavizar a transição do heading para evitar saltos bruscos
-            if (movementHeading !== 0) {
-                let diff = newHeading - movementHeading;
+        // Fator de suavização (Lerp) - transição suave
+        const SMOOTHING_FACTOR = 0.15;
 
-                // Normalizar diferença para o menor caminho (ex: de 350° para 10° é +20°, não -340°)
-                if (diff > 180) diff -= 360;
-                if (diff < -180) diff += 360;
-
-                // AJUSTE 2: Fator de suavização (Lerp) muito mais suave.
-                // Antes era 0.5 (rápido/instável). Agora 0.1 (lento/estável).
-                // Significa: "Mova apenas 10% em direção ao novo ângulo a cada atualização".
-                const SMOOTHING_FACTOR = 0.1;
-
-                movementHeading = (movementHeading + diff * SMOOTHING_FACTOR + 360) % 360;
-            } else {
-                movementHeading = newHeading;
-            }
-
-            // Atualiza o último heading conhecido apenas quando há movimento confiável
-            navigationMode.lastHeading = movementHeading;
-        }
-        // Se a distância for < 6m, mantemos o 'movementHeading' anterior (o mapa não gira)
-    } else {
-        // Primeira posição - usar direção para o destino como inicial
-        movementHeading = calculateHeading(currentPos, navigationMode.destination);
-        navigationMode.lastHeading = movementHeading;
+        movementHeading = (navigationMode.lastHeading + diff * SMOOTHING_FACTOR + 360) % 360;
     }
 
+    // Atualizar último heading
+    navigationMode.lastHeading = movementHeading;
     navigationMode.lastPosition = currentPos;
 
     // ✨ PERMITIR INTERAÇÃO DO USUÁRIO
@@ -4895,7 +4875,7 @@ async function addDeliveryMarkers() {
         const position = { lat: client.latitude, lng: client.longitude };
 
         console.log(`✅ Criando marcador verde para cliente: ${client.name} (${deliveryCount} entregas)`);
-        console.log(`���� DEBUG - Deliveries deste marcador:`, deliveries);
+        console.log(`🔍 DEBUG - Deliveries deste marcador:`, deliveries);
 
         // Criar marcador VERDE estilo pin do Google Maps
         const markerDiv = document.createElement('div');
