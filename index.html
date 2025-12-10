@@ -9615,6 +9615,17 @@ async function clearSpreadsheetData() {
         // Voltar botão para modo upload
         setButtonToUploadMode();
 
+        // Resetar estado do botão "Planejar rota de entrega"
+        const btnToggleRoute = document.getElementById('btnToggleRoute');
+        if (btnToggleRoute) {
+            btnToggleRoute.classList.remove('active');
+        }
+        routeMode = false;
+
+        // Garantir que os botões estão na posição correta
+        document.getElementById('btnClearRoute').style.display = 'none';
+        document.getElementById('btnToggleRoute').style.display = 'flex';
+
         showToast(
             '🗑️ Planilha limpa!',
             'Todos os dados foram removidos. Sistema pronto para nova planilha.',
