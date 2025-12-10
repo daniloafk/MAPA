@@ -4733,7 +4733,8 @@ async function addDeliveryMarkers() {
                 id: delivery.id,
                 spx_tn: delivery.spx_tn,
                 sequence: delivery.sequence,
-                destination_address: delivery.destination_address
+                destination_address: delivery.destination_address,
+                status: delivery.status // PRESERVE STATUS FIELD
             });
         } else {
             // Endereço NÃO CADASTRADO: agrupar por coordenada da planilha
@@ -4752,7 +4753,8 @@ async function addDeliveryMarkers() {
                 id: delivery.id,
                 spx_tn: delivery.spx_tn,
                 sequence: delivery.sequence || groupedByUnregistered[coordKey].deliveries.length + 1,
-                destination_address: delivery.destination_address
+                destination_address: delivery.destination_address,
+                status: delivery.status // PRESERVE STATUS FIELD
             });
         }
     });
