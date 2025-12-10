@@ -7739,29 +7739,9 @@ function deactivateRouteMode() {
 // Nova função: Limpar TUDO (marcadores + rotas + cluster)
 async function clearAllRoutesAndMarkers() {
     console.log('🗑️ ========================================');
-    console.log('🗑️ INICIANDO LIMPEZA COMPLETA...');
+    console.log('🗑️ LIMPANDO ROTAS E MARCADORES DO MAPA...');
+    console.log('🗑️ (Dados da planilha serão mantidos no Supabase)');
     console.log('🗑️ ========================================');
-
-    // 🔥 DELETAR TODOS OS DADOS DO SUPABASE
-    try {
-        console.log('🗑️ Deletando todos os dados do Supabase...');
-        const { error } = await supabase
-            .from('delivery_data')
-            .delete()
-            .neq('id', '00000000-0000-0000-0000-000000000000'); // Deleta todos os registros
-
-        if (error) {
-            console.error('❌ Erro ao deletar dados do Supabase:', error);
-            showToast('❌ Erro ao limpar banco de dados', 'Tente novamente', 'error', 4000);
-            return;
-        }
-
-        console.log('✅ Dados deletados do Supabase com sucesso!');
-    } catch (error) {
-        console.error('❌ Erro ao deletar dados:', error);
-        showToast('❌ Erro ao limpar banco de dados', 'Tente novamente', 'error', 4000);
-        return;
-    }
 
     // Desativar modo de rota se estiver ativo
     if (routeMode) {
@@ -7838,16 +7818,17 @@ async function clearAllRoutesAndMarkers() {
     // 4. RESETAR completamente o objeto de marcadores
     deliveryMarkers = {};
 
-    // 5. Voltar botão de upload para modo padrão
-    setButtonToUploadMode();
+    // ⚠️ NÃO voltar botão de upload para modo padrão
+    // Os dados da planilha continuam no Supabase, apenas limpamos os marcadores visuais
 
     console.log('✅ ========================================');
-    console.log('✅ LIMPEZA COMPLETA REALIZADA!');
+    console.log('✅ MARCADORES E ROTAS REMOVIDOS DO MAPA!');
+    console.log('✅ Dados da planilha mantidos no Supabase');
     console.log('✅ ========================================');
 
     showToast(
-        '🗑️ Tudo limpo!',
-        'Dados deletados e marcadores removidos',
+        '🗑️ Marcadores limpos!',
+        'Clique em "Planejar rota" para ver novamente',
         'success',
         3000
     );
