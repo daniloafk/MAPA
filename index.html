@@ -3288,8 +3288,8 @@ function updateNavigationView() {
                     map.setZoom(18);
                 }
 
-                // Recriar InfoWindow com botão "Não Entregue" ao invés de "Navegar"
-                replaceNavigateButtonWithNotDelivered(arrivedMarker, arrivedInfoWindow, arrivedClient);
+                // ❌ REMOVIDO: Não precisa mais substituir o botão, agora "Não Entregue" aparece sempre
+                // replaceNavigateButtonWithNotDelivered(arrivedMarker, arrivedInfoWindow, arrivedClient);
 
                 // Abrir InfoWindow
                 arrivedInfoWindow.open(map, arrivedMarker);
@@ -5029,8 +5029,32 @@ async function addDeliveryMarkers() {
                 }
             });
 
+            // 🔥 NOVO: Botão "Não Entregue"
+            const notDeliveredBtn = document.createElement('button');
+            notDeliveredBtn.style.flex = '1';
+            notDeliveredBtn.style.padding = '6px 10px';
+            notDeliveredBtn.style.background = '#EA4335';
+            notDeliveredBtn.style.color = 'white';
+            notDeliveredBtn.style.border = 'none';
+            notDeliveredBtn.style.borderRadius = '4px';
+            notDeliveredBtn.style.fontSize = '12px';
+            notDeliveredBtn.style.fontWeight = '600';
+            notDeliveredBtn.style.cursor = 'pointer';
+            notDeliveredBtn.style.transition = 'background 0.2s';
+            notDeliveredBtn.style.whiteSpace = 'nowrap';
+            notDeliveredBtn.innerHTML = '✕ Não Entregue';
+            notDeliveredBtn.addEventListener('mouseenter', () => { notDeliveredBtn.style.background = '#c5351c'; });
+            notDeliveredBtn.addEventListener('mouseleave', () => { notDeliveredBtn.style.background = '#EA4335'; });
+            notDeliveredBtn.addEventListener('click', async () => {
+                await markAsNotDelivered(marker, client);
+                if (currentInfoWindow) {
+                    currentInfoWindow.close();
+                }
+            });
+
             buttonsContainer.appendChild(navigateBtn);
             buttonsContainer.appendChild(deliveredBtn);
+            buttonsContainer.appendChild(notDeliveredBtn);
 
             // Aplicar visual baseado no status (se já foi entregue ou não entregue)
             const firstDelivery = deliveries[0];
@@ -5356,8 +5380,38 @@ async function addDeliveryMarkers() {
                 }
             });
 
+            // 🔥 NOVO: Botão "Não Entregue"
+            const notDeliveredBtn = document.createElement('button');
+            notDeliveredBtn.style.flex = '1';
+            notDeliveredBtn.style.padding = '6px 10px';
+            notDeliveredBtn.style.background = '#EA4335';
+            notDeliveredBtn.style.color = 'white';
+            notDeliveredBtn.style.border = 'none';
+            notDeliveredBtn.style.borderRadius = '4px';
+            notDeliveredBtn.style.fontSize = '12px';
+            notDeliveredBtn.style.fontWeight = '600';
+            notDeliveredBtn.style.cursor = 'pointer';
+            notDeliveredBtn.style.transition = 'background 0.2s';
+            notDeliveredBtn.style.whiteSpace = 'nowrap';
+            notDeliveredBtn.innerHTML = '✕ Não Entregue';
+            notDeliveredBtn.addEventListener('mouseenter', () => { notDeliveredBtn.style.background = '#c5351c'; });
+            notDeliveredBtn.addEventListener('mouseleave', () => { notDeliveredBtn.style.background = '#EA4335'; });
+            notDeliveredBtn.addEventListener('click', async () => {
+                const clientData = {
+                    name: locationData.address || 'Cliente',
+                    latitude: position.lat,
+                    longitude: position.lng,
+                    address: fullAddress
+                };
+                await markAsNotDelivered(marker, clientData);
+                if (currentInfoWindow) {
+                    currentInfoWindow.close();
+                }
+            });
+
             buttonsContainer.appendChild(navigateBtn);
             buttonsContainer.appendChild(deliveredBtn);
+            buttonsContainer.appendChild(notDeliveredBtn);
 
             // Aplicar visual baseado no status (se já foi entregue ou não entregue)
             const firstDelivery = locationData.deliveries[0];
