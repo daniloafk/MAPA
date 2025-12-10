@@ -2971,20 +2971,30 @@ async function markAsNotDelivered(marker, client) {
 
         if (deliveryIds.length > 0) {
             // Atualizar status no Supabase para cada entrega
+            // Apenas status, sem not_delivered_at (coluna pode não existir)
             const { error } = await supabase
                 .from('delivery_data')
                 .update({
-                    status: 'not_delivered',
-                    not_delivered_at: new Date().toISOString()
+                    status: 'not_delivered'
                 })
                 .in('id', deliveryIds);
 
             if (error) {
-                console.error('Erro ao atualizar Supabase:', error);
+                console.error('❌ Erro ao atualizar Supabase (not_delivered):', error);
+                console.error('❌ Detalhes do erro:', JSON.stringify(error, null, 2));
                 throw error;
             }
 
             console.log(`✅ ${deliveryIds.length} entrega(s) marcada(s) como não entregue no banco de dados`);
+        } else {
+            console.warn('⚠️ Nenhum delivery ID encontrado no marcador!');
+            showToast(
+                '⚠️ Aviso',
+                'Marcador não possui entregas associadas',
+                'warning',
+                3000
+            );
+            return;
         }
 
         // Marcar o marcador como não entregue
