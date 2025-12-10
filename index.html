@@ -2972,20 +2972,30 @@ async function markAsNotDelivered(marker, client) {
         if (deliveryIds.length > 0) {
             // Atualizar status no Supabase para cada entrega
             // Apenas status, sem not_delivered_at (coluna pode não existir)
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('delivery_data')
                 .update({
                     status: 'not_delivered'
                 })
-                .in('id', deliveryIds);
+                .in('id', deliveryIds)
+                .select(); // Adicionar select() para retornar os dados atualizados
 
             if (error) {
-                console.error('❌ Erro ao atualizar Supabase (not_delivered):', error);
-                console.error('❌ Detalhes do erro:', JSON.stringify(error, null, 2));
+                console.error('❌ ERRO ao atualizar Supabase (not_delivered):', error);
+                console.error('❌ Mensagem:', error.message);
+                console.error('❌ Detalhes:', error.details);
+                console.error('❌ Hint:', error.hint);
+                showToast(
+                    '❌ Erro ao salvar',
+                    error.message || 'Não foi possível salvar no banco',
+                    'error',
+                    5000
+                );
                 throw error;
             }
 
             console.log(`✅ ${deliveryIds.length} entrega(s) marcada(s) como não entregue no banco de dados`);
+            console.log('✅ Dados retornados do Supabase:', data);
         } else {
             console.warn('⚠️ Nenhum delivery ID encontrado no marcador!');
             showToast(
@@ -4180,20 +4190,31 @@ async function markAsDelivered(deliveries, client, marker, coordKey, deliveredBt
         const deliveryIds = deliveries.map(d => d.id);
         console.log('🔍 IDs das entregas:', deliveryIds);
 
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('delivery_data')
             .update({
                 status: 'delivered',
                 delivered_at: new Date().toISOString()
             })
-            .in('id', deliveryIds);
+            .in('id', deliveryIds)
+            .select(); // Adicionar select() para retornar os dados atualizados
 
         if (error) {
-            console.error('❌ Erro ao atualizar Supabase:', error);
+            console.error('❌ ERRO ao atualizar Supabase:', error);
+            console.error('❌ Mensagem:', error.message);
+            console.error('❌ Detalhes:', error.details);
+            console.error('❌ Hint:', error.hint);
+            showToast(
+                '❌ Erro ao salvar',
+                error.message || 'Não foi possível salvar no banco',
+                'error',
+                5000
+            );
             throw error;
         }
 
         console.log(`✅ ${deliveryIds.length} entrega(s) atualizada(s) no banco de dados com sucesso!`);
+        console.log('✅ Dados retornados do Supabase:', data);
 
         // Marcar como entregue (tornar cinza e semi-transparente)
         if (marker) {
