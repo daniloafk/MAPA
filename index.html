@@ -2707,7 +2707,8 @@ let navigationMode = {
     lastRerouteTime: null, // Para controlar frequência de recálculo de rota
     userInteracting: false, // Flag para detectar interação do usuário
     lastUserInteraction: null, // Timestamp da última interação
-    autoResumeTimeout: null // Timeout para retomar controle automático
+    autoResumeTimeout: null, // Timeout para retomar controle automático
+    systemUpdating: false // Flag para ignorar eventos quando o sistema está atualizando
 };
 
 // Retomar navegação com centralização suave (Google Maps style)
@@ -2764,6 +2765,11 @@ function setupNavigationMapInteraction() {
 
     interactionEvents.forEach(eventName => {
         map.addListener(eventName, () => {
+            // IGNORAR eventos quando o sistema está atualizando (evita loop)
+            if (navigationMode.systemUpdating) {
+                return;
+            }
+
             if (navigationMode.active) {
                 // Marcar que usuário está interagindo
                 navigationMode.userInteracting = true;
@@ -2774,12 +2780,14 @@ function setupNavigationMapInteraction() {
                     clearTimeout(navigationMode.autoResumeTimeout);
                 }
 
+                console.log('✋ Usuário interagiu - pausando navegação automática');
+
                 // Retomar controle automático após 0.5 segundos sem interação
                 navigationMode.autoResumeTimeout = setTimeout(() => {
                     navigationMode.userInteracting = false;
-                    console.log('🔄 Retomando controle automático - centralização instantânea');
+                    console.log('🔄 Retomando controle automático');
 
-                    // Forçar centralização INSTANTÂNEA e COMPLETA
+                    // Forçar centralização
                     forceCenterOnGPS();
                 }, 500); // 0.5 segundos
             }
@@ -3147,6 +3155,9 @@ function updateNavigationView() {
 
     // ✨ PERMITIR INTERAÇÃO DO USUÁRIO
     if (!navigationMode.userInteracting && map) {
+        // Marcar que o SISTEMA está atualizando (não o usuário)
+        navigationMode.systemUpdating = true;
+
         // Acompanhamento suave do GPS
         map.panTo(currentPos);
 
@@ -3167,6 +3178,11 @@ function updateNavigationView() {
         if (map.setTilt && map.getTilt() === 0) {
             map.setTilt(45);
         }
+
+        // Resetar flag após um pequeno delay
+        setTimeout(() => {
+            navigationMode.systemUpdating = false;
+        }, 100);
     }
     // Se usuário estiver interagindo, não fazer nada (deixar ele controlar o mapa)
 }
