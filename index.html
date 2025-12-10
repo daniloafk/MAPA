@@ -4979,7 +4979,17 @@ async function addDeliveryMarkers() {
             marker.deliveries = deliveries;
 
             // Adicionar botões ao container (agora que o marker foi criado)
-            // Botão de navegação
+            // Calcular distância do usuário ao marcador
+            let distanceToMarker = Infinity;
+            if (userLocationMarker && userLocationMarker.position) {
+                const userPos = userLocationMarker.position;
+                distanceToMarker = google.maps.geometry.spherical.computeDistanceBetween(
+                    new google.maps.LatLng(userPos.lat, userPos.lng),
+                    new google.maps.LatLng(position.lat, position.lng)
+                );
+            }
+
+            // Botão de navegação (só aparece se estiver longe - mais de 30m)
             const navigateBtn = document.createElement('button');
             navigateBtn.style.flex = '1';
             navigateBtn.style.padding = '6px 10px';
@@ -4996,6 +5006,12 @@ async function addDeliveryMarkers() {
             navigateBtn.addEventListener('mouseenter', () => { navigateBtn.style.background = '#3367d6'; });
             navigateBtn.addEventListener('mouseleave', () => { navigateBtn.style.background = '#4285f4'; });
             navigateBtn.addEventListener('click', () => { navigateToClient(client, marker, infoWindow); });
+
+            // 🔥 Esconder botão Navegar se estiver próximo (< 30m)
+            const isNearby = distanceToMarker < 30;
+            if (isNearby) {
+                navigateBtn.style.display = 'none';
+            }
 
             // Botão marcar como entregue / desfazer
             const deliveredBtn = document.createElement('button');
@@ -5322,7 +5338,17 @@ async function addDeliveryMarkers() {
             marker.deliveries = locationData.deliveries;
 
             // Adicionar botões ao container (agora que o marker foi criado)
-            // Botão de navegação
+            // Calcular distância do usuário ao marcador
+            let distanceToMarker = Infinity;
+            if (userLocationMarker && userLocationMarker.position) {
+                const userPos = userLocationMarker.position;
+                distanceToMarker = google.maps.geometry.spherical.computeDistanceBetween(
+                    new google.maps.LatLng(userPos.lat, userPos.lng),
+                    new google.maps.LatLng(position.lat, position.lng)
+                );
+            }
+
+            // Botão de navegação (só aparece se estiver longe - mais de 30m)
             const navigateBtn = document.createElement('button');
             navigateBtn.style.flex = '1';
             navigateBtn.style.padding = '6px 10px';
@@ -5347,6 +5373,12 @@ async function addDeliveryMarkers() {
                 };
                 navigateToClient(clientData, marker, infoWindow);
             });
+
+            // 🔥 Esconder botão Navegar se estiver próximo (< 30m)
+            const isNearby = distanceToMarker < 30;
+            if (isNearby) {
+                navigateBtn.style.display = 'none';
+            }
 
             // Botão marcar como entregue / desfazer
             const deliveredBtn = document.createElement('button');
@@ -9945,7 +9977,7 @@ async function processSpreadsheetData(jsonData) {
                 .replace(/\s+/g, ' ')
                 // Remove pontuação (vírgulas, pontos, etc.)
                 .replace(/[.,;:\-]/g, ' ')
-                // Remove espaços novamente após remover pontuação
+                // Remove espaços novamente ap��s remover pontuação
                 .replace(/\s+/g, ' ')
                 .trim();
         };
