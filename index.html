@@ -3333,50 +3333,9 @@ function updateNavigationView() {
     }
 
     // =================================================================
-    // ROTAÇÃO DO MAPA - Orientação "celular na vertical"
-    // O mapa gira para que a direção do MOVIMENTO sempre aponte PARA CIMA
+    // ORIENTAÇÃO DO MAPA - Norte sempre para cima
+    // Mapa não gira, fica sempre com norte fixo no topo
     // =================================================================
-
-    // Calcular heading baseado na direção do MOVIMENTO (posição anterior → atual)
-    let movementHeading = navigationMode.lastHeading || 0;
-
-    if (navigationMode.lastPosition) {
-        const movementDistance = calculateDistanceMeters(navigationMode.lastPosition, currentPos);
-
-        // Reduzido para 3m - gira mais cedo durante mudanças de direção
-        const MIN_DISTANCE_FOR_ROTATION = 3;
-
-        if (movementDistance > MIN_DISTANCE_FOR_ROTATION) {
-            // Calcular direção do movimento: de onde vim → para onde estou
-            const newHeading = calculateHeading(navigationMode.lastPosition, currentPos);
-
-            // Suavizar a transição do heading para evitar saltos bruscos
-            if (movementHeading !== 0 && navigationMode.lastHeading !== undefined) {
-                let diff = newHeading - movementHeading;
-
-                // Normalizar diferença para o menor caminho (ex: de 350° para 10° é +20°, não -340°)
-                if (diff > 180) diff -= 360;
-                if (diff < -180) diff += 360;
-
-                // Aumentado para 0.5 - gira MUITO mais rápido e responsivo
-                // Isso faz o mapa virar quase instantaneamente ao mudar de direção
-                const SMOOTHING_FACTOR = 0.5;
-
-                movementHeading = (movementHeading + diff * SMOOTHING_FACTOR + 360) % 360;
-            } else {
-                // Primeira vez ou heading zerado - usar diretamente o novo heading
-                movementHeading = newHeading;
-            }
-
-            // Atualiza o último heading conhecido
-            navigationMode.lastHeading = movementHeading;
-        }
-        // Se distância < 3m, mantém heading anterior (não gira quando parado/devagar)
-    } else {
-        // Primeira posição - usar direção para o destino como inicial
-        movementHeading = calculateHeading(currentPos, navigationMode.destination);
-        navigationMode.lastHeading = movementHeading;
-    }
 
     navigationMode.lastPosition = currentPos;
 
@@ -3388,10 +3347,9 @@ function updateNavigationView() {
         // Acompanhamento suave do GPS
         map.panTo(currentPos);
 
-        // Rotação suave na direção do movimento
-        // Inverte o heading em 180° para que a direção aponte PARA CIMA (não para baixo)
+        // Manter norte sempre para cima (heading 0 = norte)
         if (map.setHeading) {
-            map.setHeading((movementHeading + 180) % 360);
+            map.setHeading(0);
         }
 
         // Manter zoom adequado para navegação
@@ -6596,7 +6554,7 @@ async function handleQRCodeResult(qrData) {
             return;
         }
 
-        // Cliente NÃO cadastrado - fluxo normal de cadastro
+        // Cliente N��O cadastrado - fluxo normal de cadastro
         scannedAddress = addressData.address;
         scannedQRCode = qrData;
         scannedLatLng = {
@@ -9647,7 +9605,7 @@ async function showMatchedClientMarkers() {
             navigateBtn.style.fontWeight = 'bold';
             navigateBtn.style.cursor = 'pointer';
             navigateBtn.style.transition = 'background 0.2s';
-            navigateBtn.innerHTML = '🧭 Navegar até cliente';
+            navigateBtn.innerHTML = '���� Navegar até cliente';
 
             navigateBtn.addEventListener('mouseenter', () => {
                 navigateBtn.style.background = '#3367d6';
