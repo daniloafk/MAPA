@@ -7614,6 +7614,13 @@ setTimeout(async () => {
             // Se há dados da planilha, mudar botão para modo "Limpar"
             setButtonToClearMode();
             console.log('📊 Planilha detectada no banco de dados');
+
+            // NOVO: Carregar marcadores automaticamente ao iniciar
+            console.log('🔄 Carregando marcadores automaticamente...');
+            setTimeout(async () => {
+                await activateRouteMode();
+                console.log('✅ Marcadores carregados automaticamente!');
+            }, 1000); // Aguardar 1s para garantir que o mapa está pronto
         } else {
             // Sem dados, manter botão em modo "Upload"
             setButtonToUploadMode();
