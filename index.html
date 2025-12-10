@@ -3402,9 +3402,9 @@ function updateNavigationView() {
             map.setZoom(18);
         }
 
-        // Manter mapa totalmente reto (vista de cima, sem inclinação)
-        if (map.setTilt && map.getTilt() !== 0) {
-            map.setTilt(0);
+        // Manter perspectiva 3D para navegação
+        if (map.setTilt && map.getTilt() !== 45) {
+            map.setTilt(45);
         }
 
         // Resetar flag após um pequeno delay
@@ -6319,7 +6319,7 @@ async function startCamera() {
         }
     }
 
-    // ���� CONSTRAINTS EXATAMENTE COMO O GEMINI ESPECIFICA
+    // 🎯 CONSTRAINTS EXATAMENTE COMO O GEMINI ESPECIFICA
     const constraints = {
         video: {
             facingMode: "environment", // Prioriza a câmera traseira (como Gemini especificou)
@@ -8077,7 +8077,7 @@ async function clearAllRoutesAndMarkers() {
     console.log('🗑️ ========================================');
     console.log('🗑️ LIMPANDO ROTAS E MARCADORES DO MAPA...');
     console.log('🗑️ (Dados da planilha serão mantidos no Supabase)');
-    console.log('����️ ========================================');
+    console.log('🗑️ ========================================');
 
     // Desativar modo de rota se estiver ativo
     if (routeMode) {
@@ -9195,7 +9195,7 @@ async function showClientMarkers() {
         // Criar marcador para cada cliente
         clients.forEach((client, index) => {
             if (!client.latitude || !client.longitude) {
-                console.warn(`Cliente ${client.name} não tem coordenadas v��lidas`);
+                console.warn(`Cliente ${client.name} não tem coordenadas válidas`);
                 return;
             }
 
