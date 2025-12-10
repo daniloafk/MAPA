@@ -3389,8 +3389,9 @@ function updateNavigationView() {
         map.panTo(currentPos);
 
         // Rotação suave na direção do movimento
+        // Inverte o heading em 180° para que a direção aponte PARA CIMA (não para baixo)
         if (map.setHeading) {
-            map.setHeading(movementHeading);
+            map.setHeading((movementHeading + 180) % 360);
         }
 
         // Manter zoom adequado para navegação
