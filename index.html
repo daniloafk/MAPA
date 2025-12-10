@@ -2951,6 +2951,9 @@ async function markAsNotDelivered(marker, client) {
     if (!marker) return;
 
     console.log('❌ Marcando como não entregue:', client);
+    console.log('🔍 Marker:', marker);
+    console.log('🔍 Marker.deliveries:', marker.deliveries);
+    console.log('🔍 Marker.originalState:', marker.originalState);
 
     try {
         // Obter os IDs das entregas associadas a este marcador
@@ -2958,8 +2961,12 @@ async function markAsNotDelivered(marker, client) {
 
         if (marker.originalState && marker.originalState.deliveries) {
             deliveryIds = marker.originalState.deliveries.map(d => d.id);
+            console.log('✅ Usando marker.originalState.deliveries:', deliveryIds);
         } else if (marker.deliveries) {
             deliveryIds = marker.deliveries.map(d => d.id);
+            console.log('✅ Usando marker.deliveries:', deliveryIds);
+        } else {
+            console.error('❌ Marcador não possui deliveries!');
         }
 
         if (deliveryIds.length > 0) {
@@ -4156,9 +4163,12 @@ function createPinSVG(number) {
 async function markAsDelivered(deliveries, client, marker, coordKey, deliveredBtn) {
     try {
         console.log('📦 Marcando entregas como concluídas:', deliveries);
+        console.log('🔍 Client:', client);
+        console.log('🔍 Marker:', marker);
 
         // Atualizar status no Supabase para cada entrega
         const deliveryIds = deliveries.map(d => d.id);
+        console.log('🔍 IDs das entregas:', deliveryIds);
 
         const { error } = await supabase
             .from('delivery_data')
@@ -4169,11 +4179,11 @@ async function markAsDelivered(deliveries, client, marker, coordKey, deliveredBt
             .in('id', deliveryIds);
 
         if (error) {
-            console.error('Erro ao atualizar Supabase:', error);
+            console.error('❌ Erro ao atualizar Supabase:', error);
             throw error;
         }
 
-        console.log(`✅ ${deliveryIds.length} entrega(s) atualizada(s) no banco de dados`);
+        console.log(`✅ ${deliveryIds.length} entrega(s) atualizada(s) no banco de dados com sucesso!`);
 
         // Marcar como entregue (tornar cinza e semi-transparente)
         if (marker) {
@@ -4983,7 +4993,17 @@ async function addDeliveryMarkers() {
 
             // Aplicar visual baseado no status (se já foi entregue ou não entregue)
             const firstDelivery = deliveries[0];
+            console.log(`🔍 Status do marcador verde ${client.name}:`, firstDelivery.status);
+
             if (firstDelivery.status === 'delivered') {
+                // Salvar originalState para poder desfazer
+                marker.originalState = {
+                    deliveries: deliveries,
+                    client: client,
+                    coordKey: null,
+                    isGreen: true
+                };
+
                 // Aplicar visual de entregue
                 marker.isDelivered = true;
                 if (marker.content) {
@@ -5007,6 +5027,7 @@ async function addDeliveryMarkers() {
                 deliveredBtn._hoverOut = () => { deliveredBtn.style.background = '#FF9800'; };
                 deliveredBtn.addEventListener('mouseenter', deliveredBtn._hoverIn);
                 deliveredBtn.addEventListener('mouseleave', deliveredBtn._hoverOut);
+                console.log(`✅ Visual de ENTREGUE aplicado ao marcador verde: ${client.name}`);
             } else if (firstDelivery.status === 'not_delivered') {
                 // Aplicar visual de não entregue
                 marker.isNotDelivered = true;
@@ -5015,6 +5036,7 @@ async function addDeliveryMarkers() {
                     marker.content.style.opacity = '0.6';
                     marker.content.style.filter = 'grayscale(20%)';
                 }
+                console.log(`✅ Visual de NÃO ENTREGUE aplicado ao marcador verde: ${client.name}`);
             }
 
             bounds.extend(position);
@@ -5298,7 +5320,17 @@ async function addDeliveryMarkers() {
 
             // Aplicar visual baseado no status (se já foi entregue ou não entregue)
             const firstDelivery = locationData.deliveries[0];
+            console.log(`🔍 Status do marcador vermelho ${locationData.address}:`, firstDelivery.status);
+
             if (firstDelivery.status === 'delivered') {
+                // Salvar originalState para poder desfazer
+                marker.originalState = {
+                    deliveries: locationData.deliveries,
+                    client: null,
+                    coordKey: coordKey,
+                    isGreen: false
+                };
+
                 // Aplicar visual de entregue
                 marker.isDelivered = true;
                 if (marker.content) {
@@ -5322,6 +5354,7 @@ async function addDeliveryMarkers() {
                 deliveredBtn._hoverOut = () => { deliveredBtn.style.background = '#FF9800'; };
                 deliveredBtn.addEventListener('mouseenter', deliveredBtn._hoverIn);
                 deliveredBtn.addEventListener('mouseleave', deliveredBtn._hoverOut);
+                console.log(`✅ Visual de ENTREGUE aplicado ao marcador vermelho: ${locationData.address}`);
             } else if (firstDelivery.status === 'not_delivered') {
                 // Aplicar visual de não entregue
                 marker.isNotDelivered = true;
@@ -5330,6 +5363,7 @@ async function addDeliveryMarkers() {
                     marker.content.style.opacity = '0.6';
                     marker.content.style.filter = 'grayscale(20%)';
                 }
+                console.log(`✅ Visual de NÃO ENTREGUE aplicado ao marcador vermelho: ${locationData.address}`);
             }
 
             bounds.extend(position);
