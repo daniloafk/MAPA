@@ -2791,14 +2791,14 @@ function setupNavigationMapInteraction() {
 
                 console.log('✋ Usuário interagiu - pausando navegação automática');
 
-                // Retomar controle automático após 2 segundos sem interação
+                // Retomar controle automático após 5 segundos sem interação
                 navigationMode.autoResumeTimeout = setTimeout(() => {
                     navigationMode.userInteracting = false;
                     console.log('🔄 Retomando controle automático');
 
                     // Forçar centralização
                     forceCenterOnGPS();
-                }, 2000); // 2 segundos
+                }, 5000); // 5 segundos
             }
         });
     });
