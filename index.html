@@ -4855,8 +4855,9 @@ async function addDeliveryMarkers() {
                 delivered_at: delivery.delivered_at
             });
         } else {
-            // Endereço NÃO CADASTRADO: agrupar por coordenada da planilha
-            const coordKey = `${delivery.latitude.toFixed(6)},${delivery.longitude.toFixed(6)}`;
+            // Endereço NÃO CADASTRADO: agrupar por COORDENADA + ENDEREÇO EXATO
+            // Isso garante que apenas entregas com endereço EXATAMENTE igual sejam agrupadas
+            const coordKey = `${delivery.latitude.toFixed(6)},${delivery.longitude.toFixed(6)}|${delivery.destination_address}`;
             if (!groupedByUnregistered[coordKey]) {
                 groupedByUnregistered[coordKey] = {
                     position: { lat: delivery.latitude, lng: delivery.longitude },
