@@ -7744,10 +7744,31 @@ function deactivateRouteMode() {
 }
 
 // Nova função: Limpar TUDO (marcadores + rotas + cluster)
-function clearAllRoutesAndMarkers() {
-    console.log('🗑��� ========================================');
+async function clearAllRoutesAndMarkers() {
+    console.log('🗑️ ========================================');
     console.log('🗑️ INICIANDO LIMPEZA COMPLETA...');
     console.log('🗑️ ========================================');
+
+    // 🔥 DELETAR TODOS OS DADOS DO SUPABASE
+    try {
+        console.log('🗑️ Deletando todos os dados do Supabase...');
+        const { error } = await supabase
+            .from('delivery_data')
+            .delete()
+            .neq('id', 0); // Deleta todos os registros (neq = not equal, sempre true)
+
+        if (error) {
+            console.error('❌ Erro ao deletar dados do Supabase:', error);
+            showToast('❌ Erro ao limpar banco de dados', 'Tente novamente', 'error', 4000);
+            return;
+        }
+
+        console.log('✅ Dados deletados do Supabase com sucesso!');
+    } catch (error) {
+        console.error('❌ Erro ao deletar dados:', error);
+        showToast('❌ Erro ao limpar banco de dados', 'Tente novamente', 'error', 4000);
+        return;
+    }
 
     // Desativar modo de rota se estiver ativo
     if (routeMode) {
@@ -7824,13 +7845,16 @@ function clearAllRoutesAndMarkers() {
     // 4. RESETAR completamente o objeto de marcadores
     deliveryMarkers = {};
 
+    // 5. Voltar botão de upload para modo padrão
+    setButtonToUploadMode();
+
     console.log('✅ ========================================');
     console.log('✅ LIMPEZA COMPLETA REALIZADA!');
     console.log('✅ ========================================');
 
     showToast(
         '🗑️ Tudo limpo!',
-        'Rotas e marcadores removidos do mapa',
+        'Dados deletados e marcadores removidos',
         'success',
         3000
     );
@@ -8739,7 +8763,7 @@ async function findClientByQRCode(qrCode) {
             scanResult.classList.add('active');
             scanResultText.innerHTML = `
                 <strong style="color: #ff9800;">⚠️ Cliente não cadastrado</strong><br>
-                ���� SPX TN: ${escapeHtml(qrCode)}<br>
+                📦 SPX TN: ${escapeHtml(qrCode)}<br>
                 📍 Endereço da planilha:<br>
                 ${escapeHtml(deliveryData.destination_address || 'Sem endereço')}<br>
                 <small style="color: #666;">Nenhum cliente cadastrado corresponde a este endereço.</small>
