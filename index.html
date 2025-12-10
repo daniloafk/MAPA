@@ -2947,33 +2947,67 @@ function stopNavigationMode() {
 // MARCAR COMO NÃO ENTREGUE
 // ===========================
 
-function markAsNotDelivered(marker, client) {
+async function markAsNotDelivered(marker, client) {
     if (!marker) return;
-
-    // Marcar o marcador como não entregue
-    marker.isNotDelivered = true;
-    marker.notDeliveredTimestamp = Date.now();
 
     console.log('❌ Marcando como não entregue:', client);
 
-    // Criar overlay com X vermelho sobre o marcador
-    addNotDeliveredOverlay(marker);
+    try {
+        // Obter os IDs das entregas associadas a este marcador
+        let deliveryIds = [];
 
-    // Reduzir opacidade do marcador (mais evidente que entregue mas ainda visível)
-    if (marker.content) {
-        marker.content.style.opacity = '0.6'; // Mais visível que o 0.35 de "entregue"
-        marker.content.style.filter = 'grayscale(20%)'; // Leve dessaturação
+        if (marker.originalState && marker.originalState.deliveries) {
+            deliveryIds = marker.originalState.deliveries.map(d => d.id);
+        } else if (marker.deliveries) {
+            deliveryIds = marker.deliveries.map(d => d.id);
+        }
+
+        if (deliveryIds.length > 0) {
+            // Atualizar status no Supabase para cada entrega
+            const { error } = await supabase
+                .from('delivery_data')
+                .update({
+                    status: 'not_delivered',
+                    not_delivered_at: new Date().toISOString()
+                })
+                .in('id', deliveryIds);
+
+            if (error) {
+                console.error('Erro ao atualizar Supabase:', error);
+                throw error;
+            }
+
+            console.log(`✅ ${deliveryIds.length} entrega(s) marcada(s) como não entregue no banco de dados`);
+        }
+
+        // Marcar o marcador como não entregue
+        marker.isNotDelivered = true;
+        marker.notDeliveredTimestamp = Date.now();
+
+        // Criar overlay com X vermelho sobre o marcador
+        addNotDeliveredOverlay(marker);
+
+        // Reduzir opacidade do marcador (mais evidente que entregue mas ainda visível)
+        if (marker.content) {
+            marker.content.style.opacity = '0.6'; // Mais visível que o 0.35 de "entregue"
+            marker.content.style.filter = 'grayscale(20%)'; // Leve dessaturação
+        }
+
+        showToast(
+            '❌ Marcada como não entregue',
+            client.name || 'Encomenda',
+            'error',
+            3000
+        );
+    } catch (error) {
+        console.error('Erro ao marcar como não entregue:', error);
+        showToast(
+            '❌ Erro ao marcar como não entregue',
+            'Tente novamente',
+            'error',
+            4000
+        );
     }
-
-    // Salvar no localStorage
-    saveNotDeliveredToLocalStorage(client);
-
-    showToast(
-        '❌ Marcada como não entregue',
-        client.name || 'Encomenda',
-        'error',
-        3000
-    );
 }
 
 // Adicionar overlay de X vermelho no marcador
@@ -4594,13 +4628,13 @@ async function addDeliveryMarkers() {
     }
 
     // PASSO 3: Buscar dados da planilha (delivery_data) do Supabase
-    // Apenas entregas pendentes
+    // Buscar todas as entregas (pending, delivered, not_delivered)
     let deliveryData = [];
     try {
         const { data, error } = await supabase
             .from('delivery_data')
             .select('*')
-            .eq('status', 'pending') // Apenas entregas pendentes
+            .in('status', ['pending', 'delivered', 'not_delivered']) // Todas as entregas
             .order('sequence', { ascending: true });
 
         if (error) throw error;
@@ -4890,6 +4924,9 @@ async function addDeliveryMarkers() {
                 registeredMarkersCount++;
             }
 
+            // Armazenar deliveries no marcador para uso posterior
+            marker.deliveries = deliveries;
+
             // Adicionar botões ao container (agora que o marker foi criado)
             // Botão de navegação
             const navigateBtn = document.createElement('button');
@@ -4943,6 +4980,42 @@ async function addDeliveryMarkers() {
 
             buttonsContainer.appendChild(navigateBtn);
             buttonsContainer.appendChild(deliveredBtn);
+
+            // Aplicar visual baseado no status (se já foi entregue ou não entregue)
+            const firstDelivery = deliveries[0];
+            if (firstDelivery.status === 'delivered') {
+                // Aplicar visual de entregue
+                marker.isDelivered = true;
+                if (marker.content) {
+                    marker.content.style.opacity = '0.4';
+                    marker.content.style.filter = 'grayscale(100%)';
+                    const pinDiv = marker.content.querySelector('div');
+                    if (pinDiv) {
+                        pinDiv.style.background = '#9E9E9E';
+                        const innerCircle = pinDiv.querySelector('div');
+                        if (innerCircle) {
+                            innerCircle.style.color = '#9E9E9E';
+                        }
+                    }
+                }
+                // Atualizar botão
+                deliveredBtn.innerHTML = '↩ Desfazer';
+                deliveredBtn.style.background = '#FF9800';
+                deliveredBtn.removeEventListener('mouseenter', deliveredBtn._hoverIn);
+                deliveredBtn.removeEventListener('mouseleave', deliveredBtn._hoverOut);
+                deliveredBtn._hoverIn = () => { deliveredBtn.style.background = '#e68900'; };
+                deliveredBtn._hoverOut = () => { deliveredBtn.style.background = '#FF9800'; };
+                deliveredBtn.addEventListener('mouseenter', deliveredBtn._hoverIn);
+                deliveredBtn.addEventListener('mouseleave', deliveredBtn._hoverOut);
+            } else if (firstDelivery.status === 'not_delivered') {
+                // Aplicar visual de não entregue
+                marker.isNotDelivered = true;
+                addNotDeliveredOverlay(marker);
+                if (marker.content) {
+                    marker.content.style.opacity = '0.6';
+                    marker.content.style.filter = 'grayscale(20%)';
+                }
+            }
 
             bounds.extend(position);
         } catch (error) {
@@ -5158,6 +5231,9 @@ async function addDeliveryMarkers() {
                 unregisteredMarkersCount++;
             }
 
+            // Armazenar deliveries no marcador para uso posterior
+            marker.deliveries = locationData.deliveries;
+
             // Adicionar botões ao container (agora que o marker foi criado)
             // Botão de navegação
             const navigateBtn = document.createElement('button');
@@ -5219,6 +5295,42 @@ async function addDeliveryMarkers() {
 
             buttonsContainer.appendChild(navigateBtn);
             buttonsContainer.appendChild(deliveredBtn);
+
+            // Aplicar visual baseado no status (se já foi entregue ou não entregue)
+            const firstDelivery = locationData.deliveries[0];
+            if (firstDelivery.status === 'delivered') {
+                // Aplicar visual de entregue
+                marker.isDelivered = true;
+                if (marker.content) {
+                    marker.content.style.opacity = '0.4';
+                    marker.content.style.filter = 'grayscale(100%)';
+                    const pinDiv = marker.content.querySelector('div');
+                    if (pinDiv) {
+                        pinDiv.style.background = '#9E9E9E';
+                        const innerCircle = pinDiv.querySelector('div');
+                        if (innerCircle) {
+                            innerCircle.style.color = '#9E9E9E';
+                        }
+                    }
+                }
+                // Atualizar botão
+                deliveredBtn.innerHTML = '↩ Desfazer';
+                deliveredBtn.style.background = '#FF9800';
+                deliveredBtn.removeEventListener('mouseenter', deliveredBtn._hoverIn);
+                deliveredBtn.removeEventListener('mouseleave', deliveredBtn._hoverOut);
+                deliveredBtn._hoverIn = () => { deliveredBtn.style.background = '#e68900'; };
+                deliveredBtn._hoverOut = () => { deliveredBtn.style.background = '#FF9800'; };
+                deliveredBtn.addEventListener('mouseenter', deliveredBtn._hoverIn);
+                deliveredBtn.addEventListener('mouseleave', deliveredBtn._hoverOut);
+            } else if (firstDelivery.status === 'not_delivered') {
+                // Aplicar visual de não entregue
+                marker.isNotDelivered = true;
+                addNotDeliveredOverlay(marker);
+                if (marker.content) {
+                    marker.content.style.opacity = '0.6';
+                    marker.content.style.filter = 'grayscale(20%)';
+                }
+            }
 
             bounds.extend(position);
         } catch (error) {
