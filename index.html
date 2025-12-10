@@ -4506,7 +4506,7 @@ async function undoNotDelivered(marker, notDeliveredBtn) {
 
         // Restaurar botão para "Não Entregue"
         if (notDeliveredBtn) {
-            notDeliveredBtn.innerHTML = '✕ Não Entregue';
+            notDeliveredBtn.innerHTML = '✕ Não Entg';
             notDeliveredBtn.style.background = '#EA4335'; // Vermelho
             notDeliveredBtn.removeEventListener('mouseenter', notDeliveredBtn._hoverIn);
             notDeliveredBtn.removeEventListener('mouseleave', notDeliveredBtn._hoverOut);
@@ -4895,7 +4895,7 @@ async function addDeliveryMarkers() {
         const position = { lat: client.latitude, lng: client.longitude };
 
         console.log(`✅ Criando marcador verde para cliente: ${client.name} (${deliveryCount} entregas)`);
-        console.log(`🔍 DEBUG - Deliveries deste marcador:`, deliveries);
+        console.log(`���� DEBUG - Deliveries deste marcador:`, deliveries);
 
         // Criar marcador VERDE estilo pin do Google Maps
         const markerDiv = document.createElement('div');
@@ -5034,13 +5034,15 @@ async function addDeliveryMarkers() {
         // Container de botões (será preenchido após criar o marker)
         const buttonsContainer = document.createElement('div');
         buttonsContainer.style.display = 'flex';
-        buttonsContainer.style.gap = '6px';
+        buttonsContainer.style.flexWrap = 'wrap';
+        buttonsContainer.style.gap = '4px';
         buttonsContainer.style.marginTop = '10px';
+        buttonsContainer.style.width = '100%';
         infoWindowContent.appendChild(buttonsContainer);
 
         const infoWindow = new google.maps.InfoWindow({
             content: infoWindowContent,
-            maxWidth: 280,
+            maxWidth: 300,
             disableAutoPan: true
         });
 
@@ -5108,16 +5110,17 @@ async function addDeliveryMarkers() {
             // Botão de navegação (só aparece se estiver longe - mais de 30m)
             const navigateBtn = document.createElement('button');
             navigateBtn.style.flex = '1';
-            navigateBtn.style.padding = '6px 10px';
+            navigateBtn.style.padding = '5px 6px';
             navigateBtn.style.background = '#4285f4';
             navigateBtn.style.color = 'white';
             navigateBtn.style.border = 'none';
             navigateBtn.style.borderRadius = '4px';
-            navigateBtn.style.fontSize = '12px';
+            navigateBtn.style.fontSize = '11px';
             navigateBtn.style.fontWeight = '600';
             navigateBtn.style.cursor = 'pointer';
             navigateBtn.style.transition = 'background 0.2s';
             navigateBtn.style.whiteSpace = 'nowrap';
+            navigateBtn.style.minWidth = '0';
             navigateBtn.innerHTML = '🧭 Navegar';
             navigateBtn.addEventListener('mouseenter', () => { navigateBtn.style.background = '#3367d6'; });
             navigateBtn.addEventListener('mouseleave', () => { navigateBtn.style.background = '#4285f4'; });
@@ -5132,16 +5135,17 @@ async function addDeliveryMarkers() {
             // Botão marcar como entregue / desfazer
             const deliveredBtn = document.createElement('button');
             deliveredBtn.style.flex = '1';
-            deliveredBtn.style.padding = '6px 10px';
+            deliveredBtn.style.padding = '5px 6px';
             deliveredBtn.style.background = '#34A853';
             deliveredBtn.style.color = 'white';
             deliveredBtn.style.border = 'none';
             deliveredBtn.style.borderRadius = '4px';
-            deliveredBtn.style.fontSize = '12px';
+            deliveredBtn.style.fontSize = '11px';
             deliveredBtn.style.fontWeight = '600';
             deliveredBtn.style.cursor = 'pointer';
             deliveredBtn.style.transition = 'background 0.2s';
             deliveredBtn.style.whiteSpace = 'nowrap';
+            deliveredBtn.style.minWidth = '0';
             deliveredBtn.innerHTML = '✓ Entregue';
 
             // Armazenar funções de hover para poder removê-las depois
@@ -5164,17 +5168,18 @@ async function addDeliveryMarkers() {
             // 🔥 NOVO: Botão "Não Entregue" / "Desfazer"
             const notDeliveredBtn = document.createElement('button');
             notDeliveredBtn.style.flex = '1';
-            notDeliveredBtn.style.padding = '6px 10px';
+            notDeliveredBtn.style.padding = '5px 6px';
             notDeliveredBtn.style.background = '#EA4335';
             notDeliveredBtn.style.color = 'white';
             notDeliveredBtn.style.border = 'none';
             notDeliveredBtn.style.borderRadius = '4px';
-            notDeliveredBtn.style.fontSize = '12px';
+            notDeliveredBtn.style.fontSize = '11px';
             notDeliveredBtn.style.fontWeight = '600';
             notDeliveredBtn.style.cursor = 'pointer';
             notDeliveredBtn.style.transition = 'background 0.2s';
             notDeliveredBtn.style.whiteSpace = 'nowrap';
-            notDeliveredBtn.innerHTML = '✕ Não Entregue';
+            notDeliveredBtn.style.minWidth = '0';
+            notDeliveredBtn.innerHTML = '✕ Não Entg';
 
             // Armazenar funções de hover para poder removê-las depois
             notDeliveredBtn._hoverIn = () => { notDeliveredBtn.style.background = '#c5351c'; };
@@ -5381,13 +5386,15 @@ async function addDeliveryMarkers() {
         // Container de botões (será preenchido após criar o marker)
         const buttonsContainer = document.createElement('div');
         buttonsContainer.style.display = 'flex';
-        buttonsContainer.style.gap = '6px';
+        buttonsContainer.style.flexWrap = 'wrap';
+        buttonsContainer.style.gap = '4px';
         buttonsContainer.style.marginTop = '10px';
+        buttonsContainer.style.width = '100%';
         infoWindowContent.appendChild(buttonsContainer);
 
         const infoWindow = new google.maps.InfoWindow({
             content: infoWindowContent,
-            maxWidth: 280,
+            maxWidth: 300,
             disableAutoPan: true
         });
 
@@ -5476,16 +5483,17 @@ async function addDeliveryMarkers() {
             // Botão de navegação (só aparece se estiver longe - mais de 30m)
             const navigateBtn = document.createElement('button');
             navigateBtn.style.flex = '1';
-            navigateBtn.style.padding = '6px 10px';
+            navigateBtn.style.padding = '5px 6px';
             navigateBtn.style.background = '#4285f4';
             navigateBtn.style.color = 'white';
             navigateBtn.style.border = 'none';
             navigateBtn.style.borderRadius = '4px';
-            navigateBtn.style.fontSize = '12px';
+            navigateBtn.style.fontSize = '11px';
             navigateBtn.style.fontWeight = '600';
             navigateBtn.style.cursor = 'pointer';
             navigateBtn.style.transition = 'background 0.2s';
             navigateBtn.style.whiteSpace = 'nowrap';
+            navigateBtn.style.minWidth = '0';
             navigateBtn.innerHTML = '🧭 Navegar';
             navigateBtn.addEventListener('mouseenter', () => { navigateBtn.style.background = '#3367d6'; });
             navigateBtn.addEventListener('mouseleave', () => { navigateBtn.style.background = '#4285f4'; });
@@ -5508,16 +5516,17 @@ async function addDeliveryMarkers() {
             // Botão marcar como entregue / desfazer
             const deliveredBtn = document.createElement('button');
             deliveredBtn.style.flex = '1';
-            deliveredBtn.style.padding = '6px 10px';
+            deliveredBtn.style.padding = '5px 6px';
             deliveredBtn.style.background = '#34A853';
             deliveredBtn.style.color = 'white';
             deliveredBtn.style.border = 'none';
             deliveredBtn.style.borderRadius = '4px';
-            deliveredBtn.style.fontSize = '12px';
+            deliveredBtn.style.fontSize = '11px';
             deliveredBtn.style.fontWeight = '600';
             deliveredBtn.style.cursor = 'pointer';
             deliveredBtn.style.transition = 'background 0.2s';
             deliveredBtn.style.whiteSpace = 'nowrap';
+            deliveredBtn.style.minWidth = '0';
             deliveredBtn.innerHTML = '✓ Entregue';
 
             // Armazenar funções de hover para poder removê-las depois
@@ -5540,17 +5549,18 @@ async function addDeliveryMarkers() {
             // 🔥 NOVO: Botão "Não Entregue" / "Desfazer"
             const notDeliveredBtn = document.createElement('button');
             notDeliveredBtn.style.flex = '1';
-            notDeliveredBtn.style.padding = '6px 10px';
+            notDeliveredBtn.style.padding = '5px 6px';
             notDeliveredBtn.style.background = '#EA4335';
             notDeliveredBtn.style.color = 'white';
             notDeliveredBtn.style.border = 'none';
             notDeliveredBtn.style.borderRadius = '4px';
-            notDeliveredBtn.style.fontSize = '12px';
+            notDeliveredBtn.style.fontSize = '11px';
             notDeliveredBtn.style.fontWeight = '600';
             notDeliveredBtn.style.cursor = 'pointer';
             notDeliveredBtn.style.transition = 'background 0.2s';
             notDeliveredBtn.style.whiteSpace = 'nowrap';
-            notDeliveredBtn.innerHTML = '✕ Não Entregue';
+            notDeliveredBtn.style.minWidth = '0';
+            notDeliveredBtn.innerHTML = '✕ Não Entg';
 
             // Armazenar funções de hover para poder removê-las depois
             notDeliveredBtn._hoverIn = () => { notDeliveredBtn.style.background = '#c5351c'; };
@@ -6235,7 +6245,7 @@ async function startCamera() {
         return new Promise((resolve, reject) => {
             qrVideo.onloadedmetadata = async () => {
                 try {
-                    // Forçar play do vídeo
+                    // For��ar play do vídeo
                     await qrVideo.play();
 
                     // Iniciar scanning após vídeo começar
