@@ -5240,6 +5240,14 @@ async function addDeliveryMarkers() {
                 deliveredBtn.addEventListener('mouseleave', deliveredBtn._hoverOut);
                 console.log(`✅ Visual de ENTREGUE aplicado ao marcador verde: ${client.name}`);
             } else if (firstDelivery.status === 'not_delivered') {
+                // Salvar originalState para poder desfazer
+                marker.originalState = {
+                    deliveries: deliveries,
+                    client: client,
+                    coordKey: null,
+                    isGreen: true
+                };
+
                 // Aplicar visual de não entregue (cinza igual ao entregue + X vermelho)
                 marker.isNotDelivered = true;
                 addNotDeliveredOverlay(marker);
@@ -5247,6 +5255,15 @@ async function addDeliveryMarkers() {
                     marker.content.style.opacity = '0.4';
                     marker.content.style.filter = 'grayscale(100%)';
                 }
+                // 🔥 Atualizar botão para "Desfazer" laranja
+                notDeliveredBtn.innerHTML = '↩ Desfazer';
+                notDeliveredBtn.style.background = '#FF9800';
+                notDeliveredBtn.removeEventListener('mouseenter', notDeliveredBtn._hoverIn);
+                notDeliveredBtn.removeEventListener('mouseleave', notDeliveredBtn._hoverOut);
+                notDeliveredBtn._hoverIn = () => { notDeliveredBtn.style.background = '#e68900'; };
+                notDeliveredBtn._hoverOut = () => { notDeliveredBtn.style.background = '#FF9800'; };
+                notDeliveredBtn.addEventListener('mouseenter', notDeliveredBtn._hoverIn);
+                notDeliveredBtn.addEventListener('mouseleave', notDeliveredBtn._hoverOut);
                 console.log(`✅ Visual de NÃO ENTREGUE aplicado ao marcador verde: ${client.name}`);
             }
 
@@ -5628,6 +5645,14 @@ async function addDeliveryMarkers() {
                 deliveredBtn.addEventListener('mouseleave', deliveredBtn._hoverOut);
                 console.log(`✅ Visual de ENTREGUE aplicado ao marcador vermelho: ${locationData.address}`);
             } else if (firstDelivery.status === 'not_delivered') {
+                // Salvar originalState para poder desfazer
+                marker.originalState = {
+                    deliveries: locationData.deliveries,
+                    client: null,
+                    coordKey: coordKey,
+                    isGreen: false
+                };
+
                 // Aplicar visual de não entregue (cinza igual ao entregue + X vermelho)
                 marker.isNotDelivered = true;
                 addNotDeliveredOverlay(marker);
@@ -5635,6 +5660,15 @@ async function addDeliveryMarkers() {
                     marker.content.style.opacity = '0.4';
                     marker.content.style.filter = 'grayscale(100%)';
                 }
+                // 🔥 Atualizar botão para "Desfazer" laranja
+                notDeliveredBtn.innerHTML = '↩ Desfazer';
+                notDeliveredBtn.style.background = '#FF9800';
+                notDeliveredBtn.removeEventListener('mouseenter', notDeliveredBtn._hoverIn);
+                notDeliveredBtn.removeEventListener('mouseleave', notDeliveredBtn._hoverOut);
+                notDeliveredBtn._hoverIn = () => { notDeliveredBtn.style.background = '#e68900'; };
+                notDeliveredBtn._hoverOut = () => { notDeliveredBtn.style.background = '#FF9800'; };
+                notDeliveredBtn.addEventListener('mouseenter', notDeliveredBtn._hoverIn);
+                notDeliveredBtn.addEventListener('mouseleave', notDeliveredBtn._hoverOut);
                 console.log(`✅ Visual de NÃO ENTREGUE aplicado ao marcador vermelho: ${locationData.address}`);
             }
 
@@ -6245,7 +6279,7 @@ async function startCamera() {
         return new Promise((resolve, reject) => {
             qrVideo.onloadedmetadata = async () => {
                 try {
-                    // For��ar play do vídeo
+                    // Forçar play do vídeo
                     await qrVideo.play();
 
                     // Iniciar scanning após vídeo começar
