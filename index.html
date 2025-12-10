@@ -4734,7 +4734,8 @@ async function addDeliveryMarkers() {
                 spx_tn: delivery.spx_tn,
                 sequence: delivery.sequence,
                 destination_address: delivery.destination_address,
-                status: delivery.status // PRESERVE STATUS FIELD
+                status: delivery.status, // ✅ ADICIONAR STATUS
+                delivered_at: delivery.delivered_at
             });
         } else {
             // Endereço NÃO CADASTRADO: agrupar por coordenada da planilha
@@ -4754,7 +4755,8 @@ async function addDeliveryMarkers() {
                 spx_tn: delivery.spx_tn,
                 sequence: delivery.sequence || groupedByUnregistered[coordKey].deliveries.length + 1,
                 destination_address: delivery.destination_address,
-                status: delivery.status // PRESERVE STATUS FIELD
+                status: delivery.status, // ✅ ADICIONAR STATUS
+                delivered_at: delivery.delivered_at
             });
         }
     });
@@ -7743,7 +7745,7 @@ function deactivateRouteMode() {
 
 // Nova função: Limpar TUDO (marcadores + rotas + cluster)
 function clearAllRoutesAndMarkers() {
-    console.log('🗑️ ========================================');
+    console.log('🗑��� ========================================');
     console.log('🗑️ INICIANDO LIMPEZA COMPLETA...');
     console.log('🗑️ ========================================');
 
@@ -8737,7 +8739,7 @@ async function findClientByQRCode(qrCode) {
             scanResult.classList.add('active');
             scanResultText.innerHTML = `
                 <strong style="color: #ff9800;">⚠️ Cliente não cadastrado</strong><br>
-                📦 SPX TN: ${escapeHtml(qrCode)}<br>
+                ���� SPX TN: ${escapeHtml(qrCode)}<br>
                 📍 Endereço da planilha:<br>
                 ${escapeHtml(deliveryData.destination_address || 'Sem endereço')}<br>
                 <small style="color: #666;">Nenhum cliente cadastrado corresponde a este endereço.</small>
