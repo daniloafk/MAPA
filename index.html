@@ -3333,31 +3333,51 @@ function updateNavigationView() {
     }
 
     // =================================================================
-    // ROTAÇÃO DO MAPA - Sempre apontar para o DESTINO
+    // ROTAÇÃO DO MAPA - Orientação "celular na vertical"
+    // O mapa gira para que a direção do MOVIMENTO sempre aponte PARA CIMA
     // =================================================================
 
-    // Calcular heading baseado na direção ATUAL → DESTINO (não baseado em movimento passado)
-    // Isso faz o mapa sempre apontar "para frente" (onde você está indo)
-    const headingToDestination = calculateHeading(currentPos, navigationMode.destination);
+    // Calcular heading baseado na direção do MOVIMENTO (posição anterior → atual)
+    let movementHeading = navigationMode.lastHeading;
 
-    let movementHeading = headingToDestination;
+    if (navigationMode.lastPosition) {
+        const movementDistance = calculateDistanceMeters(navigationMode.lastPosition, currentPos);
 
-    // Suavizar a transição do heading para evitar saltos bruscos
-    if (navigationMode.lastHeading !== undefined && navigationMode.lastHeading !== 0) {
-        let diff = headingToDestination - navigationMode.lastHeading;
+        // Só atualiza o ângulo se o deslocamento for significativo (> 6m)
+        // Isso evita oscilações com ruído GPS quando parado
+        const MIN_DISTANCE_FOR_ROTATION = 6;
 
-        // Normalizar diferença para o menor caminho (ex: de 350° para 10° é +20°, não -340°)
-        if (diff > 180) diff -= 360;
-        if (diff < -180) diff += 360;
+        if (movementDistance > MIN_DISTANCE_FOR_ROTATION) {
+            // Calcular direção do movimento: de onde vim → para onde estou
+            const newHeading = calculateHeading(navigationMode.lastPosition, currentPos);
 
-        // Fator de suavização (Lerp) - transição suave
-        const SMOOTHING_FACTOR = 0.15;
+            // Suavizar a transição do heading para evitar saltos bruscos
+            if (movementHeading !== 0) {
+                let diff = newHeading - movementHeading;
 
-        movementHeading = (navigationMode.lastHeading + diff * SMOOTHING_FACTOR + 360) % 360;
+                // Normalizar diferença para o menor caminho (ex: de 350° para 10° é +20°, não -340°)
+                if (diff > 180) diff -= 360;
+                if (diff < -180) diff += 360;
+
+                // Fator de suavização - transição suave
+                // 0.2 = mais responsivo (vira mais rápido)
+                const SMOOTHING_FACTOR = 0.2;
+
+                movementHeading = (movementHeading + diff * SMOOTHING_FACTOR + 360) % 360;
+            } else {
+                movementHeading = newHeading;
+            }
+
+            // Atualiza o último heading conhecido
+            navigationMode.lastHeading = movementHeading;
+        }
+        // Se distância < 6m, mantém heading anterior (não gira quando parado)
+    } else {
+        // Primeira posição - usar direção para o destino como inicial
+        movementHeading = calculateHeading(currentPos, navigationMode.destination);
+        navigationMode.lastHeading = movementHeading;
     }
 
-    // Atualizar último heading
-    navigationMode.lastHeading = movementHeading;
     navigationMode.lastPosition = currentPos;
 
     // ✨ PERMITIR INTERAÇÃO DO USUÁRIO
