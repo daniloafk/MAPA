@@ -7755,7 +7755,7 @@ async function clearAllRoutesAndMarkers() {
         const { error } = await supabase
             .from('delivery_data')
             .delete()
-            .neq('id', 0); // Deleta todos os registros (neq = not equal, sempre true)
+            .neq('id', '00000000-0000-0000-0000-000000000000'); // Deleta todos os registros
 
         if (error) {
             console.error('❌ Erro ao deletar dados do Supabase:', error);
