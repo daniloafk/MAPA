@@ -7623,13 +7623,6 @@ setTimeout(async () => {
             // Se há dados da planilha, mudar botão para modo "Limpar"
             setButtonToClearMode();
             console.log('📊 Planilha detectada no banco de dados');
-
-            // NOVO: Carregar marcadores automaticamente ao iniciar
-            console.log('🔄 Carregando marcadores automaticamente...');
-            setTimeout(async () => {
-                await activateRouteMode();
-                console.log('✅ Marcadores carregados automaticamente!');
-            }, 1000); // Aguardar 1s para garantir que o mapa está pronto
         } else {
             // Sem dados, manter botão em modo "Upload"
             setButtonToUploadMode();
@@ -9758,7 +9751,7 @@ async function handleFile(file) {
             resultDetails.innerHTML = detailsHTML;
 
             // Fechar modal após 5 segundos (tempo maior para ler as estatísticas)
-            setTimeout(async () => {
+            setTimeout(() => {
                 closeUploadModal();
 
                 // Recarregar dados
@@ -9766,11 +9759,6 @@ async function handleFile(file) {
 
                 // Mudar botão para modo "Limpar planilha"
                 setButtonToClearMode();
-
-                // 🔥 CARREGAR MARCADORES AUTOMATICAMENTE
-                console.log('🔄 Carregando marcadores da nova planilha...');
-                await activateRouteMode();
-                console.log('✅ Marcadores carregados automaticamente!');
 
                 showToast(
                     'Planilha atualizada!',
