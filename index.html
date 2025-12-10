@@ -2836,12 +2836,13 @@ function calculateDistanceMeters(from, to) {
 }
 
 // Iniciar modo de navegação
-function startNavigationMode(destination, destinationName, marker = null, infoWindow = null) {
+function startNavigationMode(destination, destinationName, marker = null, infoWindow = null, clientData = null) {
     navigationMode.active = true;
     navigationMode.destination = destination;
     navigationMode.destinationName = destinationName;
     navigationMode.destinationMarker = marker;
     navigationMode.destinationInfoWindow = infoWindow;
+    navigationMode.clientData = clientData; // Armazenar dados do cliente
     navigationMode.lastPosition = null;
 
     console.log('🧭 Modo de navegação iniciado:', destinationName);
@@ -2940,6 +2941,119 @@ function stopNavigationMode() {
         'info',
         3000
     );
+}
+
+// ===========================
+// MARCAR COMO NÃO ENTREGUE
+// ===========================
+
+function markAsNotDelivered(marker, client) {
+    if (!marker) return;
+
+    // Marcar o marcador como não entregue
+    marker.isNotDelivered = true;
+    marker.notDeliveredTimestamp = Date.now();
+
+    console.log('❌ Marcando como não entregue:', client);
+
+    // Criar overlay com X vermelho sobre o marcador
+    addNotDeliveredOverlay(marker);
+
+    // Reduzir opacidade do marcador (mais evidente que entregue mas ainda visível)
+    if (marker.content) {
+        marker.content.style.opacity = '0.6'; // Mais visível que o 0.35 de "entregue"
+        marker.content.style.filter = 'grayscale(20%)'; // Leve dessaturação
+    }
+
+    // Salvar no localStorage
+    saveNotDeliveredToLocalStorage(client);
+
+    showToast(
+        '❌ Marcada como não entregue',
+        client.name || 'Encomenda',
+        'error',
+        3000
+    );
+}
+
+// Adicionar overlay de X vermelho no marcador
+function addNotDeliveredOverlay(marker) {
+    if (!marker || !marker.content) return;
+
+    // Criar div do X vermelho
+    const xOverlay = document.createElement('div');
+    xOverlay.className = 'not-delivered-x';
+    xOverlay.style.position = 'absolute';
+    xOverlay.style.top = '-5px';
+    xOverlay.style.left = '-5px';
+    xOverlay.style.width = '42px';
+    xOverlay.style.height = '42px';
+    xOverlay.style.display = 'flex';
+    xOverlay.style.alignItems = 'center';
+    xOverlay.style.justifyContent = 'center';
+    xOverlay.style.fontSize = '32px';
+    xOverlay.style.fontWeight = 'bold';
+    xOverlay.style.color = '#EA4335';
+    xOverlay.style.textShadow = '0 0 4px white, 0 0 8px white';
+    xOverlay.style.pointerEvents = 'none';
+    xOverlay.style.zIndex = '1000';
+    xOverlay.innerHTML = '✕';
+
+    // Adicionar ao marcador
+    marker.content.style.position = 'relative';
+    marker.content.appendChild(xOverlay);
+}
+
+// Salvar não entregue (apenas log, sem localStorage devido ao iframe)
+function saveNotDeliveredToLocalStorage(client) {
+    const deliveryData = {
+        name: client.name,
+        address: client.address,
+        latitude: client.latitude,
+        longitude: client.longitude,
+        timestamp: Date.now(),
+        date: new Date().toISOString()
+    };
+
+    console.log('💾 Não entregue registrada:', deliveryData);
+}
+
+// Substituir botão "Navegar" por "Não Entregue" quando chega no destino
+function replaceNavigateButtonWithNotDelivered(marker, infoWindow, client) {
+    if (!infoWindow || !marker) return;
+
+    // Obter o conteúdo atual do InfoWindow
+    const content = infoWindow.getContent();
+
+    // Se o conteúdo for um elemento DOM
+    if (content && content.querySelectorAll) {
+        // Procurar todos os botões
+        const buttons = content.querySelectorAll('button');
+
+        buttons.forEach(btn => {
+            // Procurar o botão que contém "Navegar" no texto
+            if (btn.innerHTML && (btn.innerHTML.includes('🧭 Navegar') || btn.innerHTML.includes('Navegar'))) {
+                // Substituir o botão Navegar por Não Entregue
+                btn.innerHTML = '❌ Não Entregue';
+                btn.style.background = '#EA4335';
+                btn.style.color = 'white';
+
+                // Remover eventos antigos
+                const newBtn = btn.cloneNode(true);
+                btn.parentNode.replaceChild(newBtn, btn);
+
+                // Adicionar novos eventos
+                newBtn.addEventListener('mouseenter', () => { newBtn.style.background = '#c5351c'; });
+                newBtn.addEventListener('mouseleave', () => { newBtn.style.background = '#EA4335'; });
+                newBtn.addEventListener('click', () => {
+                    markAsNotDelivered(marker, client);
+                    if (currentInfoWindow) {
+                        currentInfoWindow.close();
+                    }
+                });
+            }
+        });
+    }
 }
 
 // RECÁLCULO AUTOMÁTICO DE ROTA (quando sai do trajeto)
@@ -3087,6 +3201,7 @@ function updateNavigationView() {
         const arrivedMarker = navigationMode.destinationMarker;
         const arrivedInfoWindow = navigationMode.destinationInfoWindow;
         const arrivedDestination = navigationMode.destination;
+        const arrivedClient = navigationMode.clientData; // Salvar dados do cliente
 
         showToast(
             '🎉 Você chegou!',
@@ -3095,9 +3210,14 @@ function updateNavigationView() {
             5000
         );
 
+        // Marcar que chegou no destino
+        if (arrivedMarker) {
+            arrivedMarker.arrivedAtDestination = true;
+        }
+
         stopNavigationMode();
 
-        // Reabrir InfoWindow do destino após pequeno delay
+        // Reabrir InfoWindow do destino após pequeno delay com botão modificado
         setTimeout(() => {
             if (arrivedInfoWindow && arrivedMarker) {
                 // Centralizar no destino
@@ -3105,6 +3225,10 @@ function updateNavigationView() {
                     map.panTo(arrivedDestination);
                     map.setZoom(18);
                 }
+
+                // Recriar InfoWindow com botão "Não Entregue" ao invés de "Navegar"
+                replaceNavigateButtonWithNotDelivered(arrivedMarker, arrivedInfoWindow, arrivedClient);
+
                 // Abrir InfoWindow
                 arrivedInfoWindow.open(map, arrivedMarker);
                 currentInfoWindow = arrivedInfoWindow;
@@ -7274,7 +7398,7 @@ async function navigateToClient(client, marker = null, infoWindow = null) {
             });
 
             // Iniciar modo de navegação em tempo real
-            startNavigationMode(destination, client.name, marker, infoWindow);
+            startNavigationMode(destination, client.name, marker, infoWindow, client);
 
         } else {
             throw new Error(`Directions API retornou status: ${result.status}`);
