@@ -3333,8 +3333,9 @@ function updateNavigationView() {
     }
 
     // =================================================================
-    // ROTAÇÃO DO MAPA - Orientação "celular na vertical"
+    // ROTAÇÃO DO MAPA - Navegação estilo Google Maps
     // O mapa gira para que a direção do MOVIMENTO sempre aponte PARA CIMA
+    // Como se estivesse usando o celular em pé em um suporte
     // =================================================================
 
     // Calcular heading baseado na direção do MOVIMENTO (posição anterior → atual)
@@ -3343,11 +3344,11 @@ function updateNavigationView() {
     if (navigationMode.lastPosition) {
         const movementDistance = calculateDistanceMeters(navigationMode.lastPosition, currentPos);
 
-        // Reduzido para 3m - gira mais cedo durante mudanças de direção
+        // Gira quando se mover mais de 3 metros
         const MIN_DISTANCE_FOR_ROTATION = 3;
 
         if (movementDistance > MIN_DISTANCE_FOR_ROTATION) {
-            // Calcular direção do movimento: de onde vim → para onde estou
+            // Calcular direção do movimento: de onde vim → para onde estou indo
             const newHeading = calculateHeading(navigationMode.lastPosition, currentPos);
 
             // Suavizar a transição do heading para evitar saltos bruscos
@@ -3358,20 +3359,19 @@ function updateNavigationView() {
                 if (diff > 180) diff -= 360;
                 if (diff < -180) diff += 360;
 
-                // Aumentado para 0.5 - gira MUITO mais rápido e responsivo
-                // Isso faz o mapa virar quase instantaneamente ao mudar de direção
+                // Smoothing factor 0.5 - gira rápido mas suave
                 const SMOOTHING_FACTOR = 0.5;
 
                 movementHeading = (movementHeading + diff * SMOOTHING_FACTOR + 360) % 360;
             } else {
-                // Primeira vez ou heading zerado - usar diretamente o novo heading
+                // Primeira vez - usar diretamente o novo heading
                 movementHeading = newHeading;
             }
 
             // Atualiza o último heading conhecido
             navigationMode.lastHeading = movementHeading;
         }
-        // Se distância < 3m, mantém heading anterior (não gira quando parado/devagar)
+        // Se distância < 3m, mantém heading anterior (não gira quando parado)
     } else {
         // Primeira posição - usar direção para o destino como inicial
         movementHeading = calculateHeading(currentPos, navigationMode.destination);
@@ -3385,13 +3385,12 @@ function updateNavigationView() {
         // Marcar que o SISTEMA está atualizando (não o usuário)
         navigationMode.systemUpdating = true;
 
-        // Acompanhamento suave do GPS
+        // Acompanhamento suave do GPS (centraliza o marcador azul)
         map.panTo(currentPos);
 
-        // Rotação suave na direção do movimento
-        // Inverte o heading em 180° para que a direção aponte PARA CIMA (não para baixo)
+        // Rotação para que a direção do movimento aponte PARA CIMA (SEM inversão!)
         if (map.setHeading) {
-            map.setHeading((movementHeading + 180) % 360);
+            map.setHeading(movementHeading);
         }
 
         // Manter zoom adequado para navegação
@@ -3402,9 +3401,9 @@ function updateNavigationView() {
             map.setZoom(18);
         }
 
-        // Manter mapa totalmente reto (vista de cima, sem inclinação)
-        if (map.setTilt && map.getTilt() !== 0) {
-            map.setTilt(0);
+        // Manter perspectiva 3D para navegação
+        if (map.setTilt && map.getTilt() !== 45) {
+            map.setTilt(45);
         }
 
         // Resetar flag após um pequeno delay
@@ -6319,7 +6318,7 @@ async function startCamera() {
         }
     }
 
-    // ���� CONSTRAINTS EXATAMENTE COMO O GEMINI ESPECIFICA
+    // 🎯 CONSTRAINTS EXATAMENTE COMO O GEMINI ESPECIFICA
     const constraints = {
         video: {
             facingMode: "environment", // Prioriza a câmera traseira (como Gemini especificou)
@@ -8077,7 +8076,7 @@ async function clearAllRoutesAndMarkers() {
     console.log('🗑️ ========================================');
     console.log('🗑️ LIMPANDO ROTAS E MARCADORES DO MAPA...');
     console.log('🗑️ (Dados da planilha serão mantidos no Supabase)');
-    console.log('����️ ========================================');
+    console.log('🗑️ ========================================');
 
     // Desativar modo de rota se estiver ativo
     if (routeMode) {
@@ -9195,7 +9194,7 @@ async function showClientMarkers() {
         // Criar marcador para cada cliente
         clients.forEach((client, index) => {
             if (!client.latitude || !client.longitude) {
-                console.warn(`Cliente ${client.name} não tem coordenadas v��lidas`);
+                console.warn(`Cliente ${client.name} não tem coordenadas válidas`);
                 return;
             }
 
