@@ -5326,17 +5326,99 @@ async function addDeliveryMarkers() {
     console.log(`✅ Clientes cadastrados com entregas: ${groupedByRegistered.size}`);
     console.log(`❌ Locais não cadastrados: ${Object.keys(groupedByUnregistered).length}`);
 
+    // PASSO 4.5: Calcular offsets para marcadores sobrepostos (spiderfy)
+    // Coletar todas as posições dos marcadores
+    const allMarkerPositions = [];
+
+    // Posições dos clientes cadastrados (verdes)
+    groupedByRegistered.forEach((data, clientId) => {
+        allMarkerPositions.push({
+            id: `registered_${clientId}`,
+            type: 'registered',
+            clientId: clientId,
+            lat: data.client.latitude,
+            lng: data.client.longitude
+        });
+    });
+
+    // Posições dos não cadastrados (vermelhos)
+    Object.keys(groupedByUnregistered).forEach(coordKey => {
+        const data = groupedByUnregistered[coordKey];
+        allMarkerPositions.push({
+            id: `unregistered_${coordKey}`,
+            type: 'unregistered',
+            coordKey: coordKey,
+            lat: data.position.lat,
+            lng: data.position.lng
+        });
+    });
+
+    // Função para calcular offset em círculo
+    const calculateSpiderfyOffset = (index, total, baseOffset = 0.00015) => {
+        if (total <= 1) return { latOffset: 0, lngOffset: 0 };
+        const angle = (2 * Math.PI * index) / total;
+        const radius = baseOffset * (1 + Math.floor(index / 8) * 0.5); // Aumenta raio para mais de 8 marcadores
+        return {
+            latOffset: radius * Math.cos(angle),
+            lngOffset: radius * Math.sin(angle)
+        };
+    };
+
+    // Agrupar marcadores por proximidade (mesmo local ou muito próximos)
+    const proximityThreshold = 0.0001; // ~11 metros
+    const proximityGroups = [];
+    const assignedToGroup = new Set();
+
+    allMarkerPositions.forEach((pos, i) => {
+        if (assignedToGroup.has(pos.id)) return;
+
+        const group = [pos];
+        assignedToGroup.add(pos.id);
+
+        allMarkerPositions.forEach((otherPos, j) => {
+            if (i === j || assignedToGroup.has(otherPos.id)) return;
+
+            const latDiff = Math.abs(pos.lat - otherPos.lat);
+            const lngDiff = Math.abs(pos.lng - otherPos.lng);
+
+            if (latDiff < proximityThreshold && lngDiff < proximityThreshold) {
+                group.push(otherPos);
+                assignedToGroup.add(otherPos.id);
+            }
+        });
+
+        if (group.length > 1) {
+            proximityGroups.push(group);
+        }
+    });
+
+    // Criar mapa de offsets
+    const markerOffsets = {};
+    proximityGroups.forEach(group => {
+        console.log(`🔄 Grupo de ${group.length} marcadores sobrepostos detectado`);
+        group.forEach((marker, index) => {
+            const offset = calculateSpiderfyOffset(index, group.length);
+            markerOffsets[marker.id] = offset;
+        });
+    });
+
     const bounds = new google.maps.LatLngBounds();
     let registeredMarkersCount = 0;
     let unregisteredMarkersCount = 0;
 
-    // PASSO 5: Criar marcadores VERDES para clientes cadastrados (reutilizar marcadores existentes)
     // PASSO 5: Criar marcadores VERDES para clientes cadastrados
     groupedByRegistered.forEach((data, clientId) => {
         const client = data.client;
         const deliveries = data.deliveries;
         const deliveryCount = deliveries.length;
-        const position = { lat: client.latitude, lng: client.longitude };
+
+        // Aplicar offset se houver marcadores sobrepostos
+        const markerId = `registered_${clientId}`;
+        const offset = markerOffsets[markerId] || { latOffset: 0, lngOffset: 0 };
+        const position = {
+            lat: client.latitude + offset.latOffset,
+            lng: client.longitude + offset.lngOffset
+        };
 
         console.log(`✅ Criando marcador verde para cliente: ${client.name} (${deliveryCount} entregas)`);
         console.log(`🔍 DEBUG - Deliveries deste marcador:`, deliveries);
@@ -5753,8 +5835,15 @@ async function addDeliveryMarkers() {
 
     // PASSO 6: Criar marcadores VERMELHOS para endereços não cadastrados
     Object.entries(groupedByUnregistered).forEach(([coordKey, locationData]) => {
-        const position = locationData.position;
         const deliveryCount = locationData.deliveries.length;
+
+        // Aplicar offset se houver marcadores sobrepostos
+        const markerId = `unregistered_${coordKey}`;
+        const offset = markerOffsets[markerId] || { latOffset: 0, lngOffset: 0 };
+        const position = {
+            lat: locationData.position.lat + offset.latOffset,
+            lng: locationData.position.lng + offset.lngOffset
+        };
 
         console.log(`❌ Criando marcador vermelho para local não cadastrado: ${locationData.address} (${deliveryCount} entregas)`);
 
