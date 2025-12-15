@@ -7061,6 +7061,11 @@ if (btnAdjustLocation) {
             // Resetar flag
             locationPickerFromModal = false;
 
+            // Reiniciar câmera para continuar lendo QR code
+            setTimeout(() => {
+                startCamera();
+            }, 300);
+
             console.log('📍 Localização ajustada manualmente:', confirmedLocation);
         });
     });
