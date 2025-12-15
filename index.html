@@ -538,211 +538,13 @@
         background: linear-gradient(135deg, #00a884 0%, #00b8b0 100%);
     }
 
-    /* Modal Cadastro Rápido */
-    .modal-quick-register {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: var(--bg-overlay);
-        z-index: 10004;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        opacity: 0;
-        visibility: hidden;
-        transition: all 0.3s ease;
+    /* Modo Cadastro Rápido - esconder formulário */
+    .modal-overlay.quick-mode .form-section {
+        display: none !important;
     }
 
-    .modal-quick-register.active {
-        opacity: 1;
-        visibility: visible;
-    }
-
-    .modal-quick-content {
-        background: white;
-        border-radius: 20px;
-        width: 95%;
-        max-width: 420px;
-        max-height: 90vh;
-        overflow-y: auto;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        transform: scale(0.9) translateY(20px);
-        transition: transform 0.3s ease;
-    }
-
-    .modal-quick-register.active .modal-quick-content {
-        transform: scale(1) translateY(0);
-    }
-
-    .dark .modal-quick-content {
-        background: var(--dark-card);
-    }
-
-    .modal-quick-header {
-        padding: 20px;
-        border-bottom: 2px solid #e0e0e0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+    .modal-overlay.quick-mode .modal-header {
         background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
-        color: white;
-        border-radius: 20px 20px 0 0;
-    }
-
-    .modal-quick-header h3 {
-        margin: 0;
-        font-size: 18px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .modal-quick-close {
-        background: rgba(255,255,255,0.2);
-        border: none;
-        color: white;
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        font-size: 20px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: background 0.2s ease;
-    }
-
-    .modal-quick-close:hover {
-        background: rgba(255,255,255,0.3);
-    }
-
-    .modal-quick-body {
-        padding: 20px;
-    }
-
-    .quick-mode-tabs {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 20px;
-    }
-
-    .quick-mode-tab {
-        flex: 1;
-        padding: 12px;
-        border: 2px solid #e0e0e0;
-        background: white;
-        border-radius: 12px;
-        cursor: pointer;
-        text-align: center;
-        font-weight: 600;
-        transition: all 0.2s ease;
-    }
-
-    .quick-mode-tab.active {
-        border-color: #00b894;
-        background: rgba(0, 184, 148, 0.1);
-        color: #00b894;
-    }
-
-    .quick-mode-tab:hover:not(.active) {
-        border-color: #00cec9;
-    }
-
-    .dark .quick-mode-tab {
-        background: var(--dark-bg);
-        border-color: var(--dark-border);
-        color: var(--dark-text);
-    }
-
-    .dark .quick-mode-tab.active {
-        border-color: #00b894;
-        background: rgba(0, 184, 148, 0.2);
-        color: #00b894;
-    }
-
-    .quick-scanner-section {
-        display: none;
-    }
-
-    .quick-scanner-section.active {
-        display: block;
-    }
-
-    .quick-list-section {
-        display: none;
-    }
-
-    .quick-list-section.active {
-        display: block;
-    }
-
-    .quick-address-list {
-        max-height: 300px;
-        overflow-y: auto;
-        border: 1px solid #e0e0e0;
-        border-radius: 12px;
-    }
-
-    .dark .quick-address-list {
-        border-color: var(--dark-border);
-    }
-
-    .quick-address-item {
-        padding: 15px;
-        border-bottom: 1px solid #e0e0e0;
-        cursor: pointer;
-        transition: background 0.2s ease;
-        display: flex;
-        gap: 10px;
-        align-items: flex-start;
-    }
-
-    .quick-address-item:last-child {
-        border-bottom: none;
-    }
-
-    .quick-address-item:hover {
-        background: rgba(0, 184, 148, 0.1);
-    }
-
-    .dark .quick-address-item {
-        border-color: var(--dark-border);
-    }
-
-    .dark .quick-address-item:hover {
-        background: rgba(0, 184, 148, 0.2);
-    }
-
-    .quick-address-number {
-        background: #00b894;
-        color: white;
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        font-weight: 600;
-        flex-shrink: 0;
-    }
-
-    .quick-address-text {
-        flex: 1;
-        font-size: 14px;
-        line-height: 1.4;
-    }
-
-    .dark .quick-address-text {
-        color: var(--dark-text);
-    }
-
-    .quick-empty-message {
-        padding: 30px;
-        text-align: center;
-        color: #888;
     }
 
     /* ===========================
@@ -2368,49 +2170,6 @@
     <span>➕</span>
     <span>Adicionar Cliente</span>
 </button>
-
-<!-- Modal Cadastro Rápido -->
-<div class="modal-quick-register" id="modal-quick-register">
-    <div class="modal-quick-content">
-        <div class="modal-quick-header">
-            <h3>⚡ Cadastro Rápido</h3>
-            <button class="modal-quick-close" id="btn-quick-close">✕</button>
-        </div>
-        <div class="modal-quick-body">
-            <!-- Tabs de seleção -->
-            <div class="quick-mode-tabs">
-                <button class="quick-mode-tab active" id="quick-tab-scanner">
-                    📷 QR Code
-                </button>
-                <button class="quick-mode-tab" id="quick-tab-list">
-                    📋 Lista
-                </button>
-            </div>
-
-            <!-- Seção Scanner QR -->
-            <div class="quick-scanner-section active" id="quick-scanner-section">
-                <div class="qr-scanner-section">
-                    <div class="scanner-title">
-                        <span>📸 Aponte para o QR Code</span>
-                    </div>
-                    <div class="qr-scanner-container" id="quick-qr-container">
-                        <video id="quick-qr-video" autoplay playsinline muted></video>
-                        <canvas id="quick-qr-canvas"></canvas>
-                        <div class="qr-scanner-frame"></div>
-                    </div>
-                    <div class="qr-status" id="quick-qr-status">Aguardando câmera...</div>
-                </div>
-            </div>
-
-            <!-- Seção Lista de Endereços -->
-            <div class="quick-list-section" id="quick-list-section">
-                <div class="quick-address-list" id="quick-address-list">
-                    <div class="quick-empty-message">Carregando endereços...</div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Sidebar - Menu Lateral -->
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
@@ -6602,6 +6361,10 @@ let mapDragListener = null; // Listener de arrasto do mapa
 let mapDragEndListener = null; // Listener de fim de arrasto
 let locationPickerFromModal = false; // Se o picker foi ativado a partir do modal
 
+// Variáveis do Cadastro Rápido (declaradas aqui para estar disponível no resetForm)
+let isQuickRegisterMode = false; // Flag para indicar modo de cadastro rápido
+let quickRegisterAddressData = null; // Dados do endereço para salvar no modo rápido
+
 // Elementos da mira fixa
 const locationPickerCrosshair = document.getElementById('location-picker-crosshair');
 const locationPickerDot = document.getElementById('location-picker-dot');
@@ -6899,6 +6662,41 @@ function selectDropdownItem(item) {
     const lat = parseFloat(item.dataset.lat) || 0;
     const lng = parseFloat(item.dataset.lng) || 0;
 
+    // ===== MODO CADASTRO RÁPIDO =====
+    if (isQuickRegisterMode) {
+        // Salvar dados do endereço para usar depois
+        quickRegisterAddressData = {
+            address: address,
+            latitude: lat,
+            longitude: lng,
+            spx_tn: qrCode
+        };
+
+        // Fechar dropdown e modal
+        addressDropdown.classList.remove('open');
+        stopCamera();
+        closeModal();
+
+        showToast(
+            '✓ Endereço selecionado!',
+            'Ajuste a posição no mapa',
+            'success',
+            2000
+        );
+
+        // Iniciar picker de localização com callback para salvar
+        setTimeout(() => {
+            activateLocationPicker(async (confirmedLocation) => {
+                await saveQuickClient(quickRegisterAddressData, confirmedLocation);
+                closeQuickRegisterMode();
+            });
+        }, 300);
+
+        console.log(`⚡ Cadastro rápido: ${address}`);
+        return;
+    }
+
+    // ===== MODO NORMAL =====
     // Atualizar variáveis como se tivesse escaneado o QR Code
     scannedQRCode = qrCode;
     scannedAddress = address;
@@ -7026,10 +6824,17 @@ async function openModal() {
 // Fechar modal
 function closeModal() {
     modal.classList.remove('active');
+    modal.classList.remove('quick-mode'); // Remover modo rápido
     document.body.style.overflow = '';
     resetForm();
     // Restaurar formulário normal (caso esteja mostrando painel de atualização)
     showNormalRegistrationForm();
+
+    // Restaurar título do modal se estava no modo rápido
+    const modalTitle = modal.querySelector('.modal-header h3');
+    if (modalTitle) {
+        modalTitle.innerHTML = '📍 Adicionar Cliente';
+    }
 }
 
 // Resetar formulário
@@ -7067,6 +6872,10 @@ function resetForm() {
     isEditMode = false;
     editingClientId = null;
     btnSave.textContent = 'Salvar Cliente';
+
+    // Resetar modo cadastro rápido
+    isQuickRegisterMode = false;
+    quickRegisterAddressData = null;
 
     // Restaurar título do scanner
     const scannerTitle = document.querySelector('.scanner-title span');
@@ -7520,6 +7329,32 @@ async function handleQRCodeResult(qrData) {
             return;
         }
 
+        // ===== MODO CADASTRO RÁPIDO =====
+        if (isQuickRegisterMode) {
+            // Salvar dados do endereço para usar depois
+            quickRegisterAddressData = addressData;
+
+            // Fechar modal
+            closeModal();
+
+            showToast(
+                '✓ Endereço encontrado!',
+                'Ajuste a posição no mapa',
+                'success',
+                2000
+            );
+
+            // Iniciar picker de localização com callback para salvar
+            setTimeout(() => {
+                activateLocationPicker(async (confirmedLocation) => {
+                    await saveQuickClient(quickRegisterAddressData, confirmedLocation);
+                    closeQuickRegisterMode();
+                });
+            }, 300);
+            return;
+        }
+
+        // ===== MODO NORMAL =====
         // Cliente NÃO cadastrado - fluxo normal de cadastro
         scannedAddress = addressData.address;
         scannedQRCode = qrData;
@@ -7546,7 +7381,18 @@ async function handleQRCodeResult(qrData) {
             inputName.focus();
         }, 500);
     } else {
-        // Endereço não encontrado - mostrar código
+        // Endereço não encontrado
+        if (isQuickRegisterMode) {
+            showToast(
+                '⚠️ Endereço não encontrado',
+                'Este QR code não está na planilha',
+                'warning',
+                4000
+            );
+            return;
+        }
+
+        // Modo normal - mostrar código
         scannedAddress = `Código QR: ${qrData} (Endereço não cadastrado)`;
         scannedQRCode = qrData;
         scannedLatLng = null; // Sem coordenadas
@@ -7934,337 +7780,45 @@ async function lookupAddress(qrCode) {
 // ===========================
 
 const btnQuickRegister = document.getElementById('btn-quick-register');
-const modalQuickRegister = document.getElementById('modal-quick-register');
-const btnQuickClose = document.getElementById('btn-quick-close');
-const quickTabScanner = document.getElementById('quick-tab-scanner');
-const quickTabList = document.getElementById('quick-tab-list');
-const quickScannerSection = document.getElementById('quick-scanner-section');
-const quickListSection = document.getElementById('quick-list-section');
-const quickAddressList = document.getElementById('quick-address-list');
-const quickQrVideo = document.getElementById('quick-qr-video');
-const quickQrCanvas = document.getElementById('quick-qr-canvas');
-const quickQrStatus = document.getElementById('quick-qr-status');
 
-let quickCameraStream = null;
-let quickScanInterval = null;
-let quickLastScannedCode = '';
-let quickConsecutiveReads = 0;
-let quickLastReadData = null;
+// Abrir modal no modo cadastro rápido (usa o mesmo modal, mas esconde formulário)
+function openQuickRegisterModal() {
+    isQuickRegisterMode = true;
+    quickRegisterAddressData = null;
 
-// Mostrar botão de cadastro rápido quando mapa estiver pronto
-function showQuickRegisterButton() {
-    if (btnQuickRegister) {
-        btnQuickRegister.classList.add('visible');
-    }
-}
+    // Adicionar classe para estilização diferenciada
+    modal.classList.add('quick-mode');
 
-// Abrir modal de cadastro rápido
-function openQuickModal() {
-    if (modalQuickRegister) {
-        modalQuickRegister.classList.add('active');
-        document.body.style.overflow = 'hidden';
-
-        // Iniciar no modo scanner por padrão
-        switchQuickTab('scanner');
-    }
-}
-
-// Fechar modal de cadastro rápido
-function closeQuickModal() {
-    if (modalQuickRegister) {
-        modalQuickRegister.classList.remove('active');
-        modalQuickRegister.style.display = '';
-        document.body.style.overflow = '';
-        stopQuickCamera();
-    }
-}
-
-// Trocar entre tabs do modal rápido
-function switchQuickTab(tab) {
-    if (tab === 'scanner') {
-        quickTabScanner.classList.add('active');
-        quickTabList.classList.remove('active');
-        quickScannerSection.classList.add('active');
-        quickListSection.classList.remove('active');
-        startQuickCamera();
-    } else {
-        quickTabScanner.classList.remove('active');
-        quickTabList.classList.add('active');
-        quickScannerSection.classList.remove('active');
-        quickListSection.classList.add('active');
-        stopQuickCamera();
-        populateQuickAddressList();
-    }
-}
-
-// Iniciar câmera do cadastro rápido
-async function startQuickCamera() {
-    if (quickCameraStream) return;
-
-    try {
-        quickQrStatus.textContent = 'Iniciando câmera...';
-        quickQrStatus.classList.remove('success', 'error');
-
-        quickCameraStream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: 'environment',
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            }
-        });
-
-        quickQrVideo.srcObject = quickCameraStream;
-        await quickQrVideo.play();
-
-        quickQrStatus.textContent = '🔍 Procurando QR Code...';
-
-        // Iniciar scan
-        startQuickQRScan();
-
-    } catch (error) {
-        console.error('Erro ao iniciar câmera:', error);
-        quickQrStatus.textContent = '❌ Erro ao acessar câmera';
-        quickQrStatus.classList.add('error');
-    }
-}
-
-// Parar câmera do cadastro rápido
-function stopQuickCamera() {
-    if (quickScanInterval) {
-        clearInterval(quickScanInterval);
-        quickScanInterval = null;
+    // Alterar título do modal
+    const modalTitle = modal.querySelector('.modal-header h3');
+    if (modalTitle) {
+        modalTitle.innerHTML = '⚡ Cadastro Rápido';
     }
 
-    if (quickCameraStream) {
-        quickCameraStream.getTracks().forEach(track => track.stop());
-        quickCameraStream = null;
-    }
-
-    if (quickQrVideo) {
-        quickQrVideo.srcObject = null;
-    }
-
-    quickLastScannedCode = '';
-    quickConsecutiveReads = 0;
-    quickLastReadData = null;
-}
-
-// Iniciar scan de QR code do cadastro rápido
-function startQuickQRScan() {
-    if (quickScanInterval) return;
-
-    const ctx = quickQrCanvas.getContext('2d', { willReadFrequently: true });
-    const REQUIRED_READS = 3;
-
-    quickScanInterval = setInterval(() => {
-        if (!quickQrVideo || quickQrVideo.readyState !== quickQrVideo.HAVE_ENOUGH_DATA) return;
-
-        const scanSize = Math.min(quickQrVideo.videoWidth, quickQrVideo.videoHeight);
-        if (scanSize === 0) return;
-
-        quickQrCanvas.width = scanSize;
-        quickQrCanvas.height = scanSize;
-
-        const offsetX = (quickQrVideo.videoWidth - scanSize) / 2;
-        const offsetY = (quickQrVideo.videoHeight - scanSize) / 2;
-
-        ctx.drawImage(quickQrVideo, offsetX, offsetY, scanSize, scanSize, 0, 0, scanSize, scanSize);
-
-        const imageData = ctx.getImageData(0, 0, scanSize, scanSize);
-
-        if (typeof jsQR !== 'undefined') {
-            const code = jsQR(imageData.data, scanSize, scanSize, { inversionAttempts: 'dontInvert' });
-
-            if (code && code.data) {
-                const qrData = code.data.trim();
-
-                if (qrData === quickLastReadData) {
-                    quickConsecutiveReads++;
-                } else {
-                    quickConsecutiveReads = 1;
-                    quickLastReadData = qrData;
-                }
-
-                quickQrStatus.textContent = `🔍 Lendo... (${quickConsecutiveReads}/${REQUIRED_READS})`;
-
-                if (quickConsecutiveReads >= REQUIRED_READS && qrData !== quickLastScannedCode) {
-                    quickLastScannedCode = qrData;
-                    quickConsecutiveReads = 0;
-                    quickLastReadData = null;
-
-                    console.log('✅ QR Code rápido confirmado:', qrData);
-
-                    quickQrStatus.textContent = '✓ QR Code detectado!';
-                    quickQrStatus.classList.add('success');
-
-                    playBeep();
-
-                    // Processar QR code para cadastro rápido
-                    handleQuickQRResult(qrData);
-
-                    setTimeout(() => {
-                        stopQuickCamera();
-                    }, 500);
-                }
-            } else {
-                if (quickConsecutiveReads > 0) {
-                    quickConsecutiveReads = 0;
-                    quickLastReadData = null;
-                }
-            }
-        }
-    }, 50);
-}
-
-// Processar resultado do QR Code para cadastro rápido
-async function handleQuickQRResult(qrData) {
-    console.log('📦 Processando QR Code rápido:', qrData);
-
-    // Buscar endereço no banco de dados
-    const addressData = await lookupAddressData(qrData);
-
-    if (!addressData) {
-        showToast(
-            '⚠️ Endereço não encontrado',
-            'Este QR code não está na planilha',
-            'warning',
-            4000
-        );
-        return;
-    }
-
-    // Verificar se já está cadastrado
-    const existingClient = await checkClientByAddress(addressData.address);
-
-    if (existingClient) {
-        showToast(
-            '⚠️ Cliente já cadastrado',
-            `${existingClient.name || 'Sem nome'} - ${addressData.address.split('\n')[0]}`,
-            'warning',
-            4000
-        );
-        closeQuickModal();
-        return;
-    }
-
-    // Fechar modal e iniciar ajuste de posição
-    closeQuickModal();
+    // Abrir modal normalmente
+    openModal();
 
     showToast(
-        '✓ Endereço encontrado!',
-        'Ajuste a posição no mapa',
-        'success',
+        '⚡ Modo Rápido',
+        'Escaneie o QR ou escolha da lista',
+        'info',
         2000
     );
-
-    // Iniciar picker de localização com callback para salvar
-    setTimeout(() => {
-        activateLocationPicker(async (confirmedLocation) => {
-            await saveQuickClient(addressData, confirmedLocation);
-        });
-    }, 300);
 }
 
-// Popular lista de endereços para cadastro rápido
-async function populateQuickAddressList() {
-    if (!quickAddressList) return;
+// Fechar modo cadastro rápido e restaurar modal normal
+function closeQuickRegisterMode() {
+    isQuickRegisterMode = false;
+    quickRegisterAddressData = null;
 
-    quickAddressList.innerHTML = '<div class="quick-empty-message">Carregando...</div>';
+    // Remover classe de estilização
+    modal.classList.remove('quick-mode');
 
-    try {
-        // Buscar dados da planilha do dia
-        const { data: deliveryData, error } = await supabase
-            .from('delivery_data')
-            .select('*')
-            .order('sequence', { ascending: true });
-
-        if (error) throw error;
-
-        if (!deliveryData || deliveryData.length === 0) {
-            quickAddressList.innerHTML = '<div class="quick-empty-message">⚠️ Nenhuma planilha carregada</div>';
-            return;
-        }
-
-        // Buscar clientes já cadastrados
-        const { data: clients } = await supabase.from('clients').select('address');
-
-        const registeredAddresses = new Set();
-        if (clients) {
-            clients.forEach(c => {
-                if (c.address) {
-                    registeredAddresses.add(c.address.split('\n')[0].toLowerCase().trim());
-                }
-            });
-        }
-
-        // Filtrar apenas endereços NÃO cadastrados
-        const availableAddresses = deliveryData.filter(item => {
-            const firstLine = item.address?.split('\n')[0].toLowerCase().trim();
-            return !registeredAddresses.has(firstLine);
-        });
-
-        if (availableAddresses.length === 0) {
-            quickAddressList.innerHTML = '<div class="quick-empty-message">✓ Todos os endereços já foram cadastrados!</div>';
-            return;
-        }
-
-        // Renderizar lista
-        quickAddressList.innerHTML = '';
-
-        availableAddresses.forEach((item, index) => {
-            const div = document.createElement('div');
-            div.className = 'quick-address-item';
-            div.innerHTML = `
-                <span class="quick-address-number">${item.sequence || (index + 1)}</span>
-                <span class="quick-address-text">${escapeHtml(item.address?.split('\n')[0] || 'Sem endereço')}</span>
-            `;
-
-            div.addEventListener('click', () => {
-                handleQuickAddressSelect(item);
-            });
-
-            quickAddressList.appendChild(div);
-        });
-
-    } catch (error) {
-        console.error('Erro ao carregar endereços:', error);
-        quickAddressList.innerHTML = '<div class="quick-empty-message">❌ Erro ao carregar endereços</div>';
+    // Restaurar título do modal
+    const modalTitle = modal.querySelector('.modal-header h3');
+    if (modalTitle) {
+        modalTitle.innerHTML = '📍 Adicionar Cliente';
     }
-}
-
-// Processar seleção de endereço da lista
-async function handleQuickAddressSelect(addressData) {
-    console.log('📍 Endereço selecionado para cadastro rápido:', addressData);
-
-    // Verificar se já está cadastrado
-    const existingClient = await checkClientByAddress(addressData.address);
-
-    if (existingClient) {
-        showToast(
-            '⚠️ Cliente já cadastrado',
-            `${existingClient.name || 'Sem nome'}`,
-            'warning',
-            4000
-        );
-        return;
-    }
-
-    // Fechar modal
-    closeQuickModal();
-
-    showToast(
-        '✓ Endereço selecionado!',
-        'Ajuste a posição no mapa',
-        'success',
-        2000
-    );
-
-    // Iniciar picker de localização com callback para salvar
-    setTimeout(() => {
-        activateLocationPicker(async (confirmedLocation) => {
-            await saveQuickClient(addressData, confirmedLocation);
-        });
-    }, 300);
 }
 
 // Salvar cliente no modo rápido (apenas endereço e localização)
@@ -8299,7 +7853,7 @@ async function saveQuickClient(addressData, location) {
         await loadClientMarkers();
         await updateClientList();
 
-        // Atualizar lista de endereços no modal normal também
+        // Atualizar lista de endereços no modal
         await populateAddressSelect();
 
     } catch (error) {
@@ -8313,29 +7867,9 @@ async function saveQuickClient(addressData, location) {
     }
 }
 
-// Event Listeners do Cadastro Rápido
+// Event Listener do Botão Cadastro Rápido
 if (btnQuickRegister) {
-    btnQuickRegister.addEventListener('click', openQuickModal);
-}
-
-if (btnQuickClose) {
-    btnQuickClose.addEventListener('click', closeQuickModal);
-}
-
-if (modalQuickRegister) {
-    modalQuickRegister.addEventListener('click', (e) => {
-        if (e.target === modalQuickRegister) {
-            closeQuickModal();
-        }
-    });
-}
-
-if (quickTabScanner) {
-    quickTabScanner.addEventListener('click', () => switchQuickTab('scanner'));
-}
-
-if (quickTabList) {
-    quickTabList.addEventListener('click', () => switchQuickTab('list'));
+    btnQuickRegister.addEventListener('click', openQuickRegisterModal);
 }
 
 // ===========================
