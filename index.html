@@ -1059,6 +1059,46 @@
         margin-left: auto;
     }
 
+    /* Mira central fixa (estilo Uber/99) */
+    .location-picker-crosshair {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -100%);
+        z-index: 10003;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s ease, transform 0.15s ease;
+    }
+
+    .location-picker-crosshair.active {
+        opacity: 1;
+    }
+
+    .location-picker-crosshair.dragging {
+        transform: translate(-50%, -115%) scale(1.1);
+    }
+
+    /* Ponto central no chão (onde o pin aponta) */
+    .location-picker-dot {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 8px;
+        height: 8px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 50%;
+        z-index: 10002;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .location-picker-dot.active {
+        opacity: 1;
+    }
+
     /* Botão confirmar localização */
     .location-picker-confirm-btn {
         position: fixed;
@@ -2024,14 +2064,34 @@
 <!-- Container de Notificações -->
 <div id="toast-container"></div>
 
-<!-- UI de Seleção de Localização (marcador arrastável no mapa) -->
+<!-- UI de Seleção de Localização (mira fixa estilo Uber/99) -->
 <div class="location-picker-overlay" id="location-picker-overlay"></div>
+
+<!-- Mira/Pin fixo no centro da tela -->
+<div class="location-picker-crosshair" id="location-picker-crosshair">
+    <svg width="48" height="60" viewBox="0 0 48 60" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <linearGradient id="crosshairPinGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" style="stop-color:#4285F4;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#1a73e8;stop-opacity:1" />
+            </linearGradient>
+        </defs>
+        <path d="M24 0 C10.745 0 0 10.745 0 24 C0 42 24 58 24 58 S48 42 48 24 C48 10.745 37.255 0 24 0 Z"
+              fill="url(#crosshairPinGradient)"
+              stroke="#FFFFFF"
+              stroke-width="3"/>
+        <circle cx="24" cy="24" r="10" fill="#FFFFFF"/>
+        <circle cx="24" cy="24" r="5" fill="#4285F4"/>
+    </svg>
+</div>
+<div class="location-picker-dot" id="location-picker-dot"></div>
+
 <div class="location-picker-bar" id="location-picker-bar">
     <div class="location-picker-bar-content">
         <span class="location-picker-bar-icon">📍</span>
         <div class="location-picker-bar-text">
-            <span class="location-picker-bar-title">Arraste o marcador azul</span>
-            <span class="location-picker-bar-hint">Posicione no local exato do cliente</span>
+            <span class="location-picker-bar-title">Arraste o mapa</span>
+            <span class="location-picker-bar-hint">Posicione a mira no local exato</span>
         </div>
     </div>
     <span class="location-picker-bar-coords" id="picker-coords-display">---, ---</span>
@@ -3368,7 +3428,7 @@ function replaceNavigateButtonWithNotDelivered(marker, infoWindow, client) {
         buttons.forEach(btn => {
             // Procurar o botão que contém "Navegar" no texto
             if (btn.innerHTML && (btn.innerHTML.includes('🧭 Navegar') || btn.innerHTML.includes('Navegar'))) {
-                // Substituir o botão Navegar por Não Entregue
+                // Substituir o botão Navegar por N��o Entregue
                 btn.innerHTML = '❌ Não Entregue';
                 btn.style.background = '#EA4335';
                 btn.style.color = 'white';
@@ -6238,31 +6298,16 @@ const btnCancelLocation = document.getElementById('btn-cancel-location');
 const pickerCoordsDisplay = document.getElementById('picker-coords-display');
 
 let selectedLocation = null; // Coordenadas selecionadas pelo usuário
-let locationPickerMarker = null; // Marcador arrastável
 let isLocationPickerActive = false; // Se o modo de seleção está ativo
 let locationPickerCallback = null; // Callback quando confirmar localização
+let mapDragListener = null; // Listener de arrasto do mapa
+let mapDragEndListener = null; // Listener de fim de arrasto
 
-// Criar SVG do marcador arrastável (pin azul grande)
-function createDraggableMarkerSVG() {
-    return `
-        <svg width="48" height="60" viewBox="0 0 48 60" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-                <linearGradient id="draggablePinGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style="stop-color:#4285F4;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#1a73e8;stop-opacity:1" />
-                </linearGradient>
-            </defs>
-            <path d="M24 0 C10.745 0 0 10.745 0 24 C0 42 24 58 24 58 S48 42 48 24 C48 10.745 37.255 0 24 0 Z"
-                  fill="url(#draggablePinGradient)"
-                  stroke="#FFFFFF"
-                  stroke-width="3"/>
-            <circle cx="24" cy="24" r="10" fill="#FFFFFF"/>
-            <circle cx="24" cy="24" r="5" fill="#4285F4"/>
-        </svg>
-    `;
-}
+// Elementos da mira fixa
+const locationPickerCrosshair = document.getElementById('location-picker-crosshair');
+const locationPickerDot = document.getElementById('location-picker-dot');
 
-// Ativar modo de seleção de localização
+// Ativar modo de seleção de localização (estilo Uber/99 - mira fixa, arrasta o mapa)
 function activateLocationPicker(callback) {
     if (isLocationPickerActive) return;
 
@@ -6286,70 +6331,13 @@ function activateLocationPicker(callback) {
 
     selectedLocation = initialPosition;
 
-    // Criar marcador arrastável
-    const markerDiv = document.createElement('div');
-    markerDiv.innerHTML = createDraggableMarkerSVG();
-    markerDiv.style.cursor = 'grab';
-
-    if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
-        locationPickerMarker = new google.maps.marker.AdvancedMarkerElement({
-            map: map,
-            position: initialPosition,
-            content: markerDiv,
-            gmpDraggable: true,
-            title: "Arraste para posicionar"
-        });
-
-        // Listener de arrasto
-        locationPickerMarker.addListener('drag', () => {
-            const pos = locationPickerMarker.position;
-            selectedLocation = { lat: pos.lat, lng: pos.lng };
-            updatePickerCoordsDisplay();
-            markerDiv.style.cursor = 'grabbing';
-        });
-
-        locationPickerMarker.addListener('dragend', () => {
-            const pos = locationPickerMarker.position;
-            selectedLocation = { lat: pos.lat, lng: pos.lng };
-            updatePickerCoordsDisplay();
-            markerDiv.style.cursor = 'grab';
-
-            // Centralizar mapa suavemente no marcador
-            map.panTo(selectedLocation);
-        });
-    } else {
-        // Fallback para Marker clássico
-        locationPickerMarker = new google.maps.Marker({
-            map: map,
-            position: initialPosition,
-            draggable: true,
-            icon: {
-                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(createDraggableMarkerSVG()),
-                anchor: new google.maps.Point(24, 58),
-                scaledSize: new google.maps.Size(48, 60)
-            },
-            title: "Arraste para posicionar"
-        });
-
-        locationPickerMarker.addListener('drag', () => {
-            const pos = locationPickerMarker.getPosition();
-            selectedLocation = { lat: pos.lat(), lng: pos.lng() };
-            updatePickerCoordsDisplay();
-        });
-
-        locationPickerMarker.addListener('dragend', () => {
-            const pos = locationPickerMarker.getPosition();
-            selectedLocation = { lat: pos.lat(), lng: pos.lng() };
-            updatePickerCoordsDisplay();
-            map.panTo(selectedLocation);
-        });
-    }
-
     // Centralizar mapa na posição inicial com zoom bem próximo
     map.setCenter(initialPosition);
     map.setZoom(20); // Zoom máximo para ajuste preciso
 
-    // Mostrar UI
+    // Mostrar mira fixa e UI
+    if (locationPickerCrosshair) locationPickerCrosshair.classList.add('active');
+    if (locationPickerDot) locationPickerDot.classList.add('active');
     locationPickerBar.classList.add('active');
     locationPickerOverlay.classList.add('active');
     btnConfirmLocation.classList.add('active');
@@ -6364,16 +6352,34 @@ function activateLocationPicker(callback) {
     if (statusBar) statusBar.style.opacity = '0';
     if (btnAddClientEl) btnAddClientEl.style.opacity = '0';
 
-    // Atualizar coordenadas
+    // Listener: quando o mapa é arrastado, a mira "sobe"
+    mapDragListener = map.addListener('drag', () => {
+        if (locationPickerCrosshair) locationPickerCrosshair.classList.add('dragging');
+        // Atualizar coordenadas em tempo real baseado no centro do mapa
+        const center = map.getCenter();
+        selectedLocation = { lat: center.lat(), lng: center.lng() };
+        updatePickerCoordsDisplay();
+    });
+
+    // Listener: quando termina o arrasto, a mira "desce"
+    mapDragEndListener = map.addListener('dragend', () => {
+        if (locationPickerCrosshair) locationPickerCrosshair.classList.remove('dragging');
+        // Pegar posição final do centro do mapa
+        const center = map.getCenter();
+        selectedLocation = { lat: center.lat(), lng: center.lng() };
+        updatePickerCoordsDisplay();
+    });
+
+    // Atualizar coordenadas iniciais
     updatePickerCoordsDisplay();
 
-    console.log('📍 [PICKER] Modo de seleção de localização ativado');
+    console.log('📍 [PICKER] Modo de seleção de localização ativado (mira fixa)');
 
     showToast(
-        'Modo de seleção',
-        'Arraste o marcador azul para a posição exata do cliente',
+        'Ajuste a posição',
+        'Arraste o mapa para posicionar a mira no local exato',
         'info',
-        4000
+        3000
     );
 }
 
@@ -6383,17 +6389,22 @@ function deactivateLocationPicker(confirmed = false) {
 
     isLocationPickerActive = false;
 
-    // Remover marcador
-    if (locationPickerMarker) {
-        if (locationPickerMarker.map !== undefined) {
-            locationPickerMarker.map = null; // AdvancedMarkerElement
-        } else if (locationPickerMarker.setMap) {
-            locationPickerMarker.setMap(null); // Marker clássico
-        }
-        locationPickerMarker = null;
+    // Remover listeners do mapa
+    if (mapDragListener) {
+        google.maps.event.removeListener(mapDragListener);
+        mapDragListener = null;
+    }
+    if (mapDragEndListener) {
+        google.maps.event.removeListener(mapDragEndListener);
+        mapDragEndListener = null;
     }
 
-    // Esconder UI
+    // Esconder mira fixa e UI
+    if (locationPickerCrosshair) {
+        locationPickerCrosshair.classList.remove('active');
+        locationPickerCrosshair.classList.remove('dragging');
+    }
+    if (locationPickerDot) locationPickerDot.classList.remove('active');
     locationPickerBar.classList.remove('active');
     locationPickerOverlay.classList.remove('active');
     btnConfirmLocation.classList.remove('active');
