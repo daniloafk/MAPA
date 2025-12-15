@@ -6685,8 +6685,8 @@ function selectDropdownItem(item) {
 
     // ===== MODO CADASTRO RÁPIDO =====
     if (isQuickRegisterMode) {
-        // Salvar dados do endereço para usar depois
-        quickRegisterAddressData = {
+        // Salvar dados do endereço em variável local (antes do closeModal resetar)
+        const addressDataToSave = {
             address: address,
             latitude: lat,
             longitude: lng,
@@ -6696,7 +6696,11 @@ function selectDropdownItem(item) {
         // Fechar dropdown e modal
         addressDropdown.classList.remove('open');
         stopCamera();
-        closeModal();
+
+        // Fechar modal manualmente SEM resetar as variáveis do cadastro rápido
+        modal.classList.remove('active');
+        modal.classList.remove('quick-mode');
+        document.body.style.overflow = '';
 
         showToast(
             '✓ Endereço selecionado!',
@@ -6708,7 +6712,7 @@ function selectDropdownItem(item) {
         // Iniciar picker de localização com callback para salvar
         setTimeout(() => {
             activateLocationPicker(async (confirmedLocation) => {
-                await saveQuickClient(quickRegisterAddressData, confirmedLocation);
+                await saveQuickClient(addressDataToSave, confirmedLocation);
                 closeQuickRegisterMode();
             });
         }, 300);
@@ -7360,11 +7364,16 @@ async function handleQRCodeResult(qrData) {
 
         // ===== MODO CADASTRO RÁPIDO =====
         if (isQuickRegisterMode) {
-            // Salvar dados do endereço para usar depois
-            quickRegisterAddressData = addressData;
+            // Salvar dados do endereço em variável local (antes de fechar o modal)
+            const addressDataToSave = addressData;
 
-            // Fechar modal
-            closeModal();
+            // Parar câmera
+            stopCamera();
+
+            // Fechar modal manualmente SEM resetar as variáveis
+            modal.classList.remove('active');
+            modal.classList.remove('quick-mode');
+            document.body.style.overflow = '';
 
             showToast(
                 '✓ Endereço encontrado!',
@@ -7376,7 +7385,7 @@ async function handleQRCodeResult(qrData) {
             // Iniciar picker de localização com callback para salvar
             setTimeout(() => {
                 activateLocationPicker(async (confirmedLocation) => {
-                    await saveQuickClient(quickRegisterAddressData, confirmedLocation);
+                    await saveQuickClient(addressDataToSave, confirmedLocation);
                     closeQuickRegisterMode();
                 });
             }, 300);
