@@ -592,13 +592,78 @@
     .modal-container {
         background: white;
         border-radius: 16px;
-        width: 90%;
+        width: 95%;
         max-width: 500px;
-        max-height: 90vh;
+        max-height: 85vh;
         overflow-y: auto;
         box-shadow: 0 10px 40px rgba(0,0,0,0.3);
         transform: scale(0.9);
         transition: transform 0.3s ease;
+        margin: 10px;
+    }
+
+    /* Ajustes para mobile */
+    @media (max-width: 480px) {
+        .modal-container {
+            width: 100%;
+            max-height: 100vh;
+            height: 100vh;
+            margin: 0;
+            border-radius: 0;
+        }
+
+        .modal-body {
+            padding: 16px;
+            padding-bottom: 100px; /* Espaço para o footer fixo */
+        }
+
+        .form-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 12px 16px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        .dark .form-footer {
+            background: #1e1e1e;
+        }
+
+        .qr-camera-container {
+            height: 150px !important;
+            min-height: 150px !important;
+        }
+
+        .qr-camera-container video,
+        .qr-camera-container canvas {
+            height: 150px !important;
+        }
+
+        .custom-dropdown-list {
+            max-height: 200px !important;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-label {
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+
+        .form-input {
+            padding: 10px 12px;
+            font-size: 16px; /* Evita zoom no iOS */
+        }
+
+        .btn-adjust-location {
+            padding: 10px 14px;
+            font-size: 13px;
+        }
     }
 
     .modal-overlay.active .modal-container {
