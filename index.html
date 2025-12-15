@@ -4316,6 +4316,12 @@ const GOOGLE_MAPS_API_KEY = "AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU"; // API Ke
 // ===========================
 
 function showToast(title, message, type = 'info', duration = 4000) {
+    // Mostrar apenas toasts de erro para não poluir a interface
+    if (type !== 'error') {
+        console.log(`[Toast ${type}] ${title}: ${message}`);
+        return;
+    }
+
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
