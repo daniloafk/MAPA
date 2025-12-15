@@ -8316,26 +8316,19 @@ async function handleRealtimeChange(payload) {
 
 // Processar mudanças de status de entrega (delivery_data)
 async function handleDeliveryStatusChange(payload) {
-    const { new: newRecord, old: oldRecord } = payload;
+    const { new: newRecord } = payload;
 
-    // Verificar se o status realmente mudou
-    if (!newRecord || !oldRecord) return;
+    // Verificar se temos dados novos
+    if (!newRecord) return;
 
     const spxTn = newRecord.spx_tn;
     const newStatus = newRecord.status;
-    const oldStatus = oldRecord.status;
 
     console.log(`📦 [REALTIME-DELIVERY] SPX TN: ${spxTn}`);
-    console.log(`📦 [REALTIME-DELIVERY] Status antigo: ${oldStatus} → Novo status: ${newStatus}`);
-
-    // Se o status não mudou, ignorar
-    if (newStatus === oldStatus) {
-        console.log('📦 [REALTIME-DELIVERY] Status não mudou, ignorando...');
-        return;
-    }
+    console.log(`📦 [REALTIME-DELIVERY] Novo status: ${newStatus}`);
 
     // Encontrar o cliente associado a este SPX TN
-    const clientToUpdate = allClientsData.find(c => c.spx_tn === spxTn);
+    const clientToUpdate = allClients.find(c => c.spx_tn === spxTn);
 
     if (clientToUpdate) {
         console.log(`📦 [REALTIME-DELIVERY] Encontrado cliente: ${clientToUpdate.name || clientToUpdate.address}`);
