@@ -8179,15 +8179,20 @@ async function loadClients() {
 // ===========================
 
 let clientsChannel = null;
+let deliveryDataChannel = null;
 
 // Inicializar Realtime para sincronização automática
 function initRealtimeSync() {
     console.log('📡 [REALTIME] Iniciando configuração...');
 
-    // Remover canal anterior se existir
+    // Remover canais anteriores se existirem
     if (clientsChannel) {
-        console.log('📡 [REALTIME] Removendo canal anterior...');
+        console.log('📡 [REALTIME] Removendo canal clients anterior...');
         supabase.removeChannel(clientsChannel);
+    }
+    if (deliveryDataChannel) {
+        console.log('📡 [REALTIME] Removendo canal delivery_data anterior...');
+        supabase.removeChannel(deliveryDataChannel);
     }
 
     try {
@@ -8225,11 +8230,43 @@ function initRealtimeSync() {
                 } else if (status === 'TIMED_OUT') {
                     console.error('❌ [REALTIME] Timeout na conexão');
                 } else if (status === 'CLOSED') {
-                    console.warn('⚠️ [REALTIME] Canal fechado');
+                    console.warn('⚠️ [REALTIME] Canal clients fechado');
                 }
             });
 
-        console.log('📡 [REALTIME] Canal criado, aguardando conexão...');
+        // Criar canal para escutar mudanças na tabela delivery_data (status de entrega)
+        deliveryDataChannel = supabase
+            .channel('delivery-data-realtime-channel')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE', // Só precisamos escutar UPDATE para status
+                    schema: 'public',
+                    table: 'delivery_data'
+                },
+                (payload) => {
+                    console.log('📦 [REALTIME-DELIVERY] ========================================');
+                    console.log('📦 [REALTIME-DELIVERY] STATUS DE ENTREGA ALTERADO!');
+                    console.log('📦 [REALTIME-DELIVERY] SPX TN:', payload.new?.spx_tn);
+                    console.log('📦 [REALTIME-DELIVERY] Dados novos:', JSON.stringify(payload.new));
+                    console.log('📦 [REALTIME-DELIVERY] Dados antigos:', JSON.stringify(payload.old));
+                    console.log('📦 [REALTIME-DELIVERY] ========================================');
+                    handleDeliveryStatusChange(payload);
+                }
+            )
+            .subscribe((status, err) => {
+                console.log('📦 [REALTIME-DELIVERY] Status da conexão:', status);
+                if (err) {
+                    console.error('❌ [REALTIME-DELIVERY] Erro na subscrição:', err);
+                }
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ [REALTIME-DELIVERY] Conectado - sincronização de status ativa!');
+                } else if (status === 'CHANNEL_ERROR') {
+                    console.error('❌ [REALTIME-DELIVERY] Erro no canal - verifique Realtime para delivery_data');
+                }
+            });
+
+        console.log('📡 [REALTIME] Canais criados, aguardando conexão...');
 
     } catch (error) {
         console.error('❌ [REALTIME] Erro ao inicializar:', error);
@@ -8274,6 +8311,64 @@ async function handleRealtimeChange(payload) {
                 2000
             );
             break;
+    }
+}
+
+// Processar mudanças de status de entrega (delivery_data)
+async function handleDeliveryStatusChange(payload) {
+    const { new: newRecord, old: oldRecord } = payload;
+
+    // Verificar se o status realmente mudou
+    if (!newRecord || !oldRecord) return;
+
+    const spxTn = newRecord.spx_tn;
+    const newStatus = newRecord.status;
+    const oldStatus = oldRecord.status;
+
+    console.log(`📦 [REALTIME-DELIVERY] SPX TN: ${spxTn}`);
+    console.log(`📦 [REALTIME-DELIVERY] Status antigo: ${oldStatus} → Novo status: ${newStatus}`);
+
+    // Se o status não mudou, ignorar
+    if (newStatus === oldStatus) {
+        console.log('📦 [REALTIME-DELIVERY] Status não mudou, ignorando...');
+        return;
+    }
+
+    // Encontrar o cliente associado a este SPX TN
+    const clientToUpdate = allClientsData.find(c => c.spx_tn === spxTn);
+
+    if (clientToUpdate) {
+        console.log(`📦 [REALTIME-DELIVERY] Encontrado cliente: ${clientToUpdate.name || clientToUpdate.address}`);
+
+        // Atualizar o marcador no mapa
+        if (clientMarkers && clientMarkers[clientToUpdate.id]) {
+            // Remover marcador antigo
+            clientMarkers[clientToUpdate.id].map = null;
+            delete clientMarkers[clientToUpdate.id];
+        }
+
+        // Recarregar marcadores para refletir novo status
+        if (typeof showClientMarkers === 'function') {
+            await showClientMarkers();
+        }
+
+        // Mostrar notificação
+        const statusText = newStatus === 'entregue' ? '✅ Entregue' :
+                          newStatus === 'nao_entregue' ? '❌ Não Entregue' :
+                          '📦 Pendente';
+
+        showToast(
+            '📡 Status Atualizado',
+            `${clientToUpdate.address?.substring(0, 30) || spxTn}... → ${statusText}`,
+            'info',
+            3000
+        );
+    } else {
+        console.log('📦 [REALTIME-DELIVERY] Cliente não encontrado para este SPX TN');
+        // Mesmo assim, recarregar marcadores por segurança
+        if (typeof showClientMarkers === 'function') {
+            await showClientMarkers();
+        }
     }
 }
 
