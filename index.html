@@ -5146,7 +5146,7 @@ async function navigateToNextMarker(currentPosition = null) {
     }
 }
 
-async function addDeliveryMarkers() {
+async function addDeliveryMarkers(skipMapAdjust = false) {
     console.log('🔵 Adicionando marcadores de entrega...');
 
     // PASSO 1: Remover TODOS os marcadores anteriores
@@ -6250,8 +6250,8 @@ async function addDeliveryMarkers() {
     console.log(`✅ Total: ${registeredMarkersCount + unregisteredMarkersCount} marcadores criados`);
     console.log(`✅ Cadastrados: ${registeredMarkersCount} (verde) | Não cadastrados: ${unregisteredMarkersCount} (vermelho)`);
 
-    // Ajustar mapa para mostrar todos os marcadores
-    if (!bounds.isEmpty()) {
+    // Ajustar mapa para mostrar todos os marcadores (apenas se não for atualização de status)
+    if (!skipMapAdjust && !bounds.isEmpty()) {
         map.fitBounds(bounds, {
             padding: 80 // Adicionar margem de 80px ao redor
         });
@@ -8388,9 +8388,10 @@ async function handleDeliveryStatusChange(payload) {
     const clientToUpdate = allClients.find(c => c.spx_tn === spxTn);
 
     // Recarregar marcadores de entrega (verdes/vermelhos) para refletir novo status
+    // skipMapAdjust = true para não mover o mapa
     if (typeof addDeliveryMarkers === 'function') {
         console.log('📦 [REALTIME-DELIVERY] Recarregando marcadores de entrega...');
-        await addDeliveryMarkers();
+        await addDeliveryMarkers(true);
     }
 
     // Mostrar notificação
