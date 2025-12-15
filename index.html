@@ -7899,7 +7899,8 @@ function openQuickRegisterModal() {
     // Esconder campos de nome e telefone via JavaScript (fallback para navegadores sem :has())
     const formGroups = modal.querySelectorAll('.form-group');
     formGroups.forEach(group => {
-        if (group.querySelector('#input-name') || group.querySelector('#input-phone') || group.querySelector('#btn-adjust-location')) {
+        // Esconder apenas nome e telefone, NÃO o botão de ajustar localização
+        if (group.querySelector('#input-name') || group.querySelector('#input-phone')) {
             group.style.display = 'none';
         }
     });
