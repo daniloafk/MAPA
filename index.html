@@ -11614,83 +11614,9 @@ window.addEventListener('error', (e) => {
 }, true);
 
 /* ===========================
-   SERVICE WORKER REGISTRATION
+   SERVICE WORKER REMOVIDO
+   (Não funciona em iframes sandboxed)
    =========================== */
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        // Service Worker inline para cache
-        const swCode = `
-// Service Worker - Cache Offline v1.2
-const CACHE_NAME = 'mapa-clientes-v1.2';
-
-self.addEventListener('install', (event) => {
-    console.log('[SW] Instalando Service Worker...');
-    event.waitUntil(
-        caches.open(CACHE_NAME).then(() => self.skipWaiting())
-    );
-});
-
-self.addEventListener('activate', (event) => {
-    console.log('[SW] Ativando Service Worker...');
-    event.waitUntil(
-        caches.keys().then((cacheNames) => {
-            return Promise.all(
-                cacheNames.map((cacheName) => {
-                    if (cacheName !== CACHE_NAME) {
-                        return caches.delete(cacheName);
-                    }
-                })
-            );
-        }).then(() => self.clients.claim())
-    );
-});
-
-self.addEventListener('fetch', (event) => {
-    if (event.request.method !== 'GET') return;
-
-    // Ignorar APIs externas
-    const url = event.request.url;
-    if (url.includes('googleapis.com') ||
-        url.includes('supabase.co') ||
-        url.includes('cdn.jsdelivr.net')) {
-        return;
-    }
-
-    event.respondWith(
-        fetch(event.request)
-            .then((response) => {
-                if (response && response.status === 200) {
-                    const responseClone = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => {
-                        cache.put(event.request, responseClone);
-                    });
-                }
-                return response;
-            })
-            .catch(() => {
-                return caches.match(event.request).then((cached) => {
-                    if (cached) {
-                        console.log('[SW] Cache:', event.request.url);
-                        return cached;
-                    }
-                    return new Response('Offline', { status: 503 });
-                });
-            })
-    );
-});
-`;
-
-        const blob = new Blob([swCode], { type: 'application/javascript' });
-        const swUrl = URL.createObjectURL(blob);
-
-        navigator.serviceWorker.register(swUrl)
-            .then((reg) => {
-                console.log('✅ Service Worker registrado');
-                console.log('📦 Cache offline ativo');
-            })
-            .catch((err) => console.warn('⚠️ SW falhou:', err));
-    });
-}
 </script>
 
 </body>
