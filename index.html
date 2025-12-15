@@ -3,15 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Mapa de Clientes - Mapbox</title>
+<title>Mapa de Clientes - Google Maps</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📍</text></svg>">
 
 <!-- Material Icons -->
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-
-<!-- Mapbox GL JS -->
-<script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
-<link href="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css" rel="stylesheet">
 
 <style>
     :root {
@@ -3044,11 +3040,8 @@
 };
 </script>
 
-<!-- Mapbox Access Token - Configure seu token em: https://account.mapbox.com/access-tokens/ -->
-<script>
-    // IMPORTANTE: Substitua pelo seu token do Mapbox
-    mapboxgl.accessToken = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
-</script>
+<!-- Google Maps -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&loading=async&callback=initMap&v=beta&libraries=places,geometry,marker,maps3d"></script>
 
 <script>
 'use strict';
@@ -3059,24 +3052,7 @@
 let map;
 let is3D = false;
 let routeMode = false;
-let currentPopup = null; // Mapbox usa Popup ao invés de InfoWindow
-
-// Compatibilidade: criar objeto que imita InfoWindow do Google Maps
-const currentInfoWindow = {
-    close: function() {
-        if (currentPopup) {
-            currentPopup.remove();
-            currentPopup = null;
-        }
-    },
-    open: function(map, marker) {
-        if (currentPopup) currentPopup.remove();
-        if (marker && marker.getPopup) {
-            currentPopup = marker.getPopup();
-            currentPopup.addTo(map);
-        }
-    }
-};
+let currentInfoWindow = null;
 
 // Legacy global variables (mantidas para compatibilidade)
 let userLocationMarker = null;
@@ -3084,232 +3060,14 @@ let watchId = null;
 let _animating3D = false;
 let locationAccuracy = null;
 let deliveryMarkers = {};
-let currentRouteLayer = null; // Mapbox usa layers para rotas
+let directionsService = null;
+let directionsRenderer = null;
 let currentTween = null;
 let markerCoords = { lat: 0, lng: 0 };
 
 // IMPORTANTE: Inicializar array de polylines globalmente
 if (!window.routePolylines) {
     window.routePolylines = [];
-}
-
-// Mapbox Directions API URL base
-const MAPBOX_DIRECTIONS_API = 'https://api.mapbox.com/directions/v5/mapbox/driving';
-
-// ===========================
-// FUNÇÕES DE COMPATIBILIDADE MAPBOX
-// ===========================
-// Estas funções traduzem chamadas do estilo Google Maps para Mapbox
-
-// Função Haversine para calcular distância entre dois pontos (substitui google.maps.geometry.spherical.computeDistanceBetween)
-function computeDistanceBetween(pos1, pos2) {
-    const R = 6371000; // Raio da Terra em metros
-    const lat1 = pos1.lat * Math.PI / 180;
-    const lat2 = pos2.lat * Math.PI / 180;
-    const deltaLat = (pos2.lat - pos1.lat) * Math.PI / 180;
-    const deltaLng = (pos2.lng - pos1.lng) * Math.PI / 180;
-
-    const a = Math.sin(deltaLat/2) * Math.sin(deltaLat/2) +
-              Math.cos(lat1) * Math.cos(lat2) *
-              Math.sin(deltaLng/2) * Math.sin(deltaLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-    return R * c; // Distância em metros
-}
-
-// Função para criar marcador Mapbox com HTML customizado
-function createMapboxMarker(options) {
-    const { position, content, title, draggable = false } = options;
-
-    const marker = new mapboxgl.Marker({
-        element: content || undefined,
-        draggable: draggable,
-        anchor: 'bottom'
-    })
-    .setLngLat([position.lng, position.lat]);
-
-    if (title) {
-        marker.getElement().title = title;
-    }
-
-    return marker;
-}
-
-// Função para criar Popup Mapbox (substitui google.maps.InfoWindow)
-function createMapboxPopup(options) {
-    const { content, maxWidth = '300px' } = options;
-
-    const popup = new mapboxgl.Popup({
-        closeButton: true,
-        closeOnClick: false,
-        maxWidth: maxWidth,
-        className: 'mapbox-popup-custom'
-    });
-
-    if (content) {
-        if (typeof content === 'string') {
-            popup.setHTML(content);
-        } else {
-            popup.setDOMContent(content);
-        }
-    }
-
-    return popup;
-}
-
-// Função para buscar rota via Mapbox Directions API
-async function getMapboxDirections(origin, destination, waypoints = []) {
-    const coordinates = [
-        `${origin.lng},${origin.lat}`,
-        ...waypoints.map(wp => `${wp.lng},${wp.lat}`),
-        `${destination.lng},${destination.lat}`
-    ].join(';');
-
-    const url = `${MAPBOX_DIRECTIONS_API}/${coordinates}?` +
-        `access_token=${mapboxgl.accessToken}` +
-        `&geometries=geojson` +
-        `&overview=full` +
-        `&steps=true` +
-        `&language=pt-BR`;
-
-    try {
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (data.routes && data.routes.length > 0) {
-            return {
-                status: 'OK',
-                route: data.routes[0],
-                geometry: data.routes[0].geometry,
-                distance: data.routes[0].distance,
-                duration: data.routes[0].duration
-            };
-        }
-        return { status: 'ZERO_RESULTS' };
-    } catch (error) {
-        console.error('Erro ao buscar rota:', error);
-        return { status: 'ERROR', error };
-    }
-}
-
-// Função para desenhar rota no mapa
-function drawRouteOnMap(geometry, routeId = 'route') {
-    if (!map.getSource(routeId)) {
-        map.addSource(routeId, {
-            type: 'geojson',
-            data: {
-                type: 'Feature',
-                properties: {},
-                geometry: geometry
-            }
-        });
-
-        map.addLayer({
-            id: routeId,
-            type: 'line',
-            source: routeId,
-            layout: {
-                'line-join': 'round',
-                'line-cap': 'round'
-            },
-            paint: {
-                'line-color': '#4285f4',
-                'line-width': 5,
-                'line-opacity': 0.7
-            }
-        });
-    } else {
-        map.getSource(routeId).setData({
-            type: 'Feature',
-            properties: {},
-            geometry: geometry
-        });
-    }
-}
-
-// Função para limpar rota do mapa
-function clearRouteFromMap(routeId = 'route') {
-    if (map.getLayer(routeId)) {
-        map.removeLayer(routeId);
-    }
-    if (map.getSource(routeId)) {
-        map.removeSource(routeId);
-    }
-}
-
-// Classe de compatibilidade para LatLngBounds
-class MapboxBounds {
-    constructor() {
-        this._bounds = null;
-    }
-
-    extend(position) {
-        const lngLat = position.lng !== undefined ?
-            [position.lng, position.lat] :
-            [position[0], position[1]];
-
-        if (!this._bounds) {
-            this._bounds = new mapboxgl.LngLatBounds(lngLat, lngLat);
-        } else {
-            this._bounds.extend(lngLat);
-        }
-        return this;
-    }
-
-    isEmpty() {
-        return !this._bounds;
-    }
-
-    getCenter() {
-        if (!this._bounds) return { lat: 0, lng: 0 };
-        const center = this._bounds.getCenter();
-        return { lat: center.lat, lng: center.lng };
-    }
-
-    toMapbox() {
-        return this._bounds;
-    }
-}
-
-// Extensões do mapa para compatibilidade
-function extendMapWithCompatibility() {
-    if (!map) return;
-
-    // Adicionar métodos de compatibilidade ao mapa
-    map.setCenter = function(position) {
-        const center = position.lng !== undefined ?
-            [position.lng, position.lat] :
-            position;
-        this.setCenter(center);
-    };
-
-    map.panTo = function(position) {
-        const center = position.lng !== undefined ?
-            [position.lng, position.lat] :
-            position;
-        this.flyTo({ center, duration: 500 });
-    };
-
-    map.setHeading = function(heading) {
-        this.setBearing(heading);
-    };
-
-    map.getHeading = function() {
-        return this.getBearing();
-    };
-
-    map.setTilt = function(tilt) {
-        this.setPitch(tilt);
-    };
-
-    map.getTilt = function() {
-        return this.getPitch();
-    };
-
-    map.fitBounds = function(bounds, padding = 50) {
-        const mapboxBounds = bounds.toMapbox ? bounds.toMapbox() : bounds;
-        this.fitBounds(mapboxBounds, { padding, duration: 1000 });
-    };
 }
 
 // ===========================
@@ -3833,32 +3591,62 @@ async function checkAndRerouteIfNeededCore(currentPos) {
 // ✨ Versão com debounce (evita recálculos excessivos durante movimentação)
 const checkAndRerouteIfNeeded = debounce(checkAndRerouteIfNeededCore, 500);
 
-// Recalcular rota com nova origem (usando Mapbox Directions API)
+// Recalcular rota com nova origem
 async function recalculateRoute(origin, destination) {
     try {
-        const originCoords = origin.lat !== undefined ? origin : { lat: origin.lat(), lng: origin.lng() };
-        const destCoords = destination.lat !== undefined ? destination : { lat: destination.lat(), lng: destination.lng() };
+        const directionsService = new google.maps.DirectionsService();
 
-        const result = await getMapboxDirections(originCoords, destCoords);
+        const request = {
+            origin: origin,
+            destination: destination,
+            travelMode: google.maps.TravelMode.DRIVING,
+            optimizeWaypoints: false,
+            language: 'pt-BR',
+            region: 'BR'
+        };
+
+        const result = await directionsService.route(request);
 
         if (result.status === 'OK') {
-            // Desenhar nova rota usando a função auxiliar
-            drawRouteOnMap(result.geometry, 'navigation-route');
+            // Limpar rota antiga
+            if (window.routePolylines && window.routePolylines.length > 0) {
+                window.routePolylines.forEach(polyline => {
+                    if (polyline.setMap) {
+                        polyline.setMap(null);
+                    }
+                });
+                window.routePolylines = [];
+            }
+
+            // Desenhar nova rota
+            const route = result.routes[0];
+            const leg = route.legs[0];
+
+            const polyline = new google.maps.Polyline({
+                path: route.overview_path,
+                geodesic: true,
+                strokeColor: '#4285f4',
+                strokeOpacity: 0.8,
+                strokeWeight: 5,
+                map: map
+            });
+
+            window.routePolylines = [polyline];
 
             // Formatar distância e duração
-            const distanceKm = (result.distance / 1000).toFixed(1);
-            const durationMin = Math.ceil(result.duration / 60);
+            const distance = leg.distance.text;
+            const duration = leg.duration.text;
 
             showToast(
                 '✅ Nova rota calculada',
-                `📏 ${distanceKm} km • ⏱️ ${durationMin} min`,
+                `📏 ${distance} • ⏱️ ${duration}`,
                 'success',
                 3000
             );
 
             console.log('✅ Rota recalculada:', {
-                distance: result.distance,
-                duration: result.duration
+                distance: leg.distance,
+                duration: leg.duration
             });
 
         } else {
@@ -4040,28 +3828,28 @@ class GPSTracker {
         this.lastUpdate = 0;
         this.currentTween = null;
         this.markerCoords = { lat: 0, lng: 0 };
-        this.animationFrameId = null;
+        this.animationFrameId = null; // Para animação suave com requestAnimationFrame
 
         // Kalman Filter state
         this.kalman = {
             lat: null,
             lng: null,
-            variance: null
+            variance: null // Incerteza estimada
         };
-        this.kalmanQ = 0.1;
+        this.kalmanQ = 0.1; // MUITO ALTO - confiar quase totalmente nas novas leituras
         this.lastGoodPosition = null;
         this.consecutiveGoodReadings = 0;
 
-        // Configurações para rastreamento de veículo
+        // Configurações ULTRA AGRESSIVAS para rastreamento instantâneo de veículo
         this.config = {
-            updateThrottle: 0,
-            maxAccuracyThreshold: 500,
-            targetAccuracy: 50,
-            historySize: 1,
+            updateThrottle: 0,          // SEM throttle - atualizar IMEDIATAMENTE
+            maxAccuracyThreshold: 500,  // Aceitar qualquer leitura até 500m
+            targetAccuracy: 50,         // Meta relaxada para veículo
+            historySize: 1,             // Sem histórico - usar última leitura
             highAccuracy: true,
-            timeout: 8000,
-            maximumAge: 5000,
-            minReadingsForStable: 1
+            timeout: 8000,              // Timeout 8s para resposta rápida
+            maximumAge: 5000,           // Aceita dados de até 5s atrás
+            minReadingsForStable: 1     // 1 leitura é suficiente
         };
     }
 
@@ -4098,7 +3886,7 @@ class GPSTracker {
         this.accuracy = position.coords.accuracy;
         this.markerCoords = coords;
 
-        // Container principal do marcador (Mapbox usa HTML elements)
+        // Container principal do marcador
         const markerDiv = document.createElement('div');
         markerDiv.className = 'location-marker active';
 
@@ -4112,18 +3900,33 @@ class GPSTracker {
         dotDiv.className = 'location-marker-dot';
         markerDiv.appendChild(dotDiv);
 
-        // Guardar referências
+        // Guardar referências para contra-rotação
         this.markerElement = markerDiv;
         this.pulseElement = pulseDiv;
         this.dotElement = dotDiv;
 
-        // Criar marcador Mapbox
-        this.marker = new mapboxgl.Marker({
-            element: markerDiv,
-            anchor: 'center'
-        })
-        .setLngLat([coords.lng, coords.lat])
-        .addTo(map);
+        if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+            this.marker = new google.maps.marker.AdvancedMarkerElement({
+                map: map,
+                position: coords,
+                content: markerDiv,
+                title: "Sua Localização"
+            });
+        } else {
+            this.marker = new google.maps.Marker({
+                map: map,
+                position: coords,
+                title: "Sua Localização",
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 8,
+                    fillColor: "#4285f4",
+                    fillOpacity: 1,
+                    strokeColor: "white",
+                    strokeWeight: 3
+                }
+            });
+        }
 
         // Atualizar referências globais (compatibilidade)
         userLocationMarker = this.marker;
@@ -4131,7 +3934,8 @@ class GPSTracker {
         markerCoords = this.markerCoords;
 
         // Listener para contra-rotacionar o marcador quando o mapa gira
-        this.headingListener = map.on('rotate', () => {
+        // Mantém o marcador sempre na posição fixa (não gira com o mapa)
+        this.headingListener = map.addListener('heading_changed', () => {
             this.counterRotateMarker();
         });
 
@@ -4143,10 +3947,10 @@ class GPSTracker {
     counterRotateMarker() {
         if (!this.pulseElement || !this.dotElement) return;
 
-        const bearing = map.getBearing() || 0;
+        const heading = map.getHeading() || 0;
         // Aplicar rotação inversa aos elementos internos
-        this.pulseElement.style.transform = `translate(-50%, -50%) rotate(${-bearing}deg)`;
-        this.dotElement.style.transform = `translate(-50%, -50%) rotate(${-bearing}deg)`;
+        this.pulseElement.style.transform = `translate(-50%, -50%) rotate(${-heading}deg)`;
+        this.dotElement.style.transform = `translate(-50%, -50%) rotate(${-heading}deg)`;
     }
 
     startWatching(options) {
@@ -4155,7 +3959,7 @@ class GPSTracker {
             (error) => this.handleError(error),
             options
         );
-        watchId = this.watchId;
+        watchId = this.watchId; // Compatibilidade global
     }
 
     updatePosition(position) {
@@ -4163,31 +3967,36 @@ class GPSTracker {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
 
+        // Usar posição direta
         const newPos = { lat, lng };
 
+        // Atualizar marcador com animação suave
         if (this.marker) {
             this.animateMarkerSmooth(newPos);
             this.accuracy = accuracy;
             locationAccuracy = accuracy;
 
+            // Indicador visual de qualidade do sinal
             const qualityIcon = accuracy <= 10 ? '🎯' : accuracy <= 30 ? '📍' : '📡';
             updateStatus(`${qualityIcon} GPS: ${accuracy.toFixed(0)}m`, true);
         }
     }
 
-    // Animação suave usando requestAnimationFrame
+    // Animação suave usando requestAnimationFrame (como Google Maps)
     animateMarkerSmooth(newPosition) {
         if (!this.marker) return;
 
+        // Cancelar animação anterior se existir
         if (this.animationFrameId) {
             cancelAnimationFrame(this.animationFrameId);
         }
 
         const startPos = { ...this.markerCoords };
         const endPos = newPosition;
-        const duration = 250;
+        const duration = 250; // 250ms - suave mas rápido
         const startTime = performance.now();
 
+        // Se é a primeira posição, definir diretamente
         if (startPos.lat === 0 && startPos.lng === 0) {
             this.markerCoords = endPos;
             markerCoords = endPos;
@@ -4199,20 +4008,25 @@ class GPSTracker {
             const elapsed = currentTime - startTime;
             const progress = Math.min(elapsed / duration, 1);
 
+            // Easing suave (ease-out cubic)
             const easeProgress = 1 - Math.pow(1 - progress, 3);
 
+            // Interpolar posição
             const currentPos = {
                 lat: startPos.lat + (endPos.lat - startPos.lat) * easeProgress,
                 lng: startPos.lng + (endPos.lng - startPos.lng) * easeProgress
             };
 
+            // Atualizar marcador
             this.setMarkerPosition(currentPos);
             this.markerCoords = currentPos;
             markerCoords = currentPos;
 
+            // Continuar animação se não terminou
             if (progress < 1) {
                 this.animationFrameId = requestAnimationFrame(animate);
             } else {
+                // Garantir posição final exata
                 this.markerCoords = endPos;
                 markerCoords = endPos;
                 this.setMarkerPosition(endPos);
@@ -4223,10 +4037,17 @@ class GPSTracker {
         this.animationFrameId = requestAnimationFrame(animate);
     }
 
-    // Função auxiliar para definir posição do marcador (Mapbox)
+    // Função auxiliar para definir posição do marcador
     setMarkerPosition(position) {
         if (!this.marker) return;
-        this.marker.setLngLat([position.lng, position.lat]);
+
+        if (this.marker.position !== undefined) {
+            // AdvancedMarkerElement
+            this.marker.position = position;
+        } else if (this.marker.setPosition) {
+            // Marker clássico
+            this.marker.setPosition(position);
+        }
     }
 
     // Filtro de Kalman 1D aplicado a lat/lng
@@ -4347,13 +4168,9 @@ class GPSTracker {
 
     centerOnUser() {
         if (this.marker) {
-            const lngLat = this.marker.getLngLat();
-            if (lngLat) {
-                map.flyTo({
-                    center: [lngLat.lng, lngLat.lat],
-                    zoom: 17,
-                    duration: 1000
-                });
+            const position = this.marker.position || this.marker.getPosition();
+            if (position) {
+                map.panTo(position);
             }
         }
     }
@@ -4369,17 +4186,16 @@ class GPSTracker {
             watchId = null;
         }
 
-        // Remover listener de bearing (Mapbox)
+        // Remover listener de heading
         if (this.headingListener) {
-            map.off('rotate', this.headingListener);
+            google.maps.event.removeListener(this.headingListener);
             this.headingListener = null;
         }
     }
 
     getPosition() {
         if (!this.marker) return null;
-        const lngLat = this.marker.getLngLat();
-        return lngLat ? { lat: lngLat.lat, lng: lngLat.lng } : null;
+        return this.marker.position || this.marker.getPosition();
     }
 
     getAccuracy() {
@@ -4425,22 +4241,14 @@ class GPSTracker {
                 lat: position.coords.latitude,
                 lng: position.coords.longitude
             };
-            map.flyTo({
-                center: [coords.lng, coords.lat],
-                zoom: 17,
-                duration: 1000
-            });
+            map.panTo(coords);
             console.log('📍 [GPS] Mapa centralizado na nova posição');
             return position;
         } catch (error) {
             console.warn('⚠️ [GPS] Não foi possível atualizar e centralizar:', error);
             // Mesmo com erro, tenta centralizar na última posição conhecida
             if (this.markerCoords.lat !== 0 && this.markerCoords.lng !== 0) {
-                map.flyTo({
-                    center: [this.markerCoords.lng, this.markerCoords.lat],
-                    zoom: 17,
-                    duration: 1000
-                });
+                map.panTo(this.markerCoords);
             }
             throw error;
         }
@@ -4605,6 +4413,8 @@ function addGPSCenterButton() {
             gpsTracker.centerOnUser();
             gpsCenterButton.classList.add('active');
 
+            // Toast removido - ação visual já indica centralização
+
             // Remover classe active após 2 segundos
             setTimeout(() => {
                 gpsCenterButton.classList.remove('active');
@@ -4618,22 +4428,25 @@ function addGPSCenterButton() {
             return;
         }
 
-        // Pega a posição atual do marcador Mapbox
-        const lngLat = userLocationMarker.getLngLat();
+        // Pega a posição atual do marcador (compatível com ambos os tipos)
+        let currentPosition;
+        if (userLocationMarker.position) {
+            currentPosition = userLocationMarker.position;
+        } else if (userLocationMarker.getPosition) {
+            currentPosition = userLocationMarker.getPosition();
+        }
 
-        if (!lngLat) {
+        if (!currentPosition) {
             showToast('Erro ao centralizar', 'Posição não encontrada', 'error', 3000);
             return;
         }
 
-        // Anima o zoom e centraliza (Mapbox)
-        map.flyTo({
-            center: [lngLat.lng, lngLat.lat],
-            zoom: 17,
-            duration: 1000
-        });
+        // Anima o zoom e centraliza
+        map.panTo(currentPosition);
+        map.setZoom(17);
 
         gpsCenterButton.classList.add('active');
+        // Toast removido - ação visual já indica centralização
 
         // Remover classe active após 2 segundos
         setTimeout(() => {
@@ -4641,58 +4454,60 @@ function addGPSCenterButton() {
         }, 2000);
     });
 
-    // Adicionar ao container do mapa (Mapbox não tem controls API)
-    document.getElementById('map').appendChild(gpsCenterButton);
+    // Adicionar ao mapa usando controls API do Google Maps
+    map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(gpsCenterButton);
 }
 
-// Inicializar mapa Mapbox
-function initMap() {
-    console.log('Iniciando mapa Mapbox...');
+window.initMap = function () {
+    console.log('Iniciando mapa...');
     updateLoadingScreen('Carregando mapa...', 'Preparando visualização');
 
     try {
-        // Criar mapa Mapbox
-        map = new mapboxgl.Map({
-            container: 'map',
-            style: 'mapbox://styles/mapbox/streets-v12',
-            center: [-46.6333, -23.5505], // Mapbox usa [lng, lat]
+        map = new google.maps.Map(document.getElementById("map"), {
+            center: {lat: -23.5505, lng: -46.6333},
             zoom: 17,
-            pitch: 0,
-            bearing: 0,
-            minZoom: 3,
-            maxZoom: 22,
-            attributionControl: true,
-            dragRotate: true,
-            touchZoomRotate: true
+            mapId: MAP_ID,
+            tilt: 0,
+            heading: 0,
+            gestureHandling: "greedy",
+            rotateControl: true,
+            zoomControl: true,
+            streetViewControl: false,
+            fullscreenControl: true,
+            // Otimizações de performance
+            disableDefaultUI: false,
+            clickableIcons: false, // Desabilita cliques em POIs para melhor performance
+            minZoom: 3, // Permite zoom global
+            maxZoom: 22 // Zoom máximo detalhado
         });
 
-        // Adicionar controles de navegação
-        map.addControl(new mapboxgl.NavigationControl({
-            visualizePitch: true
-        }), 'top-right');
+        // Inicializar serviços de rota
+        directionsService = new google.maps.DirectionsService();
+        directionsRenderer = new google.maps.DirectionsRenderer({
+            map: map,
+            suppressMarkers: false, // Não suprimir marcadores (A, B, C, etc.)
+            polylineOptions: {
+                strokeColor: '#4285f4',
+                strokeWeight: 5,
+                strokeOpacity: 0.7
+            }
+        });
 
-        // Adicionar controle de tela cheia
-        map.addControl(new mapboxgl.FullscreenControl(), 'top-right');
-
-        // Adicionar botão de centralizar localização
+        // Adicionar botão de centralizar localização (estilo Google Maps)
         addGPSCenterButton();
 
         // Configurar detecção de interação do usuário durante navegação
         setupNavigationMapInteraction();
 
-        // Fechar Popup ao clicar no mapa (fora dos marcadores)
-        map.on('click', (e) => {
-            // Verificar se clicou em um marcador
-            const features = map.queryRenderedFeatures(e.point);
-            const clickedOnMarker = features.some(f => f.layer && f.layer.id && f.layer.id.includes('marker'));
-
-            if (!clickedOnMarker && currentPopup) {
-                currentPopup.remove();
-                currentPopup = null;
+        // Fechar InfoWindow ao clicar no mapa (fora dos marcadores)
+        map.addListener('click', () => {
+            if (currentInfoWindow) {
+                currentInfoWindow.close();
+                currentInfoWindow = null;
             }
         });
 
-        console.log('Mapa Mapbox criado, aguardando carregamento...');
+        console.log('Mapa criado, aguardando tiles...');
 
         // Timeout de segurança: se o mapa não carregar em 15s, força o início do tracking
         const safetyTimeout = setTimeout(() => {
@@ -4702,56 +4517,18 @@ function initMap() {
         }, 15000);
 
         // Espera o mapa carregar completamente
-        map.on('load', () => {
+        google.maps.event.addListenerOnce(map, 'tilesloaded', () => {
             clearTimeout(safetyTimeout);
-            console.log('Mapa Mapbox carregado, iniciando tracking...');
-
-            // Adicionar fonte e layer para rotas
-            map.addSource('route', {
-                type: 'geojson',
-                data: {
-                    type: 'Feature',
-                    properties: {},
-                    geometry: {
-                        type: 'LineString',
-                        coordinates: []
-                    }
-                }
-            });
-
-            map.addLayer({
-                id: 'route',
-                type: 'line',
-                source: 'route',
-                layout: {
-                    'line-join': 'round',
-                    'line-cap': 'round'
-                },
-                paint: {
-                    'line-color': '#4285f4',
-                    'line-width': 5,
-                    'line-opacity': 0.7
-                }
-            });
-
+            console.log('Tiles carregados, iniciando tracking...');
             updateLoadingScreen('Obtendo sua localização...', 'Ative o GPS para melhor precisão');
             startLocationTracking();
         });
-
-        // Mostrar mapa quando estiver pronto
-        map.on('idle', () => {
-            document.getElementById('map').classList.add('loaded');
-        });
-
     } catch (error) {
         console.error('Erro ao criar mapa:', error);
         hideLoadingScreen();
         showToast('Erro ao inicializar mapa', error.message, 'error', 8000);
     }
 }
-
-// Chamar initMap quando a página carregar
-document.addEventListener('DOMContentLoaded', initMap);
 
 // ===========================
 // RASTREAMENTO EM TEMPO REAL
@@ -5236,9 +5013,9 @@ async function navigateToNextMarker(currentPosition = null) {
     let nextMarker = null;
     let nextPosition = null;
 
-    // Se temos posição atual, encontrar o marcador mais próximo usando Haversine
+    // Se temos posição atual, encontrar o marcador com menor tempo de viagem REAL
     if (currentPosition) {
-        console.log('🚗 Calculando distância para TODOS os marcadores...');
+        console.log('🚗 Calculando rotas reais de tráfego para TODOS os marcadores...');
 
         // PASSO 1: Preparar lista de marcadores com suas posições
         const markersList = [];
@@ -5246,11 +5023,7 @@ async function navigateToNextMarker(currentPosition = null) {
         remainingMarkers.forEach(marker => {
             let markerPosition = null;
 
-            // Mapbox usa getLngLat()
-            if (marker.getLngLat) {
-                const lngLat = marker.getLngLat();
-                markerPosition = { lat: lngLat.lat, lng: lngLat.lng };
-            } else if (marker.position) {
+            if (marker.position) {
                 markerPosition = marker.position;
             } else if (marker.getPosition) {
                 markerPosition = marker.getPosition();
@@ -5269,39 +5042,93 @@ async function navigateToNextMarker(currentPosition = null) {
             return;
         }
 
-        console.log(`📊 Calculando distâncias para ${markersList.length} destinos...`);
+        console.log(`📊 Calculando rotas para ${markersList.length} destinos...`);
 
         try {
-            // Calcular distância para cada marcador usando Haversine
+            // PASSO 2: Dividir em lotes de 25 (limite da Distance Matrix API)
+            const MAX_DESTINATIONS = 25;
+            const batches = [];
+            for (let i = 0; i < markersList.length; i += MAX_DESTINATIONS) {
+                batches.push(markersList.slice(i, i + MAX_DESTINATIONS));
+            }
+
+            console.log(`📦 Dividido em ${batches.length} lote(s) de até ${MAX_DESTINATIONS} destinos`);
+
+            // PASSO 3: Processar todos os lotes em paralelo
+            const service = new google.maps.DistanceMatrixService();
+            const origin = new google.maps.LatLng(currentPosition.lat, currentPosition.lng);
+
+            const batchPromises = batches.map((batch, batchIndex) => {
+                const destinations = batch.map(item =>
+                    new google.maps.LatLng(item.position.lat, item.position.lng)
+                );
+
+                const request = {
+                    origins: [origin],
+                    destinations: destinations,
+                    travelMode: google.maps.TravelMode.DRIVING,
+                    unitSystem: google.maps.UnitSystem.METRIC,
+                    avoidHighways: false,
+                    avoidTolls: false,
+                    drivingOptions: {
+                        departureTime: new Date(),
+                        trafficModel: google.maps.TrafficModel.BEST_GUESS
+                    }
+                };
+
+                return new Promise((resolve, reject) => {
+                    // Delay entre requisições para evitar rate limiting
+                    setTimeout(() => {
+                        service.getDistanceMatrix(request, (response, status) => {
+                            if (status === 'OK') {
+                                resolve({ response, batch, batchIndex });
+                            } else {
+                                reject(new Error(`Lote ${batchIndex + 1} falhou: ${status}`));
+                            }
+                        });
+                    }, batchIndex * 200); // 200ms entre cada lote
+                });
+            });
+
+            // Aguardar todos os lotes
+            const batchResults = await Promise.all(batchPromises);
+
+            // PASSO 4: Encontrar o destino com MENOR DISTÂNCIA REAL (não tempo)
             let minDistance = Infinity;
             let bestMarker = null;
             let bestPosition = null;
+            let bestDistanceText = null;
+            let bestDurationText = null;
 
-            markersList.forEach((item, index) => {
-                const distance = computeDistanceBetween(currentPosition, item.position);
+            batchResults.forEach(({ response, batch, batchIndex }) => {
+                response.rows[0].elements.forEach((element, index) => {
+                    if (element.status === 'OK') {
+                        const duration = element.duration.value; // Tempo em segundos (apenas para mostrar)
+                        const distance = element.distance.value; // Distância em metros
 
-                console.log(`📍 Destino ${index + 1}: ${Math.round(distance)}m`);
+                        console.log(`📍 Lote ${batchIndex + 1}, Destino ${index + 1}: ${Math.round(distance)}m (${Math.round(duration / 60)} min)`);
 
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    bestMarker = item.marker;
-                    bestPosition = item.position;
-                }
+                        // Escolher pela MENOR DISTÂNCIA, não pelo menor tempo
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            bestMarker = batch[index].marker;
+                            bestPosition = batch[index].position;
+                            bestDistanceText = element.distance.text;
+                            bestDurationText = element.duration.text;
+                        }
+                    }
+                });
             });
 
             if (bestMarker) {
                 nextMarker = bestMarker;
                 nextPosition = bestPosition;
 
-                const distanceText = minDistance < 1000 ?
-                    `${Math.round(minDistance)}m` :
-                    `${(minDistance / 1000).toFixed(1)}km`;
-
-                console.log(`✅ Marcador mais próximo (de ${markersList.length} destinos): ${distanceText}`);
+                console.log(`✅ Rota mais curta (de ${markersList.length} destinos): ${bestDistanceText} (tempo estimado: ${bestDurationText})`);
 
                 showToast(
                     '📏 Próxima entrega',
-                    `${distanceText} de distância`,
+                    `${bestDistanceText} de distância`,
                     'info',
                     3000
                 );
@@ -5312,14 +5139,11 @@ async function navigateToNextMarker(currentPosition = null) {
             }
 
         } catch (error) {
-            console.error('Erro ao calcular distâncias:', error);
+            console.error('Erro ao calcular rotas:', error);
             // Fallback: pegar o primeiro marcador
             nextMarker = remainingMarkers[0];
 
-            if (nextMarker.getLngLat) {
-                const lngLat = nextMarker.getLngLat();
-                nextPosition = { lat: lngLat.lat, lng: lngLat.lng };
-            } else if (nextMarker.position) {
+            if (nextMarker.position) {
                 nextPosition = nextMarker.position;
             } else if (nextMarker.getPosition) {
                 nextPosition = nextMarker.getPosition();
@@ -5579,7 +5403,7 @@ async function addDeliveryMarkers(skipMapAdjust = false) {
         });
     });
 
-    const bounds = new MapboxBounds();
+    const bounds = new google.maps.LatLngBounds();
     let registeredMarkersCount = 0;
     let unregisteredMarkersCount = 0;
 
@@ -5743,49 +5567,92 @@ async function addDeliveryMarkers(skipMapAdjust = false) {
         buttonsContainer.style.width = '100%';
         infoWindowContent.appendChild(buttonsContainer);
 
-        // Criar popup Mapbox (substitui InfoWindow)
-        const popup = new mapboxgl.Popup({
-            closeButton: true,
-            closeOnClick: false,
-            maxWidth: '300px',
-            className: 'mapbox-popup-custom'
-        }).setDOMContent(infoWindowContent);
+        const infoWindow = new google.maps.InfoWindow({
+            content: infoWindowContent,
+            maxWidth: 300,
+            disableAutoPan: true
+        });
 
-        // Criar marcador Mapbox
+        // Variável para armazenar o marker
         let marker;
 
         try {
-            marker = new mapboxgl.Marker({
-                element: markerDiv,
-                anchor: 'bottom'
-            })
-            .setLngLat([position.lng, position.lat])
-            .setPopup(popup)
-            .addTo(map);
+            if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+                marker = new google.maps.marker.AdvancedMarkerElement({
+                    map,
+                    position,
+                    content: markerDiv,
+                    title: client.name
+                });
 
-            // Evento de clique
-            markerDiv.addEventListener('click', () => {
-                if (currentPopup) currentPopup.remove();
-                popup.addTo(map);
-                currentPopup = popup;
+                marker.addListener('click', () => {
+                    if (currentInfoWindow) currentInfoWindow.close();
+                    infoWindow.open(map, marker);
+                    currentInfoWindow = infoWindow;
 
-                // Centralizar considerando o Popup
-                setTimeout(() => {
-                    const scale = Math.pow(2, map.getZoom());
-                    const offsetY = 150;
-                    const latOffset = offsetY / scale * (85 / 111000);
+                    // Centralizar considerando o InfoWindow
+                    setTimeout(() => {
+                        const mapDiv = map.getDiv();
+                        const mapHeight = mapDiv.offsetHeight;
+                        const scale = Math.pow(2, map.getZoom());
 
-                    const newCenter = {
-                        lat: position.lat - latOffset,
-                        lng: position.lng
-                    };
+                        // Offset para mover o marcador mais para baixo (InfoWindow aparece acima)
+                        const offsetY = 150; // pixels para deslocar para baixo
+                        const latOffset = offsetY / scale * (85 / 111000); // Conversão aproximada
 
-                    map.flyTo({ center: [newCenter.lng, newCenter.lat], duration: 500 });
-                }, 100);
-            });
+                        const newCenter = {
+                            lat: position.lat - latOffset,
+                            lng: position.lng
+                        };
 
-            deliveryMarkers[`registered_${clientId}`] = marker;
-            registeredMarkersCount++;
+                        map.panTo(newCenter);
+                    }, 100);
+                });
+
+                deliveryMarkers[`registered_${clientId}`] = marker;
+                registeredMarkersCount++;
+            } else {
+                marker = new google.maps.Marker({
+                    map,
+                    position,
+                    title: client.name,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        fillColor: '#4CAF50',
+                        fillOpacity: 1,
+                        strokeColor: 'white',
+                        strokeWeight: 2,
+                        scale: 10
+                    }
+                });
+
+                marker.addListener('click', () => {
+                    if (currentInfoWindow) currentInfoWindow.close();
+                    infoWindow.open(map, marker);
+                    currentInfoWindow = infoWindow;
+
+                    // Centralizar considerando o InfoWindow
+                    setTimeout(() => {
+                        const mapDiv = map.getDiv();
+                        const mapHeight = mapDiv.offsetHeight;
+                        const scale = Math.pow(2, map.getZoom());
+
+                        // Offset para mover o marcador mais para baixo (InfoWindow aparece acima)
+                        const offsetY = 150; // pixels para deslocar para baixo
+                        const latOffset = offsetY / scale * (85 / 111000); // Conversão aproximada
+
+                        const newCenter = {
+                            lat: position.lat - latOffset,
+                            lng: position.lng
+                        };
+
+                        map.panTo(newCenter);
+                    }, 100);
+                });
+
+                deliveryMarkers[`registered_${clientId}`] = marker;
+                registeredMarkersCount++;
+            }
 
             // Armazenar deliveries no marcador para uso posterior
             marker.deliveries = deliveries;
@@ -5793,12 +5660,12 @@ async function addDeliveryMarkers(skipMapAdjust = false) {
             // Adicionar botões ao container (agora que o marker foi criado)
             // Calcular distância do usuário ao marcador
             let distanceToMarker = Infinity;
-            if (userLocationMarker) {
-                const lngLat = userLocationMarker.getLngLat ? userLocationMarker.getLngLat() : null;
-                if (lngLat) {
-                    const userPos = { lat: lngLat.lat, lng: lngLat.lng };
-                    distanceToMarker = computeDistanceBetween(userPos, position);
-                }
+            if (userLocationMarker && userLocationMarker.position) {
+                const userPos = userLocationMarker.position;
+                distanceToMarker = google.maps.geometry.spherical.computeDistanceBetween(
+                    new google.maps.LatLng(userPos.lat, userPos.lng),
+                    new google.maps.LatLng(position.lat, position.lng)
+                );
             }
 
             // Botão de navegação (só aparece se estiver longe - mais de 30m)
@@ -6110,59 +5977,113 @@ async function addDeliveryMarkers(skipMapAdjust = false) {
         buttonsContainer.style.width = '100%';
         infoWindowContent.appendChild(buttonsContainer);
 
-        // Criar popup Mapbox (substitui InfoWindow)
-        const popup = new mapboxgl.Popup({
-            closeButton: true,
-            closeOnClick: false,
-            maxWidth: '300px',
-            className: 'mapbox-popup-custom'
-        }).setDOMContent(infoWindowContent);
+        const infoWindow = new google.maps.InfoWindow({
+            content: infoWindowContent,
+            maxWidth: 300,
+            disableAutoPan: true
+        });
 
-        // Criar marcador Mapbox vermelho
+        // Variável para armazenar o marker
         let marker;
 
         try {
-            marker = new mapboxgl.Marker({
-                element: markerDiv,
-                anchor: 'bottom'
-            })
-            .setLngLat([position.lng, position.lat])
-            .setPopup(popup)
-            .addTo(map);
+            if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+                marker = new google.maps.marker.AdvancedMarkerElement({
+                    map,
+                    position,
+                    content: markerDiv,
+                    title: `${deliveryCount} entrega${deliveryCount > 1 ? 's' : ''} neste local`
+                });
 
-            // Evento de clique
-            markerDiv.addEventListener('click', () => {
-                if (currentPopup) currentPopup.remove();
-
-                // Salvar bearing e pitch atuais
-                const savedBearing = map.getBearing() || 0;
-                const savedPitch = map.getPitch() || 0;
-
-                // Centralizar considerando o Popup
-                setTimeout(() => {
-                    const scale = Math.pow(2, map.getZoom());
-                    const offsetY = 150;
-                    const latOffset = offsetY / scale * (85 / 111000);
-
-                    const newCenter = {
-                        lat: position.lat - latOffset,
-                        lng: position.lng
-                    };
-
-                    map.flyTo({
-                        center: [newCenter.lng, newCenter.lat],
-                        bearing: savedBearing,
-                        pitch: savedPitch,
-                        duration: 500
+                marker.addListener('click', () => {
+                    if (currentInfoWindow) currentInfoWindow.close();
+                    const savedHeading = map.getHeading() || 0;
+                    const savedTilt = map.getTilt() || 0;
+                    const headingListener = map.addListener('heading_changed', () => {
+                        if (map.getHeading() !== savedHeading) map.setHeading(savedHeading);
                     });
-                }, 100);
+                    const tiltListener = map.addListener('tilt_changed', () => {
+                        if (map.getTilt() !== savedTilt) map.setTilt(savedTilt);
+                    });
 
-                popup.addTo(map);
-                currentPopup = popup;
-            });
+                    // Centralizar considerando o InfoWindow
+                    setTimeout(() => {
+                        const mapDiv = map.getDiv();
+                        const scale = Math.pow(2, map.getZoom());
 
-            deliveryMarkers[coordKey] = marker;
-            unregisteredMarkersCount++;
+                        // Offset para mover o marcador mais para baixo (InfoWindow aparece acima)
+                        const offsetY = 150; // pixels para deslocar para baixo
+                        const latOffset = offsetY / scale * (85 / 111000); // Conversão aproximada
+
+                        const newCenter = {
+                            lat: position.lat - latOffset,
+                            lng: position.lng
+                        };
+
+                        map.panTo(newCenter);
+                    }, 100);
+
+                    infoWindow.open(map, marker);
+                    currentInfoWindow = infoWindow;
+                    setTimeout(() => {
+                        google.maps.event.removeListener(headingListener);
+                        google.maps.event.removeListener(tiltListener);
+                    }, 500);
+                });
+
+                deliveryMarkers[coordKey] = marker;
+                unregisteredMarkersCount++;
+            } else {
+                marker = new google.maps.Marker({
+                    map,
+                    position,
+                    title: `${deliveryCount} entrega${deliveryCount > 1 ? 's' : ''} neste local`,
+                    icon: {
+                        url: createPinSVG(deliveryCount, '#EA4335'),
+                        scaledSize: new google.maps.Size(32, 44),
+                        anchor: new google.maps.Point(16, 44)
+                    }
+                });
+
+                marker.addListener('click', () => {
+                    if (currentInfoWindow) currentInfoWindow.close();
+                    const savedHeading = map.getHeading() || 0;
+                    const savedTilt = map.getTilt() || 0;
+                    const headingListener = map.addListener('heading_changed', () => {
+                        if (map.getHeading() !== savedHeading) map.setHeading(savedHeading);
+                    });
+                    const tiltListener = map.addListener('tilt_changed', () => {
+                        if (map.getTilt() !== savedTilt) map.setTilt(savedTilt);
+                    });
+
+                    // Centralizar considerando o InfoWindow
+                    setTimeout(() => {
+                        const mapDiv = map.getDiv();
+                        const scale = Math.pow(2, map.getZoom());
+
+                        // Offset para mover o marcador mais para baixo (InfoWindow aparece acima)
+                        const offsetY = 150; // pixels para deslocar para baixo
+                        const latOffset = offsetY / scale * (85 / 111000); // Conversão aproximada
+
+                        const newCenter = {
+                            lat: position.lat - latOffset,
+                            lng: position.lng
+                        };
+
+                        map.panTo(newCenter);
+                    }, 100);
+
+                    infoWindow.open(map, marker);
+                    currentInfoWindow = infoWindow;
+                    setTimeout(() => {
+                        google.maps.event.removeListener(headingListener);
+                        google.maps.event.removeListener(tiltListener);
+                    }, 500);
+                });
+
+                deliveryMarkers[coordKey] = marker;
+                unregisteredMarkersCount++;
+            }
 
             // Armazenar deliveries no marcador para uso posterior
             marker.deliveries = locationData.deliveries;
@@ -6170,12 +6091,12 @@ async function addDeliveryMarkers(skipMapAdjust = false) {
             // Adicionar botões ao container (agora que o marker foi criado)
             // Calcular distância do usuário ao marcador
             let distanceToMarker = Infinity;
-            if (userLocationMarker) {
-                const lngLat = userLocationMarker.getLngLat ? userLocationMarker.getLngLat() : null;
-                if (lngLat) {
-                    const userPos = { lat: lngLat.lat, lng: lngLat.lng };
-                    distanceToMarker = computeDistanceBetween(userPos, position);
-                }
+            if (userLocationMarker && userLocationMarker.position) {
+                const userPos = userLocationMarker.position;
+                distanceToMarker = google.maps.geometry.spherical.computeDistanceBetween(
+                    new google.maps.LatLng(userPos.lat, userPos.lng),
+                    new google.maps.LatLng(position.lat, position.lng)
+                );
             }
 
             // Botão de navegação (só aparece se estiver longe - mais de 30m)
@@ -6371,10 +6292,10 @@ async function addDeliveryMarkers(skipMapAdjust = false) {
         // Usar setTimeout para garantir que o mapa processe corretamente após pan
         setTimeout(() => {
             // fitBounds com padding simples (número)
-            map.fitBounds(bounds.toMapbox(), { padding: 80, duration: 1000 });
+            map.fitBounds(bounds, 80);
 
             // Limitar zoom máximo para não ficar muito próximo
-            map.once('idle', () => {
+            google.maps.event.addListenerOnce(map, 'idle', () => {
                 const currentZoom = map.getZoom();
                 console.log(`🗺️ Zoom atual após fitBounds: ${currentZoom}`);
                 if (currentZoom > 16) {
@@ -6677,13 +6598,13 @@ function deactivateLocationPicker(confirmed = false) {
 
     isLocationPickerActive = false;
 
-    // Remover listeners do mapa (Mapbox usa off)
+    // Remover listeners do mapa
     if (mapDragListener) {
-        map.off('drag', mapDragListener);
+        google.maps.event.removeListener(mapDragListener);
         mapDragListener = null;
     }
     if (mapDragEndListener) {
-        map.off('dragend', mapDragEndListener);
+        google.maps.event.removeListener(mapDragEndListener);
         mapDragEndListener = null;
     }
 
@@ -9211,46 +9132,75 @@ async function navigateToClient(client, marker = null, infoWindow = null) {
     );
 
     try {
-        // Usar Mapbox Directions API para rota ponto-a-ponto
-        const userPos = userPosition.lat !== undefined ? userPosition :
-            { lat: userPosition.lat(), lng: userPosition.lng() };
+        // Usar Directions API para rota ponto-a-ponto
+        const directionsService = new google.maps.DirectionsService();
 
-        const result = await getMapboxDirections(userPos, destination);
+        const request = {
+            origin: userPosition,
+            destination: destination,
+            travelMode: google.maps.TravelMode.DRIVING,
+            optimizeWaypoints: false,
+            language: 'pt-BR',
+            region: 'BR'
+        };
+
+        const result = await directionsService.route(request);
 
         if (result.status === 'OK') {
             // Limpar rotas antigas
-            clearRouteFromMap('navigation-route');
+            if (window.routePolylines && window.routePolylines.length > 0) {
+                window.routePolylines.forEach(polyline => {
+                    if (polyline.setMap) {
+                        polyline.setMap(null);
+                    }
+                });
+                window.routePolylines = [];
+            }
 
-            // Desenhar nova rota usando Mapbox
-            drawRouteOnMap(result.geometry, 'navigation-route');
+            // Desenhar nova rota
+            const route = result.routes[0];
+            const leg = route.legs[0];
+
+            // Criar polyline para a rota
+            const polyline = new google.maps.Polyline({
+                path: route.overview_path,
+                geodesic: true,
+                strokeColor: '#4285f4',
+                strokeOpacity: 0.8,
+                strokeWeight: 5,
+                map: map
+            });
+
+            window.routePolylines = [polyline];
 
             // Ajustar mapa para mostrar toda a rota
-            const bounds = new MapboxBounds();
-            bounds.extend(userPos);
+            const bounds = new google.maps.LatLngBounds();
+            bounds.extend(userPosition);
             bounds.extend(destination);
-            map.fitBounds(bounds.toMapbox(), { padding: 80, duration: 1000 });
+            map.fitBounds(bounds);
 
             // Formatar distância e duração
-            const distanceKm = (result.distance / 1000).toFixed(1);
-            const durationMin = Math.ceil(result.duration / 60);
+            const distance = leg.distance.text;
+            const duration = leg.duration.text;
 
             showToast(
                 `🎯 Rota para ${client.name}`,
-                `📏 Distância: ${distanceKm} km\n⏱️ Tempo estimado: ${durationMin} min`,
+                `📏 Distância: ${distance}\n⏱️ Tempo estimado: ${duration}`,
                 'success',
                 5000
             );
 
             console.log('✅ Rota calculada:', {
-                distance: result.distance,
-                duration: result.duration
+                distance: leg.distance,
+                duration: leg.duration,
+                steps: leg.steps.length
             });
 
             // Iniciar modo de navegação em tempo real
             startNavigationMode(destination, client.name, marker, infoWindow, client);
 
         } else {
-            throw new Error(`Mapbox Directions API retornou status: ${result.status}`);
+            throw new Error(`Directions API retornou status: ${result.status}`);
         }
 
     } catch (error) {
@@ -9864,7 +9814,7 @@ async function drawRouteInSegments(allPoints, totalDeliveries) {
 
     // Desenhar todos os segmentos
     const polylines = [];
-    const bounds = new MapboxBounds();
+    const bounds = new google.maps.LatLngBounds();
     let totalDistance = 0;
     let totalDuration = 0;
 
@@ -9954,9 +9904,9 @@ async function calculateDirectionsRoute(origin, deliveryPoints) {
     const nearestPoints = deliveryPoints
         .map(point => ({
             ...point,
-            distance: computeDistanceBetween(
-                { lat: origin.lat, lng: origin.lng },
-                { lat: point.location.lat, lng: point.location.lng }
+            distance: google.maps.geometry.spherical.computeDistanceBetween(
+                new google.maps.LatLng(origin.lat, origin.lng),
+                new google.maps.LatLng(point.location.lat, point.location.lng)
             )
         }))
         .sort((a, b) => a.distance - b.distance)
@@ -10000,9 +9950,9 @@ async function calculateDirectionsRoute(origin, deliveryPoints) {
                 8000
             );
 
-            const bounds = new MapboxBounds();
-            result.routes[0].overview_path.forEach(point => bounds.extend({ lat: point.lat(), lng: point.lng() }));
-            map.fitBounds(bounds.toMapbox(), { padding: 50 });
+            const bounds = new google.maps.LatLngBounds();
+            result.routes[0].overview_path.forEach(point => bounds.extend(point));
+            map.fitBounds(bounds);
         } else {
             console.error('Erro ao calcular rota:', status);
             showToast('Erro ao calcular rota', 'Tente novamente', 'error', 5000);
@@ -10601,31 +10551,59 @@ async function showClientMarkers() {
             infoWindowContent.appendChild(phoneDiv);
             infoWindowContent.appendChild(addressDiv);
 
-            // Criar popup Mapbox
-            const popup = new mapboxgl.Popup({
-                closeButton: true,
-                closeOnClick: false,
-                maxWidth: '280px'
-            }).setDOMContent(infoWindowContent);
+            const infoWindow = new google.maps.InfoWindow({
+                content: infoWindowContent,
+                maxWidth: 280,
+                disableAutoPan: true
+            });
 
             try {
-                // Criar marcador Mapbox
-                const marker = new mapboxgl.Marker({
-                    element: markerDiv,
-                    anchor: 'bottom'
-                })
-                .setLngLat([position.lng, position.lat])
-                .setPopup(popup)
-                .addTo(map);
+                // Criar marcador usando AdvancedMarkerElement
+                if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+                    const marker = new google.maps.marker.AdvancedMarkerElement({
+                        map,
+                        position,
+                        content: markerDiv,
+                        title: client.name
+                    });
 
-                markerDiv.addEventListener('click', () => {
-                    currentInfoWindow.close();
-                    popup.addTo(map);
-                    currentPopup = popup;
-                    map.flyTo({ center: [position.lng, position.lat], duration: 500 });
-                });
+                    marker.addListener('click', () => {
+                        if (currentInfoWindow) {
+                            currentInfoWindow.close();
+                        }
+                        infoWindow.open(map, marker);
+                        currentInfoWindow = infoWindow;
+                        map.panTo(position);
+                    });
 
-                clientMarkers[client.id] = marker;
+                    clientMarkers[client.id] = marker;
+                } else {
+                    // Fallback: Marcador clássico
+                    const marker = new google.maps.Marker({
+                        map,
+                        position,
+                        title: client.name,
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            fillColor: '#2196F3',
+                            fillOpacity: 1,
+                            strokeColor: 'white',
+                            strokeWeight: 2,
+                            scale: 8
+                        }
+                    });
+
+                    marker.addListener('click', () => {
+                        if (currentInfoWindow) {
+                            currentInfoWindow.close();
+                        }
+                        infoWindow.open(map, marker);
+                        currentInfoWindow = infoWindow;
+                        map.panTo(position);
+                    });
+
+                    clientMarkers[client.id] = marker;
+                }
             } catch (error) {
                 console.error('Erro ao criar marcador:', error);
             }
@@ -10961,42 +10939,71 @@ async function showMatchedClientMarkers() {
 
             infoWindowContent.appendChild(navigateBtn);
 
-            // Criar popup Mapbox
-            const popup = new mapboxgl.Popup({
-                closeButton: true,
-                closeOnClick: false,
-                maxWidth: '300px'
-            }).setDOMContent(infoWindowContent);
+            const infoWindow = new google.maps.InfoWindow({
+                content: infoWindowContent,
+                maxWidth: 300,
+                disableAutoPan: true
+            });
 
             // Variável para armazenar referência ao marker
             let currentMarkerRef = null;
 
             try {
-                // Criar marcador Mapbox
-                const marker = new mapboxgl.Marker({
-                    element: markerDiv,
-                    anchor: 'bottom'
-                })
-                .setLngLat([position.lng, position.lat])
-                .setPopup(popup)
-                .addTo(map);
+                // Criar marcador usando AdvancedMarkerElement
+                if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+                    const marker = new google.maps.marker.AdvancedMarkerElement({
+                        map,
+                        position,
+                        content: markerDiv,
+                        title: client.name
+                    });
 
-                markerDiv.addEventListener('click', () => {
-                    currentInfoWindow.close();
-                    popup.addTo(map);
-                    currentPopup = popup;
-                    map.flyTo({ center: [position.lng, position.lat], duration: 500 });
-                });
+                    marker.addListener('click', () => {
+                        if (currentInfoWindow) {
+                            currentInfoWindow.close();
+                        }
+                        infoWindow.open(map, marker);
+                        currentInfoWindow = infoWindow;
+                        map.panTo(position);
+                    });
 
-                matchedClientMarkers[client.id] = marker;
-                currentMarkerRef = marker;
+                    matchedClientMarkers[client.id] = marker;
+                    currentMarkerRef = marker;
+                } else {
+                    // Fallback: Marcador clássico
+                    const marker = new google.maps.Marker({
+                        map,
+                        position,
+                        title: client.name,
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            fillColor: '#4CAF50',
+                            fillOpacity: 1,
+                            strokeColor: 'white',
+                            strokeWeight: 2,
+                            scale: 10
+                        }
+                    });
+
+                    marker.addListener('click', () => {
+                        if (currentInfoWindow) {
+                            currentInfoWindow.close();
+                        }
+                        infoWindow.open(map, marker);
+                        currentInfoWindow = infoWindow;
+                        map.panTo(position);
+                    });
+
+                    matchedClientMarkers[client.id] = marker;
+                    currentMarkerRef = marker;
+                }
             } catch (error) {
                 console.error('Erro ao criar marcador:', error);
             }
 
-            // Atribuir evento de navegação após criar marker e popup
+            // Atribuir evento de navegação após criar marker e infoWindow
             navigateBtn.addEventListener('click', () => {
-                navigateToClient(client, currentMarkerRef, popup);
+                navigateToClient(client, currentMarkerRef, infoWindow);
             });
         });
 
