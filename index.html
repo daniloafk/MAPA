@@ -6350,9 +6350,9 @@ function activateLocationPicker(callback) {
         });
     }
 
-    // Centralizar mapa na posição inicial
-    map.panTo(initialPosition);
-    map.setZoom(18);
+    // Centralizar mapa na posição inicial com zoom bem próximo
+    map.setCenter(initialPosition);
+    map.setZoom(20); // Zoom máximo para ajuste preciso
 
     // Mostrar UI
     locationPickerBar.classList.add('active');
