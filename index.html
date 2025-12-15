@@ -6315,6 +6315,12 @@ function activateLocationPicker(callback) {
     isLocationPickerActive = true;
     locationPickerCallback = callback;
 
+    // Fechar sidebar se estiver aberto (garantir que não sobreponha o picker)
+    const sidebarEl = document.getElementById('sidebar');
+    const sidebarOverlayEl = document.getElementById('sidebar-overlay');
+    if (sidebarEl) sidebarEl.classList.remove('open');
+    if (sidebarOverlayEl) sidebarOverlayEl.classList.remove('active');
+
     // Obter posição inicial (GPS atual)
     let initialPosition = { lat: -1.4558, lng: -48.4902 }; // Fallback
 
@@ -6805,6 +6811,12 @@ if (btnAdjustLocation) {
         modal.classList.remove('active');
         modal.style.display = 'none'; // Forçar esconder imediatamente
         document.body.style.overflow = '';
+
+        // Fechar sidebar se estiver aberto
+        const sidebarEl = document.getElementById('sidebar');
+        const sidebarOverlayEl = document.getElementById('sidebar-overlay');
+        if (sidebarEl) sidebarEl.classList.remove('open');
+        if (sidebarOverlayEl) sidebarOverlayEl.classList.remove('active');
 
         // Parar câmera
         stopCamera();
