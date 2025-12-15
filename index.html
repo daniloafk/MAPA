@@ -3,11 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Mapa de Clientes - Google Maps</title>
+<title>Mapa de Clientes - Mapbox</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📍</text></svg>">
 
 <!-- Material Icons -->
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+<!-- Mapbox GL JS -->
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css" rel="stylesheet">
 
 <style>
     :root {
@@ -3040,8 +3044,11 @@
 };
 </script>
 
-<!-- Google Maps -->
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApaDb9rSw2sNTaY7fjBqmrgjWYD9xwjcU&loading=async&callback=initMap&v=beta&libraries=places,geometry,marker,maps3d"></script>
+<!-- Mapbox Access Token - Configure seu token em: https://account.mapbox.com/access-tokens/ -->
+<script>
+    // IMPORTANTE: Substitua pelo seu token do Mapbox
+    mapboxgl.accessToken = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
+</script>
 
 <script>
 'use strict';
@@ -3052,7 +3059,7 @@
 let map;
 let is3D = false;
 let routeMode = false;
-let currentInfoWindow = null;
+let currentPopup = null; // Mapbox usa Popup ao invés de InfoWindow
 
 // Legacy global variables (mantidas para compatibilidade)
 let userLocationMarker = null;
@@ -3060,14 +3067,96 @@ let watchId = null;
 let _animating3D = false;
 let locationAccuracy = null;
 let deliveryMarkers = {};
-let directionsService = null;
-let directionsRenderer = null;
+let currentRouteLayer = null; // Mapbox usa layers para rotas
 let currentTween = null;
 let markerCoords = { lat: 0, lng: 0 };
 
 // IMPORTANTE: Inicializar array de polylines globalmente
 if (!window.routePolylines) {
     window.routePolylines = [];
+}
+
+// Mapbox Directions API URL base
+const MAPBOX_DIRECTIONS_API = 'https://api.mapbox.com/directions/v5/mapbox/driving';
+
+// ===========================
+// FUNÇÕES DE COMPATIBILIDADE MAPBOX
+// ===========================
+// Estas funções traduzem chamadas do estilo Google Maps para Mapbox
+
+// Classe de compatibilidade para LatLngBounds
+class MapboxBounds {
+    constructor() {
+        this._bounds = null;
+    }
+
+    extend(position) {
+        const lngLat = position.lng !== undefined ?
+            [position.lng, position.lat] :
+            [position[0], position[1]];
+
+        if (!this._bounds) {
+            this._bounds = new mapboxgl.LngLatBounds(lngLat, lngLat);
+        } else {
+            this._bounds.extend(lngLat);
+        }
+        return this;
+    }
+
+    isEmpty() {
+        return !this._bounds;
+    }
+
+    getCenter() {
+        if (!this._bounds) return { lat: 0, lng: 0 };
+        const center = this._bounds.getCenter();
+        return { lat: center.lat, lng: center.lng };
+    }
+
+    toMapbox() {
+        return this._bounds;
+    }
+}
+
+// Extensões do mapa para compatibilidade
+function extendMapWithCompatibility() {
+    if (!map) return;
+
+    // Adicionar métodos de compatibilidade ao mapa
+    map.setCenter = function(position) {
+        const center = position.lng !== undefined ?
+            [position.lng, position.lat] :
+            position;
+        this.setCenter(center);
+    };
+
+    map.panTo = function(position) {
+        const center = position.lng !== undefined ?
+            [position.lng, position.lat] :
+            position;
+        this.flyTo({ center, duration: 500 });
+    };
+
+    map.setHeading = function(heading) {
+        this.setBearing(heading);
+    };
+
+    map.getHeading = function() {
+        return this.getBearing();
+    };
+
+    map.setTilt = function(tilt) {
+        this.setPitch(tilt);
+    };
+
+    map.getTilt = function() {
+        return this.getPitch();
+    };
+
+    map.fitBounds = function(bounds, padding = 50) {
+        const mapboxBounds = bounds.toMapbox ? bounds.toMapbox() : bounds;
+        this.fitBounds(mapboxBounds, { padding, duration: 1000 });
+    };
 }
 
 // ===========================
@@ -3828,28 +3917,28 @@ class GPSTracker {
         this.lastUpdate = 0;
         this.currentTween = null;
         this.markerCoords = { lat: 0, lng: 0 };
-        this.animationFrameId = null; // Para animação suave com requestAnimationFrame
+        this.animationFrameId = null;
 
         // Kalman Filter state
         this.kalman = {
             lat: null,
             lng: null,
-            variance: null // Incerteza estimada
+            variance: null
         };
-        this.kalmanQ = 0.1; // MUITO ALTO - confiar quase totalmente nas novas leituras
+        this.kalmanQ = 0.1;
         this.lastGoodPosition = null;
         this.consecutiveGoodReadings = 0;
 
-        // Configurações ULTRA AGRESSIVAS para rastreamento instantâneo de veículo
+        // Configurações para rastreamento de veículo
         this.config = {
-            updateThrottle: 0,          // SEM throttle - atualizar IMEDIATAMENTE
-            maxAccuracyThreshold: 500,  // Aceitar qualquer leitura até 500m
-            targetAccuracy: 50,         // Meta relaxada para veículo
-            historySize: 1,             // Sem histórico - usar última leitura
+            updateThrottle: 0,
+            maxAccuracyThreshold: 500,
+            targetAccuracy: 50,
+            historySize: 1,
             highAccuracy: true,
-            timeout: 8000,              // Timeout 8s para resposta rápida
-            maximumAge: 5000,           // Aceita dados de até 5s atrás
-            minReadingsForStable: 1     // 1 leitura é suficiente
+            timeout: 8000,
+            maximumAge: 5000,
+            minReadingsForStable: 1
         };
     }
 
@@ -3886,7 +3975,7 @@ class GPSTracker {
         this.accuracy = position.coords.accuracy;
         this.markerCoords = coords;
 
-        // Container principal do marcador
+        // Container principal do marcador (Mapbox usa HTML elements)
         const markerDiv = document.createElement('div');
         markerDiv.className = 'location-marker active';
 
@@ -3900,33 +3989,18 @@ class GPSTracker {
         dotDiv.className = 'location-marker-dot';
         markerDiv.appendChild(dotDiv);
 
-        // Guardar referências para contra-rotação
+        // Guardar referências
         this.markerElement = markerDiv;
         this.pulseElement = pulseDiv;
         this.dotElement = dotDiv;
 
-        if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
-            this.marker = new google.maps.marker.AdvancedMarkerElement({
-                map: map,
-                position: coords,
-                content: markerDiv,
-                title: "Sua Localização"
-            });
-        } else {
-            this.marker = new google.maps.Marker({
-                map: map,
-                position: coords,
-                title: "Sua Localização",
-                icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 8,
-                    fillColor: "#4285f4",
-                    fillOpacity: 1,
-                    strokeColor: "white",
-                    strokeWeight: 3
-                }
-            });
-        }
+        // Criar marcador Mapbox
+        this.marker = new mapboxgl.Marker({
+            element: markerDiv,
+            anchor: 'center'
+        })
+        .setLngLat([coords.lng, coords.lat])
+        .addTo(map);
 
         // Atualizar referências globais (compatibilidade)
         userLocationMarker = this.marker;
@@ -3934,8 +4008,7 @@ class GPSTracker {
         markerCoords = this.markerCoords;
 
         // Listener para contra-rotacionar o marcador quando o mapa gira
-        // Mantém o marcador sempre na posição fixa (não gira com o mapa)
-        this.headingListener = map.addListener('heading_changed', () => {
+        this.headingListener = map.on('rotate', () => {
             this.counterRotateMarker();
         });
 
@@ -3947,10 +4020,10 @@ class GPSTracker {
     counterRotateMarker() {
         if (!this.pulseElement || !this.dotElement) return;
 
-        const heading = map.getHeading() || 0;
+        const bearing = map.getBearing() || 0;
         // Aplicar rotação inversa aos elementos internos
-        this.pulseElement.style.transform = `translate(-50%, -50%) rotate(${-heading}deg)`;
-        this.dotElement.style.transform = `translate(-50%, -50%) rotate(${-heading}deg)`;
+        this.pulseElement.style.transform = `translate(-50%, -50%) rotate(${-bearing}deg)`;
+        this.dotElement.style.transform = `translate(-50%, -50%) rotate(${-bearing}deg)`;
     }
 
     startWatching(options) {
@@ -3959,7 +4032,7 @@ class GPSTracker {
             (error) => this.handleError(error),
             options
         );
-        watchId = this.watchId; // Compatibilidade global
+        watchId = this.watchId;
     }
 
     updatePosition(position) {
@@ -3967,36 +4040,31 @@ class GPSTracker {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
 
-        // Usar posição direta
         const newPos = { lat, lng };
 
-        // Atualizar marcador com animação suave
         if (this.marker) {
             this.animateMarkerSmooth(newPos);
             this.accuracy = accuracy;
             locationAccuracy = accuracy;
 
-            // Indicador visual de qualidade do sinal
             const qualityIcon = accuracy <= 10 ? '🎯' : accuracy <= 30 ? '📍' : '📡';
             updateStatus(`${qualityIcon} GPS: ${accuracy.toFixed(0)}m`, true);
         }
     }
 
-    // Animação suave usando requestAnimationFrame (como Google Maps)
+    // Animação suave usando requestAnimationFrame
     animateMarkerSmooth(newPosition) {
         if (!this.marker) return;
 
-        // Cancelar animação anterior se existir
         if (this.animationFrameId) {
             cancelAnimationFrame(this.animationFrameId);
         }
 
         const startPos = { ...this.markerCoords };
         const endPos = newPosition;
-        const duration = 250; // 250ms - suave mas rápido
+        const duration = 250;
         const startTime = performance.now();
 
-        // Se é a primeira posição, definir diretamente
         if (startPos.lat === 0 && startPos.lng === 0) {
             this.markerCoords = endPos;
             markerCoords = endPos;
@@ -4008,25 +4076,20 @@ class GPSTracker {
             const elapsed = currentTime - startTime;
             const progress = Math.min(elapsed / duration, 1);
 
-            // Easing suave (ease-out cubic)
             const easeProgress = 1 - Math.pow(1 - progress, 3);
 
-            // Interpolar posição
             const currentPos = {
                 lat: startPos.lat + (endPos.lat - startPos.lat) * easeProgress,
                 lng: startPos.lng + (endPos.lng - startPos.lng) * easeProgress
             };
 
-            // Atualizar marcador
             this.setMarkerPosition(currentPos);
             this.markerCoords = currentPos;
             markerCoords = currentPos;
 
-            // Continuar animação se não terminou
             if (progress < 1) {
                 this.animationFrameId = requestAnimationFrame(animate);
             } else {
-                // Garantir posição final exata
                 this.markerCoords = endPos;
                 markerCoords = endPos;
                 this.setMarkerPosition(endPos);
@@ -4037,17 +4100,10 @@ class GPSTracker {
         this.animationFrameId = requestAnimationFrame(animate);
     }
 
-    // Função auxiliar para definir posição do marcador
+    // Função auxiliar para definir posição do marcador (Mapbox)
     setMarkerPosition(position) {
         if (!this.marker) return;
-
-        if (this.marker.position !== undefined) {
-            // AdvancedMarkerElement
-            this.marker.position = position;
-        } else if (this.marker.setPosition) {
-            // Marker clássico
-            this.marker.setPosition(position);
-        }
+        this.marker.setLngLat([position.lng, position.lat]);
     }
 
     // Filtro de Kalman 1D aplicado a lat/lng
@@ -4168,9 +4224,13 @@ class GPSTracker {
 
     centerOnUser() {
         if (this.marker) {
-            const position = this.marker.position || this.marker.getPosition();
-            if (position) {
-                map.panTo(position);
+            const lngLat = this.marker.getLngLat();
+            if (lngLat) {
+                map.flyTo({
+                    center: [lngLat.lng, lngLat.lat],
+                    zoom: 17,
+                    duration: 1000
+                });
             }
         }
     }
@@ -4186,16 +4246,17 @@ class GPSTracker {
             watchId = null;
         }
 
-        // Remover listener de heading
+        // Remover listener de bearing (Mapbox)
         if (this.headingListener) {
-            google.maps.event.removeListener(this.headingListener);
+            map.off('rotate', this.headingListener);
             this.headingListener = null;
         }
     }
 
     getPosition() {
         if (!this.marker) return null;
-        return this.marker.position || this.marker.getPosition();
+        const lngLat = this.marker.getLngLat();
+        return lngLat ? { lat: lngLat.lat, lng: lngLat.lng } : null;
     }
 
     getAccuracy() {
@@ -4241,14 +4302,22 @@ class GPSTracker {
                 lat: position.coords.latitude,
                 lng: position.coords.longitude
             };
-            map.panTo(coords);
+            map.flyTo({
+                center: [coords.lng, coords.lat],
+                zoom: 17,
+                duration: 1000
+            });
             console.log('📍 [GPS] Mapa centralizado na nova posição');
             return position;
         } catch (error) {
             console.warn('⚠️ [GPS] Não foi possível atualizar e centralizar:', error);
             // Mesmo com erro, tenta centralizar na última posição conhecida
             if (this.markerCoords.lat !== 0 && this.markerCoords.lng !== 0) {
-                map.panTo(this.markerCoords);
+                map.flyTo({
+                    center: [this.markerCoords.lng, this.markerCoords.lat],
+                    zoom: 17,
+                    duration: 1000
+                });
             }
             throw error;
         }
@@ -4413,8 +4482,6 @@ function addGPSCenterButton() {
             gpsTracker.centerOnUser();
             gpsCenterButton.classList.add('active');
 
-            // Toast removido - ação visual já indica centralização
-
             // Remover classe active após 2 segundos
             setTimeout(() => {
                 gpsCenterButton.classList.remove('active');
@@ -4428,25 +4495,22 @@ function addGPSCenterButton() {
             return;
         }
 
-        // Pega a posição atual do marcador (compatível com ambos os tipos)
-        let currentPosition;
-        if (userLocationMarker.position) {
-            currentPosition = userLocationMarker.position;
-        } else if (userLocationMarker.getPosition) {
-            currentPosition = userLocationMarker.getPosition();
-        }
+        // Pega a posição atual do marcador Mapbox
+        const lngLat = userLocationMarker.getLngLat();
 
-        if (!currentPosition) {
+        if (!lngLat) {
             showToast('Erro ao centralizar', 'Posição não encontrada', 'error', 3000);
             return;
         }
 
-        // Anima o zoom e centraliza
-        map.panTo(currentPosition);
-        map.setZoom(17);
+        // Anima o zoom e centraliza (Mapbox)
+        map.flyTo({
+            center: [lngLat.lng, lngLat.lat],
+            zoom: 17,
+            duration: 1000
+        });
 
         gpsCenterButton.classList.add('active');
-        // Toast removido - ação visual já indica centralização
 
         // Remover classe active após 2 segundos
         setTimeout(() => {
@@ -4454,60 +4518,58 @@ function addGPSCenterButton() {
         }, 2000);
     });
 
-    // Adicionar ao mapa usando controls API do Google Maps
-    map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(gpsCenterButton);
+    // Adicionar ao container do mapa (Mapbox não tem controls API)
+    document.getElementById('map').appendChild(gpsCenterButton);
 }
 
-window.initMap = function () {
-    console.log('Iniciando mapa...');
+// Inicializar mapa Mapbox
+function initMap() {
+    console.log('Iniciando mapa Mapbox...');
     updateLoadingScreen('Carregando mapa...', 'Preparando visualização');
 
     try {
-        map = new google.maps.Map(document.getElementById("map"), {
-            center: {lat: -23.5505, lng: -46.6333},
+        // Criar mapa Mapbox
+        map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/streets-v12',
+            center: [-46.6333, -23.5505], // Mapbox usa [lng, lat]
             zoom: 17,
-            mapId: MAP_ID,
-            tilt: 0,
-            heading: 0,
-            gestureHandling: "greedy",
-            rotateControl: true,
-            zoomControl: true,
-            streetViewControl: false,
-            fullscreenControl: true,
-            // Otimizações de performance
-            disableDefaultUI: false,
-            clickableIcons: false, // Desabilita cliques em POIs para melhor performance
-            minZoom: 3, // Permite zoom global
-            maxZoom: 22 // Zoom máximo detalhado
+            pitch: 0,
+            bearing: 0,
+            minZoom: 3,
+            maxZoom: 22,
+            attributionControl: true,
+            dragRotate: true,
+            touchZoomRotate: true
         });
 
-        // Inicializar serviços de rota
-        directionsService = new google.maps.DirectionsService();
-        directionsRenderer = new google.maps.DirectionsRenderer({
-            map: map,
-            suppressMarkers: false, // Não suprimir marcadores (A, B, C, etc.)
-            polylineOptions: {
-                strokeColor: '#4285f4',
-                strokeWeight: 5,
-                strokeOpacity: 0.7
-            }
-        });
+        // Adicionar controles de navegação
+        map.addControl(new mapboxgl.NavigationControl({
+            visualizePitch: true
+        }), 'top-right');
 
-        // Adicionar botão de centralizar localização (estilo Google Maps)
+        // Adicionar controle de tela cheia
+        map.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+
+        // Adicionar botão de centralizar localização
         addGPSCenterButton();
 
         // Configurar detecção de interação do usuário durante navegação
         setupNavigationMapInteraction();
 
-        // Fechar InfoWindow ao clicar no mapa (fora dos marcadores)
-        map.addListener('click', () => {
-            if (currentInfoWindow) {
-                currentInfoWindow.close();
-                currentInfoWindow = null;
+        // Fechar Popup ao clicar no mapa (fora dos marcadores)
+        map.on('click', (e) => {
+            // Verificar se clicou em um marcador
+            const features = map.queryRenderedFeatures(e.point);
+            const clickedOnMarker = features.some(f => f.layer && f.layer.id && f.layer.id.includes('marker'));
+
+            if (!clickedOnMarker && currentPopup) {
+                currentPopup.remove();
+                currentPopup = null;
             }
         });
 
-        console.log('Mapa criado, aguardando tiles...');
+        console.log('Mapa Mapbox criado, aguardando carregamento...');
 
         // Timeout de segurança: se o mapa não carregar em 15s, força o início do tracking
         const safetyTimeout = setTimeout(() => {
@@ -4517,18 +4579,56 @@ window.initMap = function () {
         }, 15000);
 
         // Espera o mapa carregar completamente
-        google.maps.event.addListenerOnce(map, 'tilesloaded', () => {
+        map.on('load', () => {
             clearTimeout(safetyTimeout);
-            console.log('Tiles carregados, iniciando tracking...');
+            console.log('Mapa Mapbox carregado, iniciando tracking...');
+
+            // Adicionar fonte e layer para rotas
+            map.addSource('route', {
+                type: 'geojson',
+                data: {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: []
+                    }
+                }
+            });
+
+            map.addLayer({
+                id: 'route',
+                type: 'line',
+                source: 'route',
+                layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                paint: {
+                    'line-color': '#4285f4',
+                    'line-width': 5,
+                    'line-opacity': 0.7
+                }
+            });
+
             updateLoadingScreen('Obtendo sua localização...', 'Ative o GPS para melhor precisão');
             startLocationTracking();
         });
+
+        // Mostrar mapa quando estiver pronto
+        map.on('idle', () => {
+            document.getElementById('map').classList.add('loaded');
+        });
+
     } catch (error) {
         console.error('Erro ao criar mapa:', error);
         hideLoadingScreen();
         showToast('Erro ao inicializar mapa', error.message, 'error', 8000);
     }
 }
+
+// Chamar initMap quando a página carregar
+document.addEventListener('DOMContentLoaded', initMap);
 
 // ===========================
 // RASTREAMENTO EM TEMPO REAL
@@ -6297,7 +6397,7 @@ async function addDeliveryMarkers(skipMapAdjust = false) {
             // Limitar zoom máximo para não ficar muito próximo
             google.maps.event.addListenerOnce(map, 'idle', () => {
                 const currentZoom = map.getZoom();
-                console.log(`🗺️ Zoom atual após fitBounds: ${currentZoom}`);
+                console.log(`🗺️ Zoom atual ap��s fitBounds: ${currentZoom}`);
                 if (currentZoom > 16) {
                     map.setZoom(16);
                 }
@@ -8308,7 +8408,7 @@ function initRealtimeSync() {
         supabase.removeChannel(clientsChannel);
     }
     if (deliveryDataChannel) {
-        console.log('📡 [REALTIME] Removendo canal delivery_data anterior...');
+        console.log('���� [REALTIME] Removendo canal delivery_data anterior...');
         supabase.removeChannel(deliveryDataChannel);
     }
 
@@ -8389,7 +8489,7 @@ function initRealtimeSync() {
     }
 }
 
-// Processar mudanças recebidas via Realtime
+// Processar mudan��as recebidas via Realtime
 async function handleRealtimeChange(payload) {
     const { eventType, new: newRecord, old: oldRecord } = payload;
 
