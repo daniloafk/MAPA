@@ -8330,39 +8330,27 @@ async function handleDeliveryStatusChange(payload) {
     // Encontrar o cliente associado a este SPX TN
     const clientToUpdate = allClients.find(c => c.spx_tn === spxTn);
 
-    if (clientToUpdate) {
-        console.log(`📦 [REALTIME-DELIVERY] Encontrado cliente: ${clientToUpdate.name || clientToUpdate.address}`);
-
-        // Atualizar o marcador no mapa
-        if (clientMarkers && clientMarkers[clientToUpdate.id]) {
-            // Remover marcador antigo
-            clientMarkers[clientToUpdate.id].map = null;
-            delete clientMarkers[clientToUpdate.id];
-        }
-
-        // Recarregar marcadores para refletir novo status
-        if (typeof showClientMarkers === 'function') {
-            await showClientMarkers();
-        }
-
-        // Mostrar notificação
-        const statusText = newStatus === 'entregue' ? '✅ Entregue' :
-                          newStatus === 'nao_entregue' ? '❌ Não Entregue' :
-                          '📦 Pendente';
-
-        showToast(
-            '📡 Status Atualizado',
-            `${clientToUpdate.address?.substring(0, 30) || spxTn}... → ${statusText}`,
-            'info',
-            3000
-        );
-    } else {
-        console.log('📦 [REALTIME-DELIVERY] Cliente não encontrado para este SPX TN');
-        // Mesmo assim, recarregar marcadores por segurança
-        if (typeof showClientMarkers === 'function') {
-            await showClientMarkers();
-        }
+    // Recarregar marcadores de entrega (verdes/vermelhos) para refletir novo status
+    if (typeof addDeliveryMarkers === 'function') {
+        console.log('📦 [REALTIME-DELIVERY] Recarregando marcadores de entrega...');
+        await addDeliveryMarkers();
     }
+
+    // Mostrar notificação
+    const statusText = newStatus === 'delivered' ? '✅ Entregue' :
+                      newStatus === 'not_delivered' ? '❌ Não Entregue' :
+                      '📦 Pendente';
+
+    const clientName = clientToUpdate ?
+        (clientToUpdate.name || clientToUpdate.address?.substring(0, 30) || spxTn) :
+        spxTn;
+
+    showToast(
+        '📡 Status Atualizado',
+        `${clientName} → ${statusText}`,
+        'info',
+        3000
+    );
 }
 
 // Atualizar marcador específico no mapa
