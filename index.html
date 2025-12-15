@@ -6302,6 +6302,7 @@ let isLocationPickerActive = false; // Se o modo de seleção está ativo
 let locationPickerCallback = null; // Callback quando confirmar localização
 let mapDragListener = null; // Listener de arrasto do mapa
 let mapDragEndListener = null; // Listener de fim de arrasto
+let locationPickerFromModal = false; // Se o picker foi ativado a partir do modal
 
 // Elementos da mira fixa
 const locationPickerCrosshair = document.getElementById('location-picker-crosshair');
@@ -6453,11 +6454,15 @@ if (btnCancelLocation) {
     btnCancelLocation.addEventListener('click', () => {
         deactivateLocationPicker(false);
 
-        // Reabrir modal se estava aberto antes
-        const modalEl = document.getElementById('modal-add-client');
-        if (modalEl) {
-            modalEl.classList.add('active');
-            document.body.style.overflow = 'hidden';
+        // Reabrir modal APENAS se o picker veio do modal
+        if (locationPickerFromModal) {
+            const modalEl = document.getElementById('modal-add-client');
+            if (modalEl) {
+                modalEl.style.display = ''; // Restaurar display
+                modalEl.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+            locationPickerFromModal = false; // Resetar flag
         }
 
         showToast(
@@ -6762,7 +6767,15 @@ function resetForm() {
 btnAddClient.addEventListener('click', async () => {
     // Verificar se está em modo de atualização de localização
     if (btnAddClient.dataset.updateMode === 'true' && pendingLocationUpdate) {
-        await updateClientLocation(pendingLocationUpdate.clientId, pendingLocationUpdate.clientName);
+        // Ativar modo de seleção de localização com mira (igual ao cadastro)
+        activateLocationPicker(async (confirmedLocation) => {
+            // Callback quando usuário confirmar a localização
+            await updateClientLocationWithCoords(
+                pendingLocationUpdate.clientId,
+                pendingLocationUpdate.clientName,
+                confirmedLocation
+            );
+        });
     } else {
         openModal();
     }
@@ -6785,8 +6798,12 @@ const locationStatusEl = document.getElementById('location-status');
 
 if (btnAdjustLocation) {
     btnAdjustLocation.addEventListener('click', () => {
-        // Fechar modal temporariamente
+        // Marcar que o picker veio do modal
+        locationPickerFromModal = true;
+
+        // Fechar modal completamente (esconder de verdade)
         modal.classList.remove('active');
+        modal.style.display = 'none'; // Forçar esconder imediatamente
         document.body.style.overflow = '';
 
         // Parar câmera
@@ -6804,8 +6821,12 @@ if (btnAdjustLocation) {
             }
 
             // Reabrir modal
+            modal.style.display = ''; // Restaurar display
             modal.classList.add('active');
             document.body.style.overflow = 'hidden';
+
+            // Resetar flag
+            locationPickerFromModal = false;
 
             showToast(
                 'Localização definida!',
@@ -7422,26 +7443,12 @@ function cancelLocationUpdate() {
     );
 }
 
-// Atualizar localização do cliente no banco de dados
-async function updateClientLocation(clientId, clientName) {
-    // Obter posição GPS atual
-    let currentPosition = null;
-
-    if (gpsTracker && gpsTracker.markerCoords) {
-        currentPosition = gpsTracker.markerCoords;
-    } else if (userLocationMarker) {
-        if (userLocationMarker.position) {
-            currentPosition = userLocationMarker.position;
-        } else if (userLocationMarker.getPosition) {
-            const pos = userLocationMarker.getPosition();
-            currentPosition = { lat: pos.lat(), lng: pos.lng() };
-        }
-    }
-
-    if (!currentPosition || !currentPosition.lat || !currentPosition.lng) {
+// Atualizar localização do cliente no banco de dados (com coordenadas manuais)
+async function updateClientLocationWithCoords(clientId, clientName, coords) {
+    if (!coords || !coords.lat || !coords.lng) {
         showToast(
-            '❌ Erro de GPS',
-            'Não foi possível obter sua localização atual',
+            '❌ Erro',
+            'Coordenadas inválidas',
             'error',
             4000
         );
@@ -7453,8 +7460,8 @@ async function updateClientLocation(clientId, clientName) {
         const { error } = await supabase
             .from('clients')
             .update({
-                latitude: currentPosition.lat,
-                longitude: currentPosition.lng
+                latitude: coords.lat,
+                longitude: coords.lng
             })
             .eq('id', clientId);
 
@@ -7488,6 +7495,8 @@ async function updateClientLocation(clientId, clientName) {
             }
         }
 
+        console.log('📍 Localização atualizada com sucesso:', coords);
+
     } catch (error) {
         console.error('Erro ao atualizar localização:', error);
         showToast(
@@ -7497,6 +7506,36 @@ async function updateClientLocation(clientId, clientName) {
             4000
         );
     }
+}
+
+// Atualizar localização do cliente no banco de dados (GPS automático - legado)
+async function updateClientLocation(clientId, clientName) {
+    // Obter posição GPS atual
+    let currentPosition = null;
+
+    if (gpsTracker && gpsTracker.markerCoords) {
+        currentPosition = gpsTracker.markerCoords;
+    } else if (userLocationMarker) {
+        if (userLocationMarker.position) {
+            currentPosition = userLocationMarker.position;
+        } else if (userLocationMarker.getPosition) {
+            const pos = userLocationMarker.getPosition();
+            currentPosition = { lat: pos.lat(), lng: pos.lng() };
+        }
+    }
+
+    if (!currentPosition || !currentPosition.lat || !currentPosition.lng) {
+        showToast(
+            '❌ Erro de GPS',
+            'Não foi possível obter sua localização atual',
+            'error',
+            4000
+        );
+        return;
+    }
+
+    // Usar a nova função com coordenadas
+    await updateClientLocationWithCoords(clientId, clientName, currentPosition);
 }
 
 // Mostrar formulário normal de cadastro
