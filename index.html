@@ -552,16 +552,14 @@
         display: none !important;
     }
 
-    /* Esconder também o botão Salvar e o botão de ajustar localização */
-    .modal-overlay.quick-mode #btn-save,
-    .modal-overlay.quick-mode #btn-adjust-location,
-    .modal-overlay.quick-mode .location-hint {
+    /* Esconder apenas o botão Salvar no modo rápido */
+    .modal-overlay.quick-mode #btn-save {
         display: none !important;
     }
 
-    /* Esconder form-group do botão de ajustar localização */
-    .modal-overlay.quick-mode .form-group:has(#btn-adjust-location) {
-        display: none !important;
+    /* Manter o botão de ajustar localização visível no modo rápido */
+    .modal-overlay.quick-mode #btn-adjust-location {
+        display: flex !important;
     }
 
     .modal-overlay.quick-mode .modal-header {
@@ -6768,20 +6766,23 @@ function selectDropdownItem(item) {
         modal.classList.remove('quick-mode');
         document.body.style.overflow = '';
 
-        showToast(
-            '✓ Endereço selecionado!',
-            'Ajuste a posição no mapa',
-            'success',
-            2000
-        );
-
-        // Iniciar picker de localização com callback para salvar
-        setTimeout(() => {
-            activateLocationPicker(async (confirmedLocation) => {
-                await saveQuickClient(addressDataToSave, confirmedLocation);
+        // Verificar se já tem localização ajustada previamente
+        if (selectedLocation) {
+            // Usar a localização já ajustada e salvar diretamente
+            console.log(`⚡ Cadastro rápido com localização pré-ajustada: ${address}`);
+            saveQuickClient(addressDataToSave, selectedLocation).then(() => {
                 closeQuickRegisterMode();
+                selectedLocation = null; // Limpar após usar
             });
-        }, 300);
+        } else {
+            // Iniciar picker de localização com callback para salvar
+            setTimeout(() => {
+                activateLocationPicker(async (confirmedLocation) => {
+                    await saveQuickClient(addressDataToSave, confirmedLocation);
+                    closeQuickRegisterMode();
+                });
+            }, 300);
+        }
 
         console.log(`⚡ Cadastro rápido: ${address}`);
         return;
@@ -7021,7 +7022,10 @@ if (btnAdjustLocation) {
         // Marcar que o picker veio do modal
         locationPickerFromModal = true;
 
-        // Fechar modal completamente (esconder de verdade)
+        // Salvar se estava no modo rápido para restaurar depois
+        const wasQuickMode = isQuickRegisterMode;
+
+        // Fechar modal completamente (esconder de verdade) mas NÃO remove quick-mode class
         modal.classList.remove('active');
         modal.style.display = 'none'; // Forçar esconder imediatamente
         document.body.style.overflow = '';
@@ -7046,20 +7050,16 @@ if (btnAdjustLocation) {
                 locationStatusEl.classList.add('adjusted');
             }
 
-            // Reabrir modal
+            // Reabrir modal mantendo quick-mode se estava ativo
             modal.style.display = ''; // Restaurar display
             modal.classList.add('active');
+            if (wasQuickMode) {
+                modal.classList.add('quick-mode');
+            }
             document.body.style.overflow = 'hidden';
 
             // Resetar flag
             locationPickerFromModal = false;
-
-            showToast(
-                'Localização definida!',
-                `${confirmedLocation.lat.toFixed(5)}, ${confirmedLocation.lng.toFixed(5)}`,
-                'success',
-                3000
-            );
 
             console.log('📍 Localização ajustada manualmente:', confirmedLocation);
         });
@@ -7441,20 +7441,23 @@ async function handleQRCodeResult(qrData) {
             modal.classList.remove('quick-mode');
             document.body.style.overflow = '';
 
-            showToast(
-                '✓ Endereço encontrado!',
-                'Ajuste a posição no mapa',
-                'success',
-                2000
-            );
-
-            // Iniciar picker de localização com callback para salvar
-            setTimeout(() => {
-                activateLocationPicker(async (confirmedLocation) => {
-                    await saveQuickClient(addressDataToSave, confirmedLocation);
+            // Verificar se já tem localização ajustada previamente
+            if (selectedLocation) {
+                // Usar a localização já ajustada e salvar diretamente
+                console.log(`⚡ Cadastro rápido via QR com localização pré-ajustada`);
+                saveQuickClient(addressDataToSave, selectedLocation).then(() => {
                     closeQuickRegisterMode();
+                    selectedLocation = null; // Limpar após usar
                 });
-            }, 300);
+            } else {
+                // Iniciar picker de localização com callback para salvar
+                setTimeout(() => {
+                    activateLocationPicker(async (confirmedLocation) => {
+                        await saveQuickClient(addressDataToSave, confirmedLocation);
+                        closeQuickRegisterMode();
+                    });
+                }, 300);
+            }
             return;
         }
 
