@@ -3443,20 +3443,9 @@ async function markAsNotDelivered(marker, client, notDeliveredBtn = null) {
             notDeliveredBtn.addEventListener('mouseleave', notDeliveredBtn._hoverOut);
         }
 
-        showToast(
-            '❌ Marcada como não entregue',
-            client.name || 'Encomenda',
-            'error',
-            3000
-        );
+        // Toast removido - ação visual já indica o status
     } catch (error) {
         console.error('Erro ao marcar como não entregue:', error);
-        showToast(
-            '❌ Erro ao marcar como não entregue',
-            'Tente novamente',
-            'error',
-            4000
-        );
     }
 }
 
@@ -4409,7 +4398,7 @@ function addGPSCenterButton() {
             gpsTracker.centerOnUser();
             gpsCenterButton.classList.add('active');
 
-            showToast('Centralizado', 'Mapa centralizado na sua localização', 'info', 2000);
+            // Toast removido - ação visual já indica centralização
 
             // Remover classe active após 2 segundos
             setTimeout(() => {
@@ -4442,7 +4431,7 @@ function addGPSCenterButton() {
         map.setZoom(17);
 
         gpsCenterButton.classList.add('active');
-        showToast('Centralizado', 'Mapa centralizado na sua localização', 'info', 2000);
+        // Toast removido - ação visual já indica centralização
 
         // Remover classe active após 2 segundos
         setTimeout(() => {
@@ -4772,13 +4761,7 @@ async function markAsDelivered(deliveries, client, marker, coordKey, deliveredBt
             currentInfoWindow = null;
         }
 
-        // Toast de sucesso
-        showToast(
-            '✅ Entrega concluída!',
-            `${deliveries.length} pacote${deliveries.length > 1 ? 's' : ''} marcado${deliveries.length > 1 ? 's' : ''} como entregue${deliveries.length > 1 ? 's' : ''}`,
-            'success',
-            3000
-        );
+        // Toast removido - ação visual já indica o status
 
         // Navegar para o próximo marcador mais próximo
         await navigateToNextMarker(currentMarkerPosition);
@@ -4875,22 +4858,10 @@ async function undoDelivery(marker, deliveredBtn) {
             deliveredBtn.addEventListener('mouseleave', deliveredBtn._hoverOut);
         }
 
-        // Toast de sucesso
-        showToast(
-            '↩ Entrega revertida!',
-            `${deliveries.length} pacote${deliveries.length > 1 ? 's' : ''} marcado${deliveries.length > 1 ? 's' : ''} como pendente novamente`,
-            'info',
-            3000
-        );
+        // Toast removido - ação visual já indica o status
 
     } catch (error) {
         console.error('Erro ao desfazer entrega:', error);
-        showToast(
-            '❌ Erro ao desfazer',
-            error.message || 'Não foi possível reverter o status',
-            'error',
-            4000
-        );
     }
 }
 
@@ -4959,22 +4930,10 @@ async function undoNotDelivered(marker, notDeliveredBtn) {
             notDeliveredBtn.addEventListener('mouseleave', notDeliveredBtn._hoverOut);
         }
 
-        // Toast de sucesso
-        showToast(
-            '↩ Não Entregue revertido!',
-            `${deliveries.length} pacote${deliveries.length > 1 ? 's' : ''} marcado${deliveries.length > 1 ? 's' : ''} como pendente novamente`,
-            'info',
-            3000
-        );
+        // Toast removido - ação visual já indica o status
 
     } catch (error) {
         console.error('Erro ao desfazer não entregue:', error);
-        showToast(
-            '❌ Erro ao desfazer',
-            error.message || 'Não foi possível reverter o status',
-            'error',
-            4000
-        );
     }
 }
 
@@ -6354,7 +6313,7 @@ document.getElementById("btnToggle3D").onclick = () => {
             btn.classList.add('active');
             btn.textContent = "2D";
             btn.disabled = false;
-            showToast('Modo 3D ativado', 'Arraste para rotacionar', 'success', 2000);
+            // Toast removido - botão já indica o modo
         });
 
     } else {
@@ -6366,7 +6325,7 @@ document.getElementById("btnToggle3D").onclick = () => {
             btn.classList.remove('loading', 'active');
             btn.textContent = "3D";
             btn.disabled = false;
-            showToast('Modo 2D ativado', '', 'success', 2000);
+            // Toast removido - botão já indica o modo
         });
     }
 };
@@ -6391,7 +6350,7 @@ document.getElementById("btnCenterLocation").onclick = () => {
     // Usar GPS Tracker modular se disponível
     if (gpsTracker) {
         gpsTracker.centerOnUser();
-        showToast('Centralizado', 'Mapa centralizado na sua localização', 'info', 2000);
+        // Toast removido - ação visual já indica centralização
         return;
     }
 
@@ -8312,10 +8271,9 @@ function initRealtimeSync() {
                 }
                 if (status === 'SUBSCRIBED') {
                     console.log('✅ [REALTIME] Conectado com sucesso - sincronização ativa!');
-                    showToast('📡 Realtime ativo', 'Sincronização entre dispositivos habilitada', 'success', 3000);
+                    // Toast removido para evitar poluição visual
                 } else if (status === 'CHANNEL_ERROR') {
-                    console.error('❌ [REALTIME] Erro no canal');
-                    showToast('❌ Erro Realtime', 'Verifique se Realtime está habilitado no Supabase', 'error', 5000);
+                    console.error('❌ [REALTIME] Erro no canal - verifique Realtime no Supabase');
                 } else if (status === 'TIMED_OUT') {
                     console.error('❌ [REALTIME] Timeout na conexão');
                 } else if (status === 'CLOSED') {
@@ -8371,12 +8329,7 @@ async function handleRealtimeChange(payload) {
             console.log('📡 [REALTIME] Novo cliente adicionado:', newRecord);
             // Recarregar lista de clientes
             await loadClients();
-            showToast(
-                '📡 Sincronizado',
-                'Novo cliente adicionado em outro dispositivo',
-                'info',
-                2000
-            );
+            // Toast removido para evitar poluição visual
             break;
 
         case 'UPDATE':
@@ -8393,12 +8346,7 @@ async function handleRealtimeChange(payload) {
             removeClientMarkerFromMap(oldRecord.id);
             // Recarregar lista
             await loadClients();
-            showToast(
-                '📡 Sincronizado',
-                'Cliente removido em outro dispositivo',
-                'info',
-                2000
-            );
+            // Toast removido para evitar poluição visual
             break;
     }
 }
@@ -8434,12 +8382,8 @@ async function handleDeliveryStatusChange(payload) {
         (clientToUpdate.name || clientToUpdate.address?.substring(0, 30) || spxTn) :
         spxTn;
 
-    showToast(
-        '📡 Status Atualizado',
-        `${clientName} → ${statusText}`,
-        'info',
-        3000
-    );
+    // Toast removido para evitar poluição visual - status é atualizado silenciosamente
+    console.log(`📦 [REALTIME-DELIVERY] ${clientName} → ${statusText}`);
 }
 
 // Atualizar marcador específico no mapa
