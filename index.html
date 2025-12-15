@@ -993,182 +993,213 @@
     }
 
     /* ===========================
-       SELETOR DE LOCALIZAÇÃO NO MAPA
+       MARCADOR ARRASTÁVEL NO MAPA PRINCIPAL
        =========================== */
-    .location-picker-section {
-        margin: 16px 0;
-        border: 2px solid #e0e0e0;
-        border-radius: 12px;
-        overflow: hidden;
-        background: #f8f9fa;
-        transition: all 0.3s ease;
-    }
 
-    .location-picker-section.active {
-        border-color: var(--primary-color);
-        box-shadow: 0 2px 12px rgba(66, 133, 244, 0.2);
-    }
-
-    .location-picker-header {
+    /* Barra de instrução flutuante no topo do mapa */
+    .location-picker-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 16px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 12px 16px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
+        z-index: 10003;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        transform: translateY(-100%);
+        transition: transform 0.3s ease;
     }
 
-    .location-picker-title {
+    .location-picker-bar.active {
+        transform: translateY(0);
+    }
+
+    .location-picker-bar-content {
         display: flex;
         align-items: center;
-        gap: 8px;
-        font-weight: 600;
+        gap: 10px;
+        flex: 1;
+    }
+
+    .location-picker-bar-icon {
+        font-size: 24px;
+        animation: bounce-pin 1s ease infinite;
+    }
+
+    @keyframes bounce-pin {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+    }
+
+    .location-picker-bar-text {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .location-picker-bar-title {
+        font-weight: 700;
         font-size: 14px;
     }
 
-    .location-picker-title .material-icons {
-        font-size: 20px;
-    }
-
-    .location-picker-hint {
-        font-size: 11px;
+    .location-picker-bar-hint {
+        font-size: 12px;
         opacity: 0.9;
     }
 
-    .location-picker-map {
-        width: 100%;
-        height: 200px;
-        position: relative;
-        background: #e0e0e0;
-    }
-
-    .location-picker-map #picker-map {
-        width: 100%;
-        height: 100%;
-    }
-
-    .location-picker-loading {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background: rgba(255, 255, 255, 0.9);
-        z-index: 10;
-    }
-
-    .location-picker-loading.hidden {
-        display: none;
-    }
-
-    .location-picker-loading .spinner-small {
-        width: 30px;
-        height: 30px;
-        border: 3px solid rgba(102, 126, 234, 0.2);
-        border-top-color: #667eea;
-        border-radius: 50%;
-        animation: spinner 0.8s linear infinite;
-    }
-
-    .location-picker-loading span {
-        margin-top: 8px;
-        font-size: 12px;
-        color: #666;
-    }
-
-    .location-picker-coords {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 10px 16px;
-        background: white;
-        border-top: 1px solid #e0e0e0;
-        font-size: 12px;
-    }
-
-    .location-picker-coords-text {
-        color: #666;
+    .location-picker-bar-coords {
         font-family: 'Roboto Mono', monospace;
+        font-size: 11px;
+        background: rgba(255, 255, 255, 0.2);
+        padding: 4px 8px;
+        border-radius: 4px;
+        margin-left: auto;
     }
 
-    .location-picker-coords-text.updated {
-        color: var(--success-color);
-        font-weight: 600;
-    }
-
-    .location-picker-btn-center {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        padding: 6px 12px;
-        background: var(--primary-color);
+    /* Botão confirmar localização */
+    .location-picker-confirm-btn {
+        position: fixed;
+        bottom: 100px;
+        left: 50%;
+        transform: translateX(-50%) scale(0);
+        background: linear-gradient(135deg, #34a853 0%, #1e8e3e 100%);
         color: white;
         border: none;
-        border-radius: 16px;
-        font-size: 11px;
-        font-weight: 600;
+        padding: 14px 28px;
+        border-radius: 30px;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 4px 20px rgba(52, 168, 83, 0.4);
+        z-index: 10003;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .location-picker-confirm-btn.active {
+        transform: translateX(-50%) scale(1);
+    }
+
+    .location-picker-confirm-btn:hover {
+        transform: translateX(-50%) scale(1.05);
+        box-shadow: 0 6px 25px rgba(52, 168, 83, 0.5);
+    }
+
+    .location-picker-confirm-btn:active {
+        transform: translateX(-50%) scale(0.98);
+    }
+
+    .location-picker-confirm-btn .material-icons {
+        font-size: 20px;
+    }
+
+    /* Botão cancelar seleção */
+    .location-picker-cancel-btn {
+        position: fixed;
+        bottom: 100px;
+        left: 20px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        border: none;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        font-size: 20px;
+        cursor: pointer;
+        z-index: 10003;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transform: scale(0);
+        transition: all 0.3s ease;
+    }
+
+    .location-picker-cancel-btn.active {
+        transform: scale(1);
+    }
+
+    .location-picker-cancel-btn:hover {
+        background: rgba(234, 67, 53, 0.9);
+    }
+
+    /* Overlay semi-transparente nas bordas durante seleção */
+    .location-picker-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        pointer-events: none;
+        z-index: 10002;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        box-shadow: inset 0 0 100px rgba(102, 126, 234, 0.3);
+    }
+
+    .location-picker-overlay.active {
+        opacity: 1;
+    }
+
+    /* Botão de ajustar localização no modal */
+    .btn-adjust-location {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border: 2px dashed #4285f4;
+        border-radius: 10px;
         cursor: pointer;
         transition: all 0.2s ease;
-    }
-
-    .location-picker-btn-center:hover {
-        background: #3367d6;
-        transform: scale(1.02);
-    }
-
-    .location-picker-btn-center .material-icons {
         font-size: 14px;
+        font-weight: 600;
+        color: #333;
     }
 
-    /* Marcador central fixo (estilo Uber/99) */
-    .picker-center-marker {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -100%);
-        z-index: 100;
-        pointer-events: none;
-        transition: transform 0.15s ease;
+    .btn-adjust-location:hover {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+        border-style: solid;
+        transform: translateY(-1px);
     }
 
-    .picker-center-marker.dragging {
-        transform: translate(-50%, -110%) scale(1.1);
+    .btn-adjust-location:active {
+        transform: translateY(0);
     }
 
-    .picker-center-marker svg {
-        filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3));
+    .btn-adjust-location .material-icons {
+        font-size: 24px;
+        color: #4285f4;
     }
 
-    .picker-center-dot {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 6px;
-        height: 6px;
-        background: rgba(0, 0, 0, 0.2);
-        border-radius: 50%;
-        z-index: 99;
-        pointer-events: none;
+    .btn-adjust-location .location-status {
+        margin-left: auto;
+        font-size: 11px;
+        font-weight: 500;
+        padding: 4px 10px;
+        border-radius: 12px;
+        background: rgba(66, 133, 244, 0.1);
+        color: #4285f4;
     }
 
-    /* Dark mode */
-    .dark .location-picker-section {
-        background: #2d2d2d;
-        border-color: #444;
+    .btn-adjust-location .location-status.adjusted {
+        background: rgba(52, 168, 83, 0.1);
+        color: #34a853;
     }
 
-    .dark .location-picker-coords {
-        background: #1e1e1e;
-        border-top-color: #444;
+    .dark .btn-adjust-location {
+        background: linear-gradient(135deg, #2d2d2d 0%, #3d3d3d 100%);
+        color: #e0e0e0;
+        border-color: #4285f4;
     }
 
-    .dark .location-picker-coords-text {
-        color: #aaa;
+    .dark .btn-adjust-location:hover {
+        background: linear-gradient(135deg, #3a3a4a 0%, #4a4a5a 100%);
     }
 
     /* Formulário */
@@ -1993,6 +2024,24 @@
 <!-- Container de Notificações -->
 <div id="toast-container"></div>
 
+<!-- UI de Seleção de Localização (marcador arrastável no mapa) -->
+<div class="location-picker-overlay" id="location-picker-overlay"></div>
+<div class="location-picker-bar" id="location-picker-bar">
+    <div class="location-picker-bar-content">
+        <span class="location-picker-bar-icon">📍</span>
+        <div class="location-picker-bar-text">
+            <span class="location-picker-bar-title">Arraste o marcador azul</span>
+            <span class="location-picker-bar-hint">Posicione no local exato do cliente</span>
+        </div>
+    </div>
+    <span class="location-picker-bar-coords" id="picker-coords-display">---, ---</span>
+</div>
+<button class="location-picker-confirm-btn" id="btn-confirm-location">
+    <span class="material-icons">check</span>
+    Confirmar Local
+</button>
+<button class="location-picker-cancel-btn" id="btn-cancel-location">✕</button>
+
 <!-- Status Bar -->
 <div id="status-bar">
     <div class="status-indicator" id="status-indicator"></div>
@@ -2082,49 +2131,6 @@
                 <div class="address-text" id="address-text"></div>
             </div>
 
-            <!-- Seletor de Localização no Mapa -->
-            <div class="location-picker-section" id="location-picker-section">
-                <div class="location-picker-header">
-                    <div class="location-picker-title">
-                        <span class="material-icons">pin_drop</span>
-                        <span>Ajustar Localização</span>
-                    </div>
-                    <div class="location-picker-hint">Arraste o mapa para ajustar</div>
-                </div>
-                <div class="location-picker-map">
-                    <div id="picker-map"></div>
-                    <!-- Marcador central fixo (estilo Uber/99) -->
-                    <div class="picker-center-marker" id="picker-center-marker">
-                        <svg width="40" height="50" viewBox="0 0 40 50" xmlns="http://www.w3.org/2000/svg">
-                            <defs>
-                                <linearGradient id="pickerPinGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                                    <stop offset="0%" style="stop-color:#4285F4;stop-opacity:1" />
-                                    <stop offset="100%" style="stop-color:#1a73e8;stop-opacity:1" />
-                                </linearGradient>
-                            </defs>
-                            <path d="M20 0 C8.954 0 0 8.954 0 20 C0 35 20 50 20 50 S40 35 40 20 C40 8.954 31.046 0 20 0 Z"
-                                  fill="url(#pickerPinGradient)"
-                                  stroke="#FFFFFF"
-                                  stroke-width="2"/>
-                            <circle cx="20" cy="20" r="8" fill="#FFFFFF"/>
-                        </svg>
-                    </div>
-                    <div class="picker-center-dot"></div>
-                    <!-- Loading -->
-                    <div class="location-picker-loading" id="picker-loading">
-                        <div class="spinner-small"></div>
-                        <span>Carregando mapa...</span>
-                    </div>
-                </div>
-                <div class="location-picker-coords">
-                    <span class="location-picker-coords-text" id="picker-coords">Aguardando GPS...</span>
-                    <button type="button" class="location-picker-btn-center" id="btn-center-picker">
-                        <span class="material-icons">my_location</span>
-                        Meu GPS
-                    </button>
-                </div>
-            </div>
-
             <!-- Formulário -->
             <form id="form-add-client">
 
@@ -2148,6 +2154,19 @@
                         placeholder="(91)9 9942-1942"
                         maxlength="16"
                     >
+                </div>
+
+                <!-- Botão para ajustar localização no mapa -->
+                <div class="form-group">
+                    <label class="form-label">📍 Localização do Cliente</label>
+                    <button type="button" class="btn-adjust-location" id="btn-adjust-location">
+                        <span class="material-icons">edit_location_alt</span>
+                        <span>Ajustar no Mapa</span>
+                        <span class="location-status" id="location-status">GPS atual</span>
+                    </button>
+                    <div class="location-hint" style="font-size: 11px; color: #666; margin-top: 4px;">
+                        💡 Arraste o marcador no mapa para posição exata
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -3075,7 +3094,7 @@ function startNavigationMode(destination, destinationName, marker = null, infoWi
         currentInfoWindow = null;
     }
 
-    // Mostrar botão de parar navega��ão
+    // Mostrar botão de parar navegação
     const btnStopNav = document.getElementById('btnStopNavigation');
     if (btnStopNav) {
         btnStopNav.style.display = 'flex';
@@ -6210,30 +6229,53 @@ let scannedQRCode = ''; // Armazena o código QR escaneado
 let scannedLatLng = null; // Armazena coordenadas do endereço escaneado
 
 // ===========================
-// LOCATION PICKER (Seletor de Localização)
+// LOCATION PICKER (Marcador Arrastável no Mapa Principal)
 // ===========================
-const locationPickerSection = document.getElementById('location-picker-section');
-const pickerMapContainer = document.getElementById('picker-map');
-const pickerLoading = document.getElementById('picker-loading');
-const pickerCoords = document.getElementById('picker-coords');
-const pickerCenterMarker = document.getElementById('picker-center-marker');
-const btnCenterPicker = document.getElementById('btn-center-picker');
+const locationPickerBar = document.getElementById('location-picker-bar');
+const locationPickerOverlay = document.getElementById('location-picker-overlay');
+const btnConfirmLocation = document.getElementById('btn-confirm-location');
+const btnCancelLocation = document.getElementById('btn-cancel-location');
+const pickerCoordsDisplay = document.getElementById('picker-coords-display');
 
-let pickerMap = null; // Mini mapa do picker
 let selectedLocation = null; // Coordenadas selecionadas pelo usuário
-let pickerInitialized = false;
-let pickerIsDragging = false;
+let locationPickerMarker = null; // Marcador arrastável
+let isLocationPickerActive = false; // Se o modo de seleção está ativo
+let locationPickerCallback = null; // Callback quando confirmar localização
 
-// Inicializar o mapa do picker quando o modal abrir
-async function initLocationPicker() {
-    if (pickerInitialized && pickerMap) {
-        // Se já inicializado, apenas centralizar na posição atual
-        centerPickerOnGPS();
-        return;
-    }
+// Criar SVG do marcador arrastável (pin azul grande)
+function createDraggableMarkerSVG() {
+    return `
+        <svg width="48" height="60" viewBox="0 0 48 60" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="draggablePinGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#4285F4;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#1a73e8;stop-opacity:1" />
+                </linearGradient>
+                <filter id="pinShadow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="rgba(0,0,0,0.4)"/>
+                </filter>
+            </defs>
+            <g filter="url(#pinShadow)">
+                <path d="M24 0 C10.745 0 0 10.745 0 24 C0 42 24 58 24 58 S48 42 48 24 C48 10.745 37.255 0 24 0 Z"
+                      fill="url(#draggablePinGradient)"
+                      stroke="#FFFFFF"
+                      stroke-width="3"/>
+                <circle cx="24" cy="24" r="10" fill="#FFFFFF"/>
+                <circle cx="24" cy="24" r="5" fill="#4285F4"/>
+            </g>
+        </svg>
+    `;
+}
 
-    // Obter posição inicial do GPS
-    let initialPosition = { lat: -1.4558, lng: -48.4902 }; // Fallback: Belém
+// Ativar modo de seleção de localização
+function activateLocationPicker(callback) {
+    if (isLocationPickerActive) return;
+
+    isLocationPickerActive = true;
+    locationPickerCallback = callback;
+
+    // Obter posição inicial (GPS atual)
+    let initialPosition = { lat: -1.4558, lng: -48.4902 }; // Fallback
 
     if (gpsTracker && gpsTracker.markerCoords.lat !== 0) {
         initialPosition = {
@@ -6247,137 +6289,177 @@ async function initLocationPicker() {
         }
     }
 
-    try {
-        // Criar mapa do picker
-        pickerMap = new google.maps.Map(pickerMapContainer, {
-            center: initialPosition,
-            zoom: 18,
-            mapTypeId: 'roadmap',
-            disableDefaultUI: true,
-            zoomControl: false,
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: false,
-            gestureHandling: 'greedy', // Permite arrastar facilmente
-            clickableIcons: false
+    selectedLocation = initialPosition;
+
+    // Criar marcador arrastável
+    const markerDiv = document.createElement('div');
+    markerDiv.innerHTML = createDraggableMarkerSVG();
+    markerDiv.style.cursor = 'grab';
+
+    if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+        locationPickerMarker = new google.maps.marker.AdvancedMarkerElement({
+            map: map,
+            position: initialPosition,
+            content: markerDiv,
+            gmpDraggable: true,
+            title: "Arraste para posicionar"
         });
 
-        // Atualizar coordenadas quando o mapa é arrastado
-        pickerMap.addListener('center_changed', () => {
-            updatePickerCoords();
+        // Listener de arrasto
+        locationPickerMarker.addListener('drag', () => {
+            const pos = locationPickerMarker.position;
+            selectedLocation = { lat: pos.lat, lng: pos.lng };
+            updatePickerCoordsDisplay();
+            markerDiv.style.cursor = 'grabbing';
         });
 
-        // Detectar início do arrasto
-        pickerMap.addListener('dragstart', () => {
-            pickerIsDragging = true;
-            pickerCenterMarker.classList.add('dragging');
-            locationPickerSection.classList.add('active');
+        locationPickerMarker.addListener('dragend', () => {
+            const pos = locationPickerMarker.position;
+            selectedLocation = { lat: pos.lat, lng: pos.lng };
+            updatePickerCoordsDisplay();
+            markerDiv.style.cursor = 'grab';
+
+            // Centralizar mapa suavemente no marcador
+            map.panTo(selectedLocation);
+        });
+    } else {
+        // Fallback para Marker clássico
+        locationPickerMarker = new google.maps.Marker({
+            map: map,
+            position: initialPosition,
+            draggable: true,
+            icon: {
+                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(createDraggableMarkerSVG()),
+                anchor: new google.maps.Point(24, 58),
+                scaledSize: new google.maps.Size(48, 60)
+            },
+            title: "Arraste para posicionar"
         });
 
-        // Detectar fim do arrasto
-        pickerMap.addListener('dragend', () => {
-            pickerIsDragging = false;
-            pickerCenterMarker.classList.remove('dragging');
-            updatePickerCoords();
-
-            // Feedback visual de que a posição foi atualizada
-            pickerCoords.classList.add('updated');
-            setTimeout(() => {
-                pickerCoords.classList.remove('updated');
-            }, 1500);
+        locationPickerMarker.addListener('drag', () => {
+            const pos = locationPickerMarker.getPosition();
+            selectedLocation = { lat: pos.lat(), lng: pos.lng() };
+            updatePickerCoordsDisplay();
         });
 
-        // Atualizar coordenadas iniciais
-        selectedLocation = initialPosition;
-        updatePickerCoords();
-
-        // Esconder loading
-        pickerLoading.classList.add('hidden');
-        pickerInitialized = true;
-
-        console.log('✅ [PICKER] Mapa do picker inicializado em:', initialPosition);
-
-    } catch (error) {
-        console.error('❌ [PICKER] Erro ao inicializar mapa:', error);
-        pickerCoords.textContent = 'Erro ao carregar mapa';
+        locationPickerMarker.addListener('dragend', () => {
+            const pos = locationPickerMarker.getPosition();
+            selectedLocation = { lat: pos.lat(), lng: pos.lng() };
+            updatePickerCoordsDisplay();
+            map.panTo(selectedLocation);
+        });
     }
+
+    // Centralizar mapa na posição inicial
+    map.panTo(initialPosition);
+    map.setZoom(18);
+
+    // Mostrar UI
+    locationPickerBar.classList.add('active');
+    locationPickerOverlay.classList.add('active');
+    btnConfirmLocation.classList.add('active');
+    btnCancelLocation.classList.add('active');
+
+    // Esconder outros controles
+    const mapControl = document.querySelector('.map-control');
+    const statusBar = document.getElementById('status-bar');
+    const btnAddClientEl = document.getElementById('btn-add-client');
+
+    if (mapControl) mapControl.style.opacity = '0';
+    if (statusBar) statusBar.style.opacity = '0';
+    if (btnAddClientEl) btnAddClientEl.style.opacity = '0';
+
+    // Atualizar coordenadas
+    updatePickerCoordsDisplay();
+
+    console.log('📍 [PICKER] Modo de seleção de localização ativado');
+
+    showToast(
+        'Modo de seleção',
+        'Arraste o marcador azul para a posição exata do cliente',
+        'info',
+        4000
+    );
 }
 
-// Atualizar as coordenadas exibidas
-function updatePickerCoords() {
-    if (!pickerMap) return;
+// Desativar modo de seleção
+function deactivateLocationPicker(confirmed = false) {
+    if (!isLocationPickerActive) return;
 
-    const center = pickerMap.getCenter();
-    selectedLocation = {
-        lat: center.lat(),
-        lng: center.lng()
-    };
+    isLocationPickerActive = false;
 
-    pickerCoords.textContent = `${selectedLocation.lat.toFixed(6)}, ${selectedLocation.lng.toFixed(6)}`;
-}
-
-// Centralizar picker na posição GPS atual
-function centerPickerOnGPS() {
-    let currentPosition = null;
-
-    if (gpsTracker && gpsTracker.markerCoords.lat !== 0) {
-        currentPosition = {
-            lat: gpsTracker.markerCoords.lat,
-            lng: gpsTracker.markerCoords.lng
-        };
-    } else if (userLocationMarker) {
-        const pos = userLocationMarker.position || userLocationMarker.getPosition();
-        if (pos) {
-            currentPosition = { lat: pos.lat, lng: pos.lng };
+    // Remover marcador
+    if (locationPickerMarker) {
+        if (locationPickerMarker.map !== undefined) {
+            locationPickerMarker.map = null; // AdvancedMarkerElement
+        } else if (locationPickerMarker.setMap) {
+            locationPickerMarker.setMap(null); // Marker clássico
         }
+        locationPickerMarker = null;
     }
 
-    if (currentPosition && pickerMap) {
-        pickerMap.panTo(currentPosition);
-        selectedLocation = currentPosition;
-        updatePickerCoords();
+    // Esconder UI
+    locationPickerBar.classList.remove('active');
+    locationPickerOverlay.classList.remove('active');
+    btnConfirmLocation.classList.remove('active');
+    btnCancelLocation.classList.remove('active');
+
+    // Mostrar controles novamente
+    const mapControl = document.querySelector('.map-control');
+    const statusBar = document.getElementById('status-bar');
+    const btnAddClientEl = document.getElementById('btn-add-client');
+
+    if (mapControl) mapControl.style.opacity = '1';
+    if (statusBar) statusBar.style.opacity = '1';
+    if (btnAddClientEl) btnAddClientEl.style.opacity = '1';
+
+    // Executar callback se confirmou
+    if (confirmed && locationPickerCallback && selectedLocation) {
+        locationPickerCallback(selectedLocation);
+    }
+
+    locationPickerCallback = null;
+
+    console.log('📍 [PICKER] Modo de seleção de localização desativado', confirmed ? '(confirmado)' : '(cancelado)');
+}
+
+// Atualizar coordenadas na barra
+function updatePickerCoordsDisplay() {
+    if (pickerCoordsDisplay && selectedLocation) {
+        pickerCoordsDisplay.textContent = `${selectedLocation.lat.toFixed(5)}, ${selectedLocation.lng.toFixed(5)}`;
+    }
+}
+
+// Resetar o picker (compatibilidade)
+function resetLocationPicker() {
+    deactivateLocationPicker(false);
+    selectedLocation = null;
+}
+
+// Event listeners dos botões
+if (btnConfirmLocation) {
+    btnConfirmLocation.addEventListener('click', () => {
+        deactivateLocationPicker(true);
+    });
+}
+
+if (btnCancelLocation) {
+    btnCancelLocation.addEventListener('click', () => {
+        deactivateLocationPicker(false);
+
+        // Reabrir modal se estava aberto antes
+        const modalEl = document.getElementById('modal-add-client');
+        if (modalEl) {
+            modalEl.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
 
         showToast(
-            'Centralizado no GPS',
-            'Arraste o mapa para ajustar a posição',
-            'success',
+            'Seleção cancelada',
+            'A posição será definida pelo GPS atual',
+            'info',
             2000
         );
-    } else {
-        showToast(
-            'GPS indisponível',
-            'Não foi possível obter sua localização',
-            'warning',
-            3000
-        );
-    }
-}
-
-// Resetar o picker quando o modal fechar
-function resetLocationPicker() {
-    selectedLocation = null;
-    pickerIsDragging = false;
-    locationPickerSection.classList.remove('active');
-
-    if (pickerCoords) {
-        pickerCoords.textContent = 'Aguardando GPS...';
-        pickerCoords.classList.remove('updated');
-    }
-
-    if (pickerCenterMarker) {
-        pickerCenterMarker.classList.remove('dragging');
-    }
-
-    if (pickerLoading) {
-        pickerLoading.classList.remove('hidden');
-    }
-}
-
-// Event listener do botão "Meu GPS"
-if (btnCenterPicker) {
-    btnCenterPicker.addEventListener('click', (e) => {
-        e.preventDefault();
-        centerPickerOnGPS();
     });
 }
 
@@ -6577,12 +6659,6 @@ async function openModal() {
     // Popular lista de endereços da planilha
     populateAddressSelect();
 
-    // Inicializar seletor de localização no mapa
-    // Aguardar um pequeno delay para o modal renderizar
-    setTimeout(() => {
-        initLocationPicker();
-    }, 300);
-
     // Verificar se câmera está disponível
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         showToast(
@@ -6646,6 +6722,13 @@ function resetForm() {
     // Resetar seletor de localização
     resetLocationPicker();
 
+    // Resetar botão de ajuste de localização
+    const locStatusEl = document.getElementById('location-status');
+    if (locStatusEl) {
+        locStatusEl.textContent = 'GPS atual';
+        locStatusEl.classList.remove('adjusted');
+    }
+
     // Resetar dropdown customizado de endereço manual
     if (addressDropdown) {
         addressDropdown.classList.remove('open');
@@ -6687,6 +6770,48 @@ modal.addEventListener('click', (e) => {
         closeModal();
     }
 });
+
+// ===========================
+// BOTÃO AJUSTAR LOCALIZAÇÃO NO MAPA
+// ===========================
+const btnAdjustLocation = document.getElementById('btn-adjust-location');
+const locationStatusEl = document.getElementById('location-status');
+
+if (btnAdjustLocation) {
+    btnAdjustLocation.addEventListener('click', () => {
+        // Fechar modal temporariamente
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+
+        // Parar câmera
+        stopCamera();
+
+        // Ativar modo de seleção de localização
+        activateLocationPicker((confirmedLocation) => {
+            // Callback quando usuário confirmar a localização
+            selectedLocation = confirmedLocation;
+
+            // Atualizar status visual no botão
+            if (locationStatusEl) {
+                locationStatusEl.textContent = '✓ Ajustado';
+                locationStatusEl.classList.add('adjusted');
+            }
+
+            // Reabrir modal
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+
+            showToast(
+                'Localização definida!',
+                `${confirmedLocation.lat.toFixed(5)}, ${confirmedLocation.lng.toFixed(5)}`,
+                'success',
+                3000
+            );
+
+            console.log('📍 Localização ajustada manualmente:', confirmedLocation);
+        });
+    });
+}
 
 // ===========================
 // MÁSCARA DE TELEFONE
