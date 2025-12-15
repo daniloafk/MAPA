@@ -3847,8 +3847,8 @@ class GPSTracker {
             targetAccuracy: 50,         // Meta relaxada para veículo
             historySize: 1,             // Sem histórico - usar última leitura
             highAccuracy: true,
-            timeout: 30000,             // Timeout 30s para não perder leituras
-            maximumAge: 0,              // Sempre dados frescos
+            timeout: 8000,              // Timeout 8s para resposta rápida
+            maximumAge: 5000,           // Aceita dados de até 5s atrás
             minReadingsForStable: 1     // 1 leitura é suficiente
         };
     }
@@ -4543,12 +4543,35 @@ window.initMap = function () {
 async function startLocationTracking() {
     console.log('✅ [MODULAR] Iniciando GPS Tracker...');
 
+    // Timeout de segurança: libera a tela em 10 segundos mesmo se GPS travar
+    const gpsTimeout = setTimeout(() => {
+        console.warn('⚠️ Timeout de GPS - liberando tela de loading');
+        hideLoadingScreen();
+        showAddClientButton();
+
+        // Centralizar em São Paulo como fallback
+        if (map && !userLocationMarker) {
+            map.setCenter({ lat: -23.5505, lng: -46.6333 });
+            map.setZoom(12);
+        }
+
+        showToast(
+            'GPS demorado',
+            'Continuando sem localização precisa. O GPS continuará tentando em segundo plano.',
+            'warning',
+            5000
+        );
+    }, 10000);
+
     try {
         // Criar instância do GPS Tracker modular
         gpsTracker = new GPSTracker();
 
         // Iniciar rastreamento
         const position = await gpsTracker.start();
+
+        // Limpar timeout - GPS respondeu a tempo
+        clearTimeout(gpsTimeout);
 
         console.log('✅ Posição obtida:', position.coords.latitude, position.coords.longitude);
 
@@ -4573,8 +4596,12 @@ async function startLocationTracking() {
         console.log('✅ GPS Tracker iniciado com sucesso!');
 
     } catch (error) {
+        // Limpar timeout em caso de erro
+        clearTimeout(gpsTimeout);
+
         console.error('❌ Erro ao iniciar GPS:', error);
         hideLoadingScreen();
+        showAddClientButton();
         handleGeoError(error, true);
     }
 }
