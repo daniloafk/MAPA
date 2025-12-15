@@ -9270,7 +9270,8 @@ async function activateRouteMode() {
     }
 
     // NOVO: Adicionar marcadores do Supabase SOMENTE quando clicar
-    await addDeliveryMarkers();
+    // skipMapAdjust = false para ajustar o mapa aos marcadores
+    await addDeliveryMarkers(false);
 
     // Rota otimizada desabilitada (Fleet Routing API quota esgotada)
     // await calculateOptimizedRouteFromDB(currentPosition);
