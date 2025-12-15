@@ -8174,6 +8174,111 @@ async function loadClients() {
     }
 }
 
+// ===========================
+// SUPABASE REALTIME - Sincronização entre navegadores
+// ===========================
+
+let clientsChannel = null;
+
+// Inicializar Realtime para sincronização automática
+function initRealtimeSync() {
+    // Remover canal anterior se existir
+    if (clientsChannel) {
+        supabase.removeChannel(clientsChannel);
+    }
+
+    // Criar canal para escutar mudanças na tabela clients
+    clientsChannel = supabase
+        .channel('clients-changes')
+        .on(
+            'postgres_changes',
+            {
+                event: '*', // Escutar INSERT, UPDATE, DELETE
+                schema: 'public',
+                table: 'clients'
+            },
+            (payload) => {
+                console.log('📡 [REALTIME] Mudança detectada:', payload.eventType, payload);
+                handleRealtimeChange(payload);
+            }
+        )
+        .subscribe((status) => {
+            console.log('📡 [REALTIME] Status da conexão:', status);
+            if (status === 'SUBSCRIBED') {
+                console.log('✅ [REALTIME] Conectado - sincronização ativa');
+            }
+        });
+}
+
+// Processar mudanças recebidas via Realtime
+async function handleRealtimeChange(payload) {
+    const { eventType, new: newRecord, old: oldRecord } = payload;
+
+    switch (eventType) {
+        case 'INSERT':
+            console.log('📡 [REALTIME] Novo cliente adicionado:', newRecord);
+            // Recarregar lista de clientes
+            await loadClients();
+            showToast(
+                '📡 Sincronizado',
+                'Novo cliente adicionado em outro dispositivo',
+                'info',
+                2000
+            );
+            break;
+
+        case 'UPDATE':
+            console.log('📡 [REALTIME] Cliente atualizado:', newRecord);
+            // Atualizar marcador no mapa
+            updateClientMarkerOnMap(newRecord);
+            // Recarregar lista
+            await loadClients();
+            break;
+
+        case 'DELETE':
+            console.log('📡 [REALTIME] Cliente removido:', oldRecord);
+            // Remover marcador do mapa
+            removeClientMarkerFromMap(oldRecord.id);
+            // Recarregar lista
+            await loadClients();
+            showToast(
+                '📡 Sincronizado',
+                'Cliente removido em outro dispositivo',
+                'info',
+                2000
+            );
+            break;
+    }
+}
+
+// Atualizar marcador específico no mapa
+function updateClientMarkerOnMap(client) {
+    if (!client || !clientMarkers) return;
+
+    // Remover marcador antigo se existir
+    if (clientMarkers[client.id]) {
+        clientMarkers[client.id].map = null;
+        delete clientMarkers[client.id];
+    }
+
+    // Recarregar todos os marcadores para atualizar o status
+    // (mais simples e garante consistência)
+    if (typeof showClientMarkers === 'function') {
+        showClientMarkers();
+    }
+}
+
+// Remover marcador do mapa por ID do cliente
+function removeClientMarkerFromMap(clientId) {
+    if (!clientMarkers) return;
+
+    if (clientMarkers[clientId]) {
+        clientMarkers[clientId].map = null;
+        delete clientMarkers[clientId];
+        console.log('📍 Marcador removido do mapa:', clientId);
+    }
+}
+
 // Renderizar lista de clientes
 function renderClients(clients) {
     if (!clients || clients.length === 0) {
@@ -8911,6 +9016,9 @@ function escapeHtml(text) {
 // Carregar clientes ao inicializar e verificar se há dados da planilha
 setTimeout(async () => {
     loadClients();
+
+    // Inicializar sincronização em tempo real entre navegadores
+    initRealtimeSync();
 
     // Verificar se há dados da planilha salvos no Supabase
     try {
