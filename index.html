@@ -4772,8 +4772,8 @@ async function markAsDelivered(deliveries, client, marker, coordKey, deliveredBt
 
         // Toast removido - ação visual já indica o status
 
-        // Navegar para o próximo marcador mais próximo
-        await navigateToNextMarker(currentMarkerPosition);
+        // Redirecionamento automático desativado
+        // await navigateToNextMarker(currentMarkerPosition);
 
     } catch (error) {
         console.error('Erro ao marcar entregas:', error);
