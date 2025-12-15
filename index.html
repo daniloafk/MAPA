@@ -6264,10 +6264,26 @@ async function addDeliveryMarkers(skipMapAdjust = false) {
 
     // Ajustar mapa para mostrar todos os marcadores (apenas se não for atualização de status)
     if (!skipMapAdjust && !bounds.isEmpty()) {
-        map.fitBounds(bounds, {
-            padding: 80 // Adicionar margem de 80px ao redor
-        });
-        console.log('🗺️ Mapa ajustado para mostrar todos os marcadores');
+        // Primeiro centralizar no centro dos bounds
+        const center = bounds.getCenter();
+        map.panTo(center);
+
+        // Usar setTimeout para garantir que o mapa processe corretamente após pan
+        setTimeout(() => {
+            // fitBounds com padding simples (número)
+            map.fitBounds(bounds, 80);
+
+            // Limitar zoom máximo para não ficar muito próximo
+            google.maps.event.addListenerOnce(map, 'idle', () => {
+                const currentZoom = map.getZoom();
+                console.log(`🗺️ Zoom atual após fitBounds: ${currentZoom}`);
+                if (currentZoom > 16) {
+                    map.setZoom(16);
+                }
+            });
+
+            console.log('🗺️ Mapa centralizado e ajustado para mostrar todos os marcadores');
+        }, 100);
     }
 
     // Mostrar toast com estatísticas
