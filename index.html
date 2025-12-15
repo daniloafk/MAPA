@@ -3259,6 +3259,12 @@ function startNavigationMode(destination, destinationName, marker = null, infoWi
         btnAddClient.style.display = 'none';
     }
 
+    // Ocultar botão cadastro rápido
+    const btnQuickRegister = document.getElementById('btn-quick-register');
+    if (btnQuickRegister) {
+        btnQuickRegister.style.display = 'none';
+    }
+
     // Mostrar toast informativo
     showToast(
         '🧭 Navegação ativa',
@@ -3305,6 +3311,12 @@ function stopNavigationMode() {
     const btnAddClient = document.getElementById('btn-add-client');
     if (btnAddClient) {
         btnAddClient.style.display = 'flex';
+    }
+
+    // Mostrar botão cadastro rápido novamente
+    const btnQuickRegister = document.getElementById('btn-quick-register');
+    if (btnQuickRegister) {
+        btnQuickRegister.style.display = 'flex';
     }
 
     // Limpar linha azul do trajeto
@@ -8384,43 +8396,30 @@ async function handleDeliveryStatusChange(payload) {
     console.log(`📦 [REALTIME-DELIVERY] SPX TN: ${spxTn}`);
     console.log(`📦 [REALTIME-DELIVERY] Novo status: ${newStatus}`);
 
-    // Encontrar o marcador correspondente e atualizar seu visual diretamente
-    // (sem recarregar todos os marcadores para evitar piscar)
-    const markerKey = Object.keys(deliveryMarkers).find(key => {
-        const marker = deliveryMarkers[key];
-        if (marker && marker.deliveries) {
-            return marker.deliveries.some(d => d.spx_tn === spxTn);
-        }
-        return false;
-    });
+    // Encontrar o cliente associado a este SPX TN
+    const clientToUpdate = allClients.find(c => c.spx_tn === spxTn);
 
-    if (markerKey && deliveryMarkers[markerKey]) {
-        const marker = deliveryMarkers[markerKey];
+    // Pequeno delay para garantir que o banco já processou a atualização
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-        if (newStatus === 'delivered' || newStatus === 'not_delivered') {
-            // Aplicar visual de entregue/não entregue
-            if (marker.content) {
-                marker.content.style.opacity = '0.4';
-                marker.content.style.filter = 'grayscale(100%)';
-                const pinDiv = marker.content.querySelector('div');
-                if (pinDiv) {
-                    pinDiv.style.background = '#9E9E9E';
-                }
-            }
-            marker.isDelivered = true;
-        } else {
-            // Restaurar visual original
-            if (marker.content) {
-                marker.content.style.opacity = '1';
-                marker.content.style.filter = 'none';
-            }
-            marker.isDelivered = false;
-        }
-
-        console.log(`📦 [REALTIME-DELIVERY] Marcador atualizado: ${spxTn} → ${newStatus}`);
-    } else {
-        console.log(`📦 [REALTIME-DELIVERY] Marcador não encontrado para: ${spxTn}`);
+    // Recarregar marcadores de entrega (verdes/vermelhos) para refletir novo status
+    // skipMapAdjust = true para não mover o mapa
+    if (typeof addDeliveryMarkers === 'function') {
+        console.log('📦 [REALTIME-DELIVERY] Recarregando marcadores de entrega...');
+        await addDeliveryMarkers(true);
     }
+
+    // Mostrar notificação
+    const statusText = newStatus === 'delivered' ? '✅ Entregue' :
+                      newStatus === 'not_delivered' ? '❌ Não Entregue' :
+                      '📦 Pendente';
+
+    const clientName = clientToUpdate ?
+        (clientToUpdate.name || clientToUpdate.address?.substring(0, 30) || spxTn) :
+        spxTn;
+
+    // Toast removido para evitar poluição visual - status é atualizado silenciosamente
+    console.log(`📦 [REALTIME-DELIVERY] ${clientName} → ${statusText}`);
 }
 
 // Atualizar marcador específico no mapa
