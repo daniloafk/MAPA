@@ -8182,32 +8182,58 @@ let clientsChannel = null;
 
 // Inicializar Realtime para sincronização automática
 function initRealtimeSync() {
+    console.log('📡 [REALTIME] Iniciando configuração...');
+
     // Remover canal anterior se existir
     if (clientsChannel) {
+        console.log('📡 [REALTIME] Removendo canal anterior...');
         supabase.removeChannel(clientsChannel);
     }
 
-    // Criar canal para escutar mudanças na tabela clients
-    clientsChannel = supabase
-        .channel('clients-changes')
-        .on(
-            'postgres_changes',
-            {
-                event: '*', // Escutar INSERT, UPDATE, DELETE
-                schema: 'public',
-                table: 'clients'
-            },
-            (payload) => {
-                console.log('📡 [REALTIME] Mudança detectada:', payload.eventType, payload);
-                handleRealtimeChange(payload);
-            }
-        )
-        .subscribe((status) => {
-            console.log('📡 [REALTIME] Status da conexão:', status);
-            if (status === 'SUBSCRIBED') {
-                console.log('✅ [REALTIME] Conectado - sincronização ativa');
-            }
-        });
+    try {
+        // Criar canal para escutar mudanças na tabela clients
+        clientsChannel = supabase
+            .channel('clients-realtime-channel')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*', // Escutar INSERT, UPDATE, DELETE
+                    schema: 'public',
+                    table: 'clients'
+                },
+                (payload) => {
+                    console.log('📡 [REALTIME] ========================================');
+                    console.log('📡 [REALTIME] MUDANÇA DETECTADA!');
+                    console.log('📡 [REALTIME] Tipo:', payload.eventType);
+                    console.log('📡 [REALTIME] Dados novos:', JSON.stringify(payload.new));
+                    console.log('📡 [REALTIME] Dados antigos:', JSON.stringify(payload.old));
+                    console.log('📡 [REALTIME] ========================================');
+                    handleRealtimeChange(payload);
+                }
+            )
+            .subscribe((status, err) => {
+                console.log('📡 [REALTIME] Status da conexão:', status);
+                if (err) {
+                    console.error('❌ [REALTIME] Erro na subscrição:', err);
+                }
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ [REALTIME] Conectado com sucesso - sincronização ativa!');
+                    showToast('📡 Realtime ativo', 'Sincronização entre dispositivos habilitada', 'success', 3000);
+                } else if (status === 'CHANNEL_ERROR') {
+                    console.error('❌ [REALTIME] Erro no canal');
+                    showToast('❌ Erro Realtime', 'Verifique se Realtime está habilitado no Supabase', 'error', 5000);
+                } else if (status === 'TIMED_OUT') {
+                    console.error('❌ [REALTIME] Timeout na conexão');
+                } else if (status === 'CLOSED') {
+                    console.warn('⚠️ [REALTIME] Canal fechado');
+                }
+            });
+
+        console.log('📡 [REALTIME] Canal criado, aguardando conexão...');
+
+    } catch (error) {
+        console.error('❌ [REALTIME] Erro ao inicializar:', error);
+    }
 }
 
 // Processar mudanças recebidas via Realtime
