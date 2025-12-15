@@ -538,8 +538,29 @@
         background: linear-gradient(135deg, #00a884 0%, #00b8b0 100%);
     }
 
-    /* Modo Cadastro Rápido - esconder formulário */
-    .modal-overlay.quick-mode .form-section {
+    /* Modo Cadastro Rápido - esconder campos de nome e telefone */
+    .modal-overlay.quick-mode #input-name,
+    .modal-overlay.quick-mode #input-phone,
+    .modal-overlay.quick-mode label[for="input-name"],
+    .modal-overlay.quick-mode label[for="input-phone"] {
+        display: none !important;
+    }
+
+    /* Esconder os form-groups de nome e telefone inteiros */
+    .modal-overlay.quick-mode .form-group:has(#input-name),
+    .modal-overlay.quick-mode .form-group:has(#input-phone) {
+        display: none !important;
+    }
+
+    /* Esconder também o botão Salvar e o botão de ajustar localização */
+    .modal-overlay.quick-mode #btn-save,
+    .modal-overlay.quick-mode #btn-adjust-location,
+    .modal-overlay.quick-mode .location-hint {
+        display: none !important;
+    }
+
+    /* Esconder form-group do botão de ajustar localização */
+    .modal-overlay.quick-mode .form-group:has(#btn-adjust-location) {
         display: none !important;
     }
 
@@ -6830,6 +6851,14 @@ function closeModal() {
     // Restaurar formulário normal (caso esteja mostrando painel de atualização)
     showNormalRegistrationForm();
 
+    // Restaurar visibilidade dos campos escondidos pelo modo rápido
+    const formGroups = modal.querySelectorAll('.form-group');
+    formGroups.forEach(group => {
+        group.style.display = '';
+    });
+    const btnSaveEl = modal.querySelector('#btn-save');
+    if (btnSaveEl) btnSaveEl.style.display = '';
+
     // Restaurar título do modal se estava no modo rápido
     const modalTitle = modal.querySelector('.modal-header h3');
     if (modalTitle) {
@@ -7789,6 +7818,18 @@ function openQuickRegisterModal() {
     // Adicionar classe para estilização diferenciada
     modal.classList.add('quick-mode');
 
+    // Esconder campos de nome e telefone via JavaScript (fallback para navegadores sem :has())
+    const formGroups = modal.querySelectorAll('.form-group');
+    formGroups.forEach(group => {
+        if (group.querySelector('#input-name') || group.querySelector('#input-phone') || group.querySelector('#btn-adjust-location')) {
+            group.style.display = 'none';
+        }
+    });
+
+    // Esconder botão Salvar
+    const btnSaveEl = modal.querySelector('#btn-save');
+    if (btnSaveEl) btnSaveEl.style.display = 'none';
+
     // Alterar título do modal
     const modalTitle = modal.querySelector('.modal-header h3');
     if (modalTitle) {
@@ -7813,6 +7854,16 @@ function closeQuickRegisterMode() {
 
     // Remover classe de estilização
     modal.classList.remove('quick-mode');
+
+    // Restaurar visibilidade dos campos escondidos via JavaScript
+    const formGroups = modal.querySelectorAll('.form-group');
+    formGroups.forEach(group => {
+        group.style.display = '';
+    });
+
+    // Restaurar botão Salvar
+    const btnSaveEl = modal.querySelector('#btn-save');
+    if (btnSaveEl) btnSaveEl.style.display = '';
 
     // Restaurar título do modal
     const modalTitle = modal.querySelector('.modal-header h3');
