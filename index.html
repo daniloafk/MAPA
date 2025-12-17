@@ -6963,6 +6963,9 @@ function showAddClientButton() {
 
 // Abrir modal
 async function openModal() {
+    // 🔥 IMPORTANTE: Resetar formulário ao abrir para limpar dados anteriores
+    resetForm();
+
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
 
@@ -8037,6 +8040,10 @@ const btnQuickRegister = document.getElementById('btn-quick-register');
 
 // Abrir modal no modo cadastro rápido (usa o mesmo modal, mas esconde formulário)
 function openQuickRegisterModal() {
+    // 🔥 IMPORTANTE: Resetar formulário primeiro para limpar dados anteriores
+    resetForm();
+
+    // Definir modo rápido APÓS o reset
     isQuickRegisterMode = true;
     quickRegisterAddressData = null;
 
@@ -8062,8 +8069,17 @@ function openQuickRegisterModal() {
         modalTitle.innerHTML = '⚡ Cadastro Rápido';
     }
 
-    // Abrir modal normalmente
-    openModal();
+    // Abrir modal (sem resetar novamente, já resetamos acima)
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    // Popular lista de endereços da planilha
+    populateAddressSelect();
+
+    // Iniciar câmera
+    startCamera().catch(error => {
+        console.error('Erro ao abrir câmera:', error);
+    });
 
     showToast(
         '⚡ Modo Rápido',
