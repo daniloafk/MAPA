@@ -3392,6 +3392,11 @@ async function markAsNotDelivered(marker, client, notDeliveredBtn = null) {
         }
 
         if (deliveryIds.length > 0) {
+            // 🔥 Marcar todos os SPX TNs como recentemente atualizados para evitar conflito com Realtime
+            deliveries.forEach(d => {
+                if (d.spx_tn) markAsRecentlyUpdated(d.spx_tn);
+            });
+
             // Atualizar status no Supabase para cada entrega
             // Apenas status, sem not_delivered_at (coluna pode não existir)
             const { data, error } = await supabase
@@ -4693,6 +4698,11 @@ async function markAsDelivered(deliveries, client, marker, coordKey, deliveredBt
         console.log('🔍 Client:', client);
         console.log('🔍 Marker:', marker);
 
+        // 🔥 Marcar todos os SPX TNs como recentemente atualizados para evitar conflito com Realtime
+        deliveries.forEach(d => {
+            if (d.spx_tn) markAsRecentlyUpdated(d.spx_tn);
+        });
+
         // Atualizar status no Supabase para cada entrega
         const deliveryIds = deliveries.map(d => d.id);
         console.log('🔍 IDs das entregas:', deliveryIds);
@@ -4830,6 +4840,11 @@ async function undoDelivery(marker, deliveredBtn) {
         const { deliveries, client, coordKey, isGreen } = marker.originalState;
         console.log('↩ Desfazendo marcação de entrega:', deliveries);
 
+        // 🔥 Marcar todos os SPX TNs como recentemente atualizados para evitar conflito com Realtime
+        deliveries.forEach(d => {
+            if (d.spx_tn) markAsRecentlyUpdated(d.spx_tn);
+        });
+
         // Atualizar status no Supabase de volta para pending
         const deliveryIds = deliveries.map(d => d.id);
 
@@ -4917,6 +4932,11 @@ async function undoNotDelivered(marker, notDeliveredBtn) {
 
         const { deliveries, client, coordKey, isGreen } = marker.originalState;
         console.log('↩ Desfazendo marcação de NÃO entregue:', deliveries);
+
+        // 🔥 Marcar todos os SPX TNs como recentemente atualizados para evitar conflito com Realtime
+        deliveries.forEach(d => {
+            if (d.spx_tn) markAsRecentlyUpdated(d.spx_tn);
+        });
 
         // Atualizar status no Supabase de volta para pending
         const deliveryIds = deliveries.map(d => d.id);
@@ -8553,6 +8573,10 @@ async function handleRealtimeChange(payload) {
     }
 }
 
+// 🔥 Set para rastrear marcadores que foram atualizados localmente recentemente
+// Isso evita que o Realtime tente atualizar novamente e cause bugs visuais
+const recentlyUpdatedMarkers = new Set();
+
 // Processar mudanças de status de entrega (delivery_data)
 async function handleDeliveryStatusChange(payload) {
     const { new: newRecord } = payload;
@@ -8565,6 +8589,12 @@ async function handleDeliveryStatusChange(payload) {
 
     console.log(`📦 [REALTIME-DELIVERY] SPX TN: ${spxTn}`);
     console.log(`📦 [REALTIME-DELIVERY] Novo status: ${newStatus}`);
+
+    // 🔥 VERIFICAR: Se este marcador foi atualizado localmente nos últimos 3 segundos, ignorar
+    if (recentlyUpdatedMarkers.has(spxTn)) {
+        console.log(`📦 [REALTIME-DELIVERY] Ignorando - marcador ${spxTn} foi atualizado localmente recentemente`);
+        return;
+    }
 
     // 🔥 OTIMIZAÇÃO: Atualizar apenas o marcador específico em vez de recarregar todos
     const markerUpdated = updateSpecificDeliveryMarker(spxTn, newStatus, newRecord);
@@ -8582,6 +8612,15 @@ async function handleDeliveryStatusChange(payload) {
 
     // Toast removido para evitar poluição visual - status é atualizado silenciosamente
     console.log(`📦 [REALTIME-DELIVERY] ${spxTn} → ${statusText}`);
+}
+
+// Função para marcar um SPX TN como recentemente atualizado localmente
+function markAsRecentlyUpdated(spxTn) {
+    recentlyUpdatedMarkers.add(spxTn);
+    // Remover após 3 segundos
+    setTimeout(() => {
+        recentlyUpdatedMarkers.delete(spxTn);
+    }, 3000);
 }
 
 // 🔥 NOVA FUNÇÃO: Atualizar apenas um marcador específico sem recarregar todos
