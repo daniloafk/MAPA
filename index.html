@@ -6820,11 +6820,24 @@ function selectDropdownItem(item) {
         modal.classList.remove('quick-mode');
         document.body.style.overflow = '';
 
-        // 🔥 CORREÇÃO: Sempre limpar selectedLocation antes de abrir o picker
-        // Isso evita o bug de salvar diretamente sem mostrar o picker
-        selectedLocation = null;
+        // 🔥 VERIFICAR: Se já ajustou location picker antes, salvar diretamente
+        if (selectedLocation && selectedLocation.lat && selectedLocation.lng) {
+            console.log('⚡ Cadastro rápido (lista) com localização pré-ajustada');
+            showToast(
+                '⚡ Salvando com localização ajustada',
+                'Usando a posição definida anteriormente',
+                'success',
+                2000
+            );
+            saveQuickClient(addressDataToSave, selectedLocation).then(() => {
+                closeQuickRegisterMode();
+                selectedLocation = null; // Limpar após usar
+            });
+            console.log(`⚡ Cadastro rápido: ${address}`);
+            return;
+        }
 
-        // Sempre iniciar picker de localização com callback para salvar
+        // Se não tem localização pré-ajustada, abrir picker
         setTimeout(() => {
             activateLocationPicker(async (confirmedLocation) => {
                 await saveQuickClient(addressDataToSave, confirmedLocation);
@@ -6858,10 +6871,43 @@ function selectDropdownItem(item) {
     // Parar câmera (não precisa mais escanear)
     stopCamera();
 
-    // Limpar selectedLocation - será definida pelo picker OU usará GPS no salvamento
-    selectedLocation = null;
+    // 🔥 VERIFICAR: Se já ajustou location picker antes, salvar diretamente
+    if (selectedLocation && selectedLocation.lat && selectedLocation.lng) {
+        console.log('⚡ Localização já ajustada previamente, salvando diretamente...');
 
-    // Mostrar endereço selecionado e aguardar ação do usuário
+        // Mostrar endereço selecionado
+        addressDisplay.classList.add('active');
+        addressText.textContent = address;
+
+        showToast(
+            '⚡ Salvando com localização ajustada',
+            'Usando a posição definida anteriormente',
+            'success',
+            2000
+        );
+
+        // Submeter o formulário automaticamente após pequeno delay
+        setTimeout(() => {
+            // Verificar se precisa de nome (modo normal exige)
+            if (!inputName.value.trim()) {
+                inputName.focus();
+                showToast(
+                    '✏️ Preencha o nome',
+                    'Digite o nome do cliente para salvar',
+                    'info',
+                    3000
+                );
+            } else {
+                // Se já tem nome, submeter automaticamente
+                form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            }
+        }, 300);
+
+        console.log(`✅ Endereço selecionado manualmente com localização pré-ajustada: ${qrCode}`);
+        return;
+    }
+
+    // Se não tem localização pré-ajustada, mostrar endereço e aguardar ação do usuário
     addressDisplay.classList.add('active');
     addressText.textContent = address;
 
@@ -7497,11 +7543,23 @@ async function handleQRCodeResult(qrData) {
             modal.classList.remove('quick-mode');
             document.body.style.overflow = '';
 
-            // 🔥 CORREÇÃO: Sempre limpar selectedLocation antes de abrir o picker
-            // Isso evita o bug de salvar diretamente sem mostrar o picker
-            selectedLocation = null;
+            // 🔥 VERIFICAR: Se já ajustou location picker antes, salvar diretamente
+            if (selectedLocation && selectedLocation.lat && selectedLocation.lng) {
+                console.log('⚡ Cadastro rápido via QR com localização pré-ajustada');
+                showToast(
+                    '⚡ Salvando com localização ajustada',
+                    'Usando a posição definida anteriormente',
+                    'success',
+                    2000
+                );
+                saveQuickClient(addressDataToSave, selectedLocation).then(() => {
+                    closeQuickRegisterMode();
+                    selectedLocation = null; // Limpar após usar
+                });
+                return;
+            }
 
-            // Sempre iniciar picker de localização com callback para salvar
+            // Se não tem localização pré-ajustada, abrir picker
             setTimeout(() => {
                 activateLocationPicker(async (confirmedLocation) => {
                     await saveQuickClient(addressDataToSave, confirmedLocation);
@@ -7523,10 +7581,43 @@ async function handleQRCodeResult(qrData) {
         // Parar câmera
         stopCamera();
 
-        // Limpar selectedLocation - será definida pelo picker OU usará GPS no salvamento
-        selectedLocation = null;
+        // 🔥 VERIFICAR: Se já ajustou location picker antes, salvar diretamente
+        if (selectedLocation && selectedLocation.lat && selectedLocation.lng) {
+            console.log('⚡ Localização já ajustada previamente (QR Code), salvando diretamente...');
 
-        // Mostrar formulário normal e aguardar ação do usuário
+            // Mostrar formulário normal
+            showNormalRegistrationForm();
+
+            addressText.textContent = addressData.address;
+            addressDisplay.classList.add('active');
+
+            showToast(
+                '⚡ Salvando com localização ajustada',
+                'Usando a posição definida anteriormente',
+                'success',
+                2000
+            );
+
+            // Submeter o formulário automaticamente após pequeno delay
+            setTimeout(() => {
+                // Verificar se precisa de nome (modo normal exige)
+                if (!inputName.value.trim()) {
+                    inputName.focus();
+                    showToast(
+                        '✏️ Preencha o nome',
+                        'Digite o nome do cliente para salvar',
+                        'info',
+                        3000
+                    );
+                } else {
+                    // Se já tem nome, submeter automaticamente
+                    form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                }
+            }, 300);
+            return;
+        }
+
+        // Se não tem localização pré-ajustada, mostrar formulário e aguardar ação do usuário
         showNormalRegistrationForm();
 
         addressText.textContent = addressData.address;
