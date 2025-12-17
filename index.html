@@ -2449,7 +2449,8 @@
     const SUPABASE_URL = "https://dctlgztkqtktxnmiuqgr.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjdGxnenRrcXRrdHhubWl1cWdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2MzMwNDIsImV4cCI6MjA4MDIwOTA0Mn0.Ctlx8A4QBFxa7Iu6fObw_OthHfA2XrzY47UiMMIhbIU";
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Criar cliente Supabase e disponibilizar globalmente
+    window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // Dados da planilha Excel - Mapeamento de QR codes para endereços
     const addressDatabase = {
@@ -3049,6 +3050,10 @@
 /* ===========================
    GLOBAL VARIABLES
    =========================== */
+
+// Referência ao cliente Supabase (criado no script anterior)
+const supabase = window.supabaseClient;
+
 let map;
 let is3D = false;
 let routeMode = false;
@@ -4485,19 +4490,8 @@ window.initMap = function () {
             minZoom: 3, // Permite zoom global
             maxZoom: 22, // Zoom máximo detalhado
             // 🔥 Desabilitar prédios 3D para melhor performance
-            isFractionalZoomEnabled: false,
-            // Estilos para esconder prédios 3D e deixar mapa mais leve
-            styles: [
-                {
-                    featureType: "poi",
-                    elementType: "labels",
-                    stylers: [{ visibility: "off" }]
-                },
-                {
-                    featureType: "transit",
-                    stylers: [{ visibility: "off" }]
-                }
-            ]
+            isFractionalZoomEnabled: false
+            // Nota: styles não pode ser usado com mapId - configure estilos na Cloud Console
         });
 
         // 🔥 Desabilitar renderização 3D de prédios (deixa mapa mais leve)
@@ -10516,7 +10510,7 @@ function startPackageScanning() {
 
                     console.log('✅ QR Code do pacote confirmado:', qrData);
 
-                    qrPackageStatus.textContent = '✅ Código detectado!';
+                    qrPackageStatus.textContent = '��� Código detectado!';
                     qrPackageStatus.classList.add('success');
 
                     // Buscar cliente pelo código QR
@@ -11878,7 +11872,7 @@ async function processSpreadsheetData(jsonData) {
 
         console.log(`📊 Análise de endereços:`);
         console.log(`   ✅ Cadastrados: ${matchedCount}`);
-        console.log(`   ⚠️ Não cadastrados: ${notRegisteredCount}`);
+        console.log(`   ���️ Não cadastrados: ${notRegisteredCount}`);
 
         // Armazenar endereços matched globalmente para uso posterior
         window.matchedAddressesFromSpreadsheet = Array.from(matchedAddresses);
