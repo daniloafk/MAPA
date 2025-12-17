@@ -3052,8 +3052,8 @@
    GLOBAL VARIABLES
    =========================== */
 
-// Cliente Supabase disponível via window.supabase (criado no script anterior)
-const supabase = window.supabase;
+// Nota: Cliente Supabase disponível via variável global 'supabase'
+// (criado no script anterior via window.supabase = ...)
 
 let map;
 let is3D = false;
@@ -10614,7 +10614,7 @@ async function findClientByQRCode(qrCode) {
                 const latDiff = Math.abs(client.latitude - deliveryData.latitude);
                 const lngDiff = Math.abs(client.longitude - deliveryData.longitude);
 
-                // Se diferen��a menor que 0.0001 graus (~11 metros), considera mesmo endereço
+                // Se diferença menor que 0.0001 graus (~11 metros), considera mesmo endereço
                 if (latDiff < 0.0001 && lngDiff < 0.0001) {
                     matchedClient = client;
                     break;
