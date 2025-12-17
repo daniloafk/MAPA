@@ -2449,8 +2449,9 @@
     const SUPABASE_URL = "https://dctlgztkqtktxnmiuqgr.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjdGxnenRrcXRrdHhubWl1cWdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2MzMwNDIsImV4cCI6MjA4MDIwOTA0Mn0.Ctlx8A4QBFxa7Iu6fObw_OthHfA2XrzY47UiMMIhbIU";
 
-    // Criar cliente Supabase e disponibilizar globalmente
-    window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Criar cliente Supabase e sobrescrever a referência global
+    // (após criar o cliente, não precisamos mais da biblioteca)
+    window.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // Dados da planilha Excel - Mapeamento de QR codes para endereços
     const addressDatabase = {
@@ -2546,7 +2547,7 @@
     "address": "Passg Santa Rita De Kace, 31\nBairro: Ariramba (Mosqueiro)\nBelém - 66914-110",
     "latitude": -1.1463585,
     "longitude": -48.4638905,
-    "city": "Belém",
+    "city": "Bel��m",
     "zipcode": "66914-110",
     "sequence": 12
   },
@@ -2658,7 +2659,7 @@
     "address": "Travessa Coronel José Mota, 263, Proximidade da Av 16 de Novemb\nBairro: Vila (Mosqueiro)\nBelém - 66910-680",
     "latitude": -1.1585106,
     "longitude": -48.4683007,
-    "city": "Belém",
+    "city": "Bel��m",
     "zipcode": "66910-680",
     "sequence": 26
   },
@@ -3051,8 +3052,8 @@
    GLOBAL VARIABLES
    =========================== */
 
-// Referência ao cliente Supabase (criado no script anterior)
-const supabase = window.supabaseClient;
+// Cliente Supabase disponível via window.supabase (criado no script anterior)
+const supabase = window.supabase;
 
 let map;
 let is3D = false;
@@ -10510,7 +10511,7 @@ function startPackageScanning() {
 
                     console.log('✅ QR Code do pacote confirmado:', qrData);
 
-                    qrPackageStatus.textContent = '��� Código detectado!';
+                    qrPackageStatus.textContent = '✅ Código detectado!';
                     qrPackageStatus.classList.add('success');
 
                     // Buscar cliente pelo código QR
@@ -10613,7 +10614,7 @@ async function findClientByQRCode(qrCode) {
                 const latDiff = Math.abs(client.latitude - deliveryData.latitude);
                 const lngDiff = Math.abs(client.longitude - deliveryData.longitude);
 
-                // Se diferença menor que 0.0001 graus (~11 metros), considera mesmo endereço
+                // Se diferen��a menor que 0.0001 graus (~11 metros), considera mesmo endereço
                 if (latDiff < 0.0001 && lngDiff < 0.0001) {
                     matchedClient = client;
                     break;
@@ -11872,7 +11873,7 @@ async function processSpreadsheetData(jsonData) {
 
         console.log(`📊 Análise de endereços:`);
         console.log(`   ✅ Cadastrados: ${matchedCount}`);
-        console.log(`   ���️ Não cadastrados: ${notRegisteredCount}`);
+        console.log(`   ⚠️ Não cadastrados: ${notRegisteredCount}`);
 
         // Armazenar endereços matched globalmente para uso posterior
         window.matchedAddressesFromSpreadsheet = Array.from(matchedAddresses);
