@@ -8433,17 +8433,13 @@ async function handleDeliveryStatusChange(payload) {
     console.log(`📦 [REALTIME-DELIVERY] SPX TN: ${spxTn}`);
     console.log(`📦 [REALTIME-DELIVERY] Novo status: ${newStatus}`);
 
-    // Encontrar o cliente associado a este SPX TN
-    const clientToUpdate = allClients.find(c => c.spx_tn === spxTn);
+    // 🔥 OTIMIZAÇÃO: Atualizar apenas o marcador específico em vez de recarregar todos
+    const markerUpdated = updateSpecificDeliveryMarker(spxTn, newStatus, newRecord);
 
-    // Pequeno delay para garantir que o banco já processou a atualização
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Recarregar marcadores de entrega (verdes/vermelhos) para refletir novo status
-    // skipMapAdjust = true para não mover o mapa
-    if (typeof addDeliveryMarkers === 'function') {
-        console.log('📦 [REALTIME-DELIVERY] Recarregando marcadores de entrega...');
-        await addDeliveryMarkers(true);
+    if (markerUpdated) {
+        console.log(`📦 [REALTIME-DELIVERY] Marcador atualizado localmente para SPX TN: ${spxTn}`);
+    } else {
+        console.log(`📦 [REALTIME-DELIVERY] Marcador não encontrado para SPX TN: ${spxTn}`);
     }
 
     // Mostrar notificação
@@ -8451,12 +8447,135 @@ async function handleDeliveryStatusChange(payload) {
                       newStatus === 'not_delivered' ? '❌ Não Entregue' :
                       '📦 Pendente';
 
-    const clientName = clientToUpdate ?
-        (clientToUpdate.name || clientToUpdate.address?.substring(0, 30) || spxTn) :
-        spxTn;
-
     // Toast removido para evitar poluição visual - status é atualizado silenciosamente
-    console.log(`📦 [REALTIME-DELIVERY] ${clientName} → ${statusText}`);
+    console.log(`📦 [REALTIME-DELIVERY] ${spxTn} → ${statusText}`);
+}
+
+// 🔥 NOVA FUNÇÃO: Atualizar apenas um marcador específico sem recarregar todos
+function updateSpecificDeliveryMarker(spxTn, newStatus, newRecord) {
+    if (!deliveryMarkers || typeof deliveryMarkers !== 'object') {
+        console.warn('📦 [REALTIME-DELIVERY] deliveryMarkers não disponível');
+        return false;
+    }
+
+    // Procurar o marcador que contém esta entrega
+    let targetMarker = null;
+    let targetMarkerKey = null;
+    let targetDeliveryIndex = -1;
+
+    for (const [key, marker] of Object.entries(deliveryMarkers)) {
+        if (!marker || !marker.deliveries) continue;
+
+        const deliveryIndex = marker.deliveries.findIndex(d => d.spx_tn === spxTn);
+        if (deliveryIndex !== -1) {
+            targetMarker = marker;
+            targetMarkerKey = key;
+            targetDeliveryIndex = deliveryIndex;
+            break;
+        }
+    }
+
+    if (!targetMarker) {
+        return false;
+    }
+
+    console.log(`📦 [REALTIME-DELIVERY] Encontrado marcador: ${targetMarkerKey}`);
+
+    // Atualizar o status da entrega no array local
+    targetMarker.deliveries[targetDeliveryIndex].status = newStatus;
+    if (newRecord.delivered_at) {
+        targetMarker.deliveries[targetDeliveryIndex].delivered_at = newRecord.delivered_at;
+    }
+
+    // Verificar se TODAS as entregas deste marcador têm o mesmo status
+    const allDelivered = targetMarker.deliveries.every(d => d.status === 'delivered');
+    const allNotDelivered = targetMarker.deliveries.every(d => d.status === 'not_delivered');
+    const allPending = targetMarker.deliveries.every(d => d.status === 'pending');
+
+    // Atualizar visual do marcador baseado no novo status
+    if (allDelivered) {
+        // Aplicar visual de entregue (cinza, opacidade baixa)
+        targetMarker.isDelivered = true;
+        targetMarker.isNotDelivered = false;
+        if (targetMarker.content) {
+            targetMarker.content.style.opacity = '0.4';
+            targetMarker.content.style.filter = 'grayscale(100%)';
+            const pinDiv = targetMarker.content.querySelector('div');
+            if (pinDiv) {
+                pinDiv.style.background = '#9E9E9E';
+                const innerCircle = pinDiv.querySelector('div');
+                if (innerCircle) {
+                    innerCircle.style.color = '#9E9E9E';
+                }
+            }
+        } else if (targetMarker.setIcon) {
+            // Marcador clássico
+            targetMarker.setIcon({
+                path: google.maps.SymbolPath.CIRCLE,
+                fillColor: '#9E9E9E',
+                fillOpacity: 0.4,
+                strokeColor: 'white',
+                strokeWeight: 2,
+                scale: 10
+            });
+        }
+    } else if (allNotDelivered) {
+        // Aplicar visual de não entregue (cinza com X)
+        targetMarker.isDelivered = false;
+        targetMarker.isNotDelivered = true;
+        if (targetMarker.content) {
+            targetMarker.content.style.opacity = '0.5';
+            targetMarker.content.style.filter = 'grayscale(80%)';
+            const pinDiv = targetMarker.content.querySelector('div');
+            if (pinDiv) {
+                pinDiv.style.background = '#757575';
+                const innerCircle = pinDiv.querySelector('div');
+                if (innerCircle) {
+                    innerCircle.style.color = '#757575';
+                }
+            }
+        } else if (targetMarker.setIcon) {
+            targetMarker.setIcon({
+                path: google.maps.SymbolPath.CIRCLE,
+                fillColor: '#757575',
+                fillOpacity: 0.5,
+                strokeColor: 'white',
+                strokeWeight: 2,
+                scale: 10
+            });
+        }
+    } else if (allPending) {
+        // Restaurar visual original (pendente)
+        targetMarker.isDelivered = false;
+        targetMarker.isNotDelivered = false;
+        if (targetMarker.content) {
+            targetMarker.content.style.opacity = '1';
+            targetMarker.content.style.filter = 'none';
+            // Restaurar cor original baseado no tipo de marcador
+            const isGreen = targetMarkerKey.startsWith('registered_');
+            const pinDiv = targetMarker.content.querySelector('div');
+            if (pinDiv) {
+                pinDiv.style.background = isGreen ? '#4CAF50' : '#EA4335';
+                const innerCircle = pinDiv.querySelector('div');
+                if (innerCircle) {
+                    innerCircle.style.color = isGreen ? '#4CAF50' : '#EA4335';
+                }
+            }
+        } else if (targetMarker.setIcon) {
+            const isGreen = targetMarkerKey.startsWith('registered_');
+            targetMarker.setIcon({
+                path: google.maps.SymbolPath.CIRCLE,
+                fillColor: isGreen ? '#4CAF50' : '#EA4335',
+                fillOpacity: 1,
+                strokeColor: 'white',
+                strokeWeight: 2,
+                scale: 10
+            });
+        }
+    }
+
+    console.log(`📦 [REALTIME-DELIVERY] Visual atualizado - Entregue: ${allDelivered}, Não Entregue: ${allNotDelivered}, Pendente: ${allPending}`);
+    return true;
 }
 
 // Atualizar marcador específico no mapa
