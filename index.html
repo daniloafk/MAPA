@@ -6820,23 +6820,17 @@ function selectDropdownItem(item) {
         modal.classList.remove('quick-mode');
         document.body.style.overflow = '';
 
-        // Verificar se já tem localização ajustada previamente
-        if (selectedLocation) {
-            // Usar a localização já ajustada e salvar diretamente
-            console.log(`⚡ Cadastro rápido com localização pré-ajustada: ${address}`);
-            saveQuickClient(addressDataToSave, selectedLocation).then(() => {
+        // 🔥 CORREÇÃO: Sempre limpar selectedLocation antes de abrir o picker
+        // Isso evita o bug de salvar diretamente sem mostrar o picker
+        selectedLocation = null;
+
+        // Sempre iniciar picker de localização com callback para salvar
+        setTimeout(() => {
+            activateLocationPicker(async (confirmedLocation) => {
+                await saveQuickClient(addressDataToSave, confirmedLocation);
                 closeQuickRegisterMode();
-                selectedLocation = null; // Limpar após usar
             });
-        } else {
-            // Iniciar picker de localização com callback para salvar
-            setTimeout(() => {
-                activateLocationPicker(async (confirmedLocation) => {
-                    await saveQuickClient(addressDataToSave, confirmedLocation);
-                    closeQuickRegisterMode();
-                });
-            }, 300);
-        }
+        }, 300);
 
         console.log(`⚡ Cadastro rápido: ${address}`);
         return;
@@ -6861,12 +6855,15 @@ function selectDropdownItem(item) {
     // Fechar dropdown
     addressDropdown.classList.remove('open');
 
-    // Mostrar endereço selecionado
-    addressDisplay.classList.add('active');
-    addressText.textContent = address;
-
     // Parar câmera (não precisa mais escanear)
     stopCamera();
+
+    // Limpar selectedLocation - será definida pelo picker OU usará GPS no salvamento
+    selectedLocation = null;
+
+    // Mostrar endereço selecionado e aguardar ação do usuário
+    addressDisplay.classList.add('active');
+    addressText.textContent = address;
 
     // Focar no campo nome para preenchimento
     setTimeout(() => {
@@ -6875,7 +6872,7 @@ function selectDropdownItem(item) {
 
     showToast(
         '📍 Endereço selecionado',
-        'Preencha os dados do cliente',
+        'Ajuste a localização ou salve com GPS atual',
         'info',
         3000
     );
@@ -7500,23 +7497,17 @@ async function handleQRCodeResult(qrData) {
             modal.classList.remove('quick-mode');
             document.body.style.overflow = '';
 
-            // Verificar se já tem localização ajustada previamente
-            if (selectedLocation) {
-                // Usar a localização já ajustada e salvar diretamente
-                console.log(`⚡ Cadastro rápido via QR com localização pré-ajustada`);
-                saveQuickClient(addressDataToSave, selectedLocation).then(() => {
+            // 🔥 CORREÇÃO: Sempre limpar selectedLocation antes de abrir o picker
+            // Isso evita o bug de salvar diretamente sem mostrar o picker
+            selectedLocation = null;
+
+            // Sempre iniciar picker de localização com callback para salvar
+            setTimeout(() => {
+                activateLocationPicker(async (confirmedLocation) => {
+                    await saveQuickClient(addressDataToSave, confirmedLocation);
                     closeQuickRegisterMode();
-                    selectedLocation = null; // Limpar após usar
                 });
-            } else {
-                // Iniciar picker de localização com callback para salvar
-                setTimeout(() => {
-                    activateLocationPicker(async (confirmedLocation) => {
-                        await saveQuickClient(addressDataToSave, confirmedLocation);
-                        closeQuickRegisterMode();
-                    });
-                }, 300);
-            }
+            }, 300);
             return;
         }
 
@@ -7529,23 +7520,29 @@ async function handleQRCodeResult(qrData) {
             longitude: addressData.longitude
         };
 
-        // Mostrar formulário normal
+        // Parar câmera
+        stopCamera();
+
+        // Limpar selectedLocation - será definida pelo picker OU usará GPS no salvamento
+        selectedLocation = null;
+
+        // Mostrar formulário normal e aguardar ação do usuário
         showNormalRegistrationForm();
 
         addressText.textContent = addressData.address;
         addressDisplay.classList.add('active');
 
+        // Focar no campo nome para preenchimento
+        setTimeout(() => {
+            inputName.focus();
+        }, 100);
+
         showToast(
             '✓ Endereço encontrado!',
-            'Preencha o nome do cliente',
+            'Ajuste a localização ou salve com GPS atual',
             'success',
             3000
         );
-
-        // Focar automaticamente no campo de nome
-        setTimeout(() => {
-            inputName.focus();
-        }, 500);
     } else {
         // Endereço não encontrado
         if (isQuickRegisterMode) {
@@ -8082,28 +8079,57 @@ form.addEventListener('submit', async (e) => {
         clientData.longitude = selectedLocation.lng;
         console.log('📍 Salvando localização selecionada no mapa:', selectedLocation);
     } else {
-        // Fallback 1: usar posição GPS atual
+        // Fallback 1: usar posição GPS atual (prioridade quando não ajustou no picker)
         let currentPosition = null;
-        if (userLocationMarker) {
+
+        // Tentar obter do gpsTracker primeiro (mais preciso)
+        if (gpsTracker && gpsTracker.markerCoords && gpsTracker.markerCoords.lat !== 0) {
+            currentPosition = {
+                lat: gpsTracker.markerCoords.lat,
+                lng: gpsTracker.markerCoords.lng
+            };
+        } else if (userLocationMarker) {
+            // Fallback para userLocationMarker
             if (userLocationMarker.position) {
-                currentPosition = userLocationMarker.position;
+                currentPosition = {
+                    lat: typeof userLocationMarker.position.lat === 'function'
+                        ? userLocationMarker.position.lat()
+                        : userLocationMarker.position.lat,
+                    lng: typeof userLocationMarker.position.lng === 'function'
+                        ? userLocationMarker.position.lng()
+                        : userLocationMarker.position.lng
+                };
             } else if (userLocationMarker.getPosition) {
-                currentPosition = userLocationMarker.getPosition();
+                const pos = userLocationMarker.getPosition();
+                currentPosition = { lat: pos.lat(), lng: pos.lng() };
             }
         }
 
-        if (currentPosition) {
+        if (currentPosition && currentPosition.lat && currentPosition.lng) {
             clientData.latitude = currentPosition.lat;
             clientData.longitude = currentPosition.lng;
             console.log('📍 Salvando localização GPS atual:', currentPosition);
+            showToast(
+                '📍 Usando GPS atual',
+                'Localização salva com base no GPS',
+                'info',
+                2000
+            );
         } else {
             // Fallback 2: usar coordenadas do QR code se disponíveis
-            if (scannedLatLng) {
+            if (scannedLatLng && scannedLatLng.latitude && scannedLatLng.longitude) {
                 clientData.latitude = scannedLatLng.latitude;
                 clientData.longitude = scannedLatLng.longitude;
                 console.log('📍 Usando coordenadas do QR code:', scannedLatLng);
             } else {
                 console.warn('⚠️ Nenhuma coordenada disponível para salvar');
+                showToast(
+                    '⚠️ Sem localização',
+                    'Ajuste a localização manualmente antes de salvar',
+                    'warning',
+                    4000
+                );
+                return; // Não salvar sem coordenadas
             }
         }
     }
