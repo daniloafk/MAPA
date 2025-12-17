@@ -3146,10 +3146,10 @@ function forceCenterOnGPS() {
         map.setZoom(18);
     }
 
-    // Manter inclinação 3D para navegação (MESMA LÓGICA)
-    if (map.setTilt && map.getTilt() === 0) {
-        map.setTilt(45);
-    }
+    // 🔥 DESABILITADO: Não usar mais inclinação 3D (deixa mapa mais leve)
+    // if (map.setTilt && map.getTilt() === 0) {
+    //     map.setTilt(45);
+    // }
 
     // Resetar flag após um pequeno delay
     setTimeout(() => {
@@ -3801,10 +3801,10 @@ function updateNavigationView() {
             map.setZoom(18);
         }
 
-        // Manter perspectiva 3D para navegação
-        if (map.setTilt && map.getTilt() !== 45) {
-            map.setTilt(45);
-        }
+        // 🔥 DESABILITADO: Não usar mais inclinação 3D (deixa mapa mais leve)
+        // if (map.setTilt && map.getTilt() !== 45) {
+        //     map.setTilt(45);
+        // }
 
         // Resetar flag após um pequeno delay
         setTimeout(() => {
@@ -4483,8 +4483,25 @@ window.initMap = function () {
             disableDefaultUI: false,
             clickableIcons: false, // Desabilita cliques em POIs para melhor performance
             minZoom: 3, // Permite zoom global
-            maxZoom: 22 // Zoom máximo detalhado
+            maxZoom: 22, // Zoom máximo detalhado
+            // 🔥 Desabilitar prédios 3D para melhor performance
+            isFractionalZoomEnabled: false,
+            // Estilos para esconder prédios 3D e deixar mapa mais leve
+            styles: [
+                {
+                    featureType: "poi",
+                    elementType: "labels",
+                    stylers: [{ visibility: "off" }]
+                },
+                {
+                    featureType: "transit",
+                    stylers: [{ visibility: "off" }]
+                }
+            ]
         });
+
+        // 🔥 Desabilitar renderização 3D de prédios (deixa mapa mais leve)
+        map.setTilt(0);
 
         // Inicializar serviços de rota
         directionsService = new google.maps.DirectionsService();
